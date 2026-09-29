@@ -269,16 +269,16 @@ fallback player and the GM UI. Hidden modifiers (later milestones) are never inc
 
 Data in `content/starter/star-chase.json`, fully configurable.
 
-- **Board:** 20-space outer ring plus a 4-space inner shortcut through the Demon's Lair (25 spaces).
+- **Board:** 20-space outer ring plus a 5-space inner shortcut through the Demon's Lair (25 spaces).
 - **Economy:** Coin spaces (+3 gold), Blue spaces (+2 gold; Fishy Blue Bonus), Hazards (lose 2d6 HP),
   a hidden trap (a public-looking space whose hidden rule costs gold), and a private "Stash" resource
   found at the Old Well.
-- **Stars:** a Star Vendor fixture sells a Star for 20 gold and relocates to a random star spot after each
+- **Stars:** a Star Vendor fixture sells a Star for 25 gold and relocates to a random star spot after each
   sale. **Victory:** 3 stars at the end of a round, otherwise most stars after round 20 (ties: gold,
   then shared).
-- **Power sources:** Dojos (+30 Power), Ash Shrine (+60 Power, −15 HP), Gear Shop (Wooden Sword +60 for
+- **Power sources:** Dojos (+40 Power), Ash Shrine (+60 Power, −15 HP), Gear Shop (Wooden Sword +60 for
   6 gold, Guardian Mail +100 for 12, Iron Sword +150 for 15, Demon Blade +300 for 32; carry at most 3),
-  Slimes (+40 Power, +3 gold).
+  Slimes (60 Power, 30 HP; +50 Power and +3 gold when defeated, respawn next round).
 - **The goal enemy:** Demon (500 Power, 300 HP, regenerates 20/round, respawns after 4 rounds). Defeating
   it grants **2 stars** and 20 gold. It ambushes anyone who lands on its lair.
 - **Contestants** start with 80 Power, 100/100 HP, 10 gold.

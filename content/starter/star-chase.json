@@ -1,0 +1,1226 @@
+{
+  "id": "star-chase",
+  "name": "Star Chase",
+  "description": "Collect gold, buy stars from the wandering Star Vendor, and grow strong enough to slay the Demon for two stars of your own.",
+  "rulesLanguageVersion": 1,
+  "settings": {
+    "core": {
+      "hp": "res.hp",
+      "maxHp": "res.max_hp",
+      "power": "res.power",
+      "gold": "res.gold"
+    },
+    "startSpace": "space.harbor_gate",
+    "movement": {
+      "die": 6
+    },
+    "inventoryCapacity": 3,
+    "rest": {
+      "heal": 40
+    },
+    "combat": {
+      "damage": {
+        "base": 25,
+        "ratioExponent": 1,
+        "min": 1,
+        "max": 100
+      },
+      "maxSpinsPerFight": 8
+    },
+    "ko": {
+      "goldLossPercent": 50,
+      "skipTurns": 1
+    },
+    "victory": {
+      "resource": "res.stars",
+      "threshold": 3,
+      "roundLimit": 20,
+      "ranking": [
+        "res.stars",
+        "res.gold",
+        "res.stash"
+      ]
+    }
+  },
+  "resources": [
+    {
+      "id": "res.hp",
+      "name": "HP",
+      "role": "pool",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 100,
+      "min": 0,
+      "max": null,
+      "maxFrom": "res.max_hp",
+      "icon": "❤️"
+    },
+    {
+      "id": "res.max_hp",
+      "name": "Max HP",
+      "role": "stat",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 100,
+      "min": 1,
+      "max": 100000
+    },
+    {
+      "id": "res.power",
+      "name": "Power",
+      "role": "stat",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 80,
+      "min": 1,
+      "max": 1000000,
+      "icon": "⚡"
+    },
+    {
+      "id": "res.gold",
+      "name": "Gold",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 10,
+      "min": 0,
+      "max": 9999,
+      "icon": "🪙"
+    },
+    {
+      "id": "res.stars",
+      "name": "Stars",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 99,
+      "icon": "⭐"
+    },
+    {
+      "id": "res.bananas",
+      "name": "Bananas",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 99,
+      "icon": "🍌"
+    },
+    {
+      "id": "res.stash",
+      "name": "Stash",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 999,
+      "visibility": "owner",
+      "icon": "💰"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag.start",
+      "name": "Start",
+      "appliesTo": "space",
+      "color": "#95a5a6"
+    },
+    {
+      "id": "tag.coin",
+      "name": "Coin",
+      "appliesTo": "space",
+      "color": "#f1c40f"
+    },
+    {
+      "id": "tag.rich_coin",
+      "name": "Rich Coin",
+      "appliesTo": "space",
+      "color": "#f39c12"
+    },
+    {
+      "id": "tag.blue",
+      "name": "Blue",
+      "appliesTo": "space",
+      "color": "#3498db"
+    },
+    {
+      "id": "tag.dojo",
+      "name": "Dojo",
+      "appliesTo": "space",
+      "color": "#e67e22"
+    },
+    {
+      "id": "tag.shrine",
+      "name": "Shrine",
+      "appliesTo": "space",
+      "color": "#c0392b"
+    },
+    {
+      "id": "tag.hazard",
+      "name": "Hazard",
+      "appliesTo": "space",
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "tag.den",
+      "name": "Den",
+      "appliesTo": "space",
+      "color": "#2ecc71"
+    },
+    {
+      "id": "tag.lair",
+      "name": "Lair",
+      "appliesTo": "space",
+      "color": "#8e1b1b"
+    },
+    {
+      "id": "tag.shop",
+      "name": "Shop",
+      "appliesTo": "space",
+      "color": "#9b59b6"
+    },
+    {
+      "id": "tag.well",
+      "name": "Well",
+      "appliesTo": "space",
+      "color": "#16a085"
+    },
+    {
+      "id": "tag.idol",
+      "name": "Idol",
+      "appliesTo": "space",
+      "color": "#d4ac0d"
+    },
+    {
+      "id": "tag.star_spot",
+      "name": "Star Spot",
+      "appliesTo": "space",
+      "color": "#fdfd96"
+    },
+    {
+      "id": "tag.fish",
+      "name": "Fish",
+      "appliesTo": "entity",
+      "color": "#5dade2",
+      "description": "Cosmetic unless rules say otherwise."
+    },
+    {
+      "id": "tag.cursed",
+      "name": "Cursed",
+      "appliesTo": "entity",
+      "color": "#6c3483"
+    },
+    {
+      "id": "tag.demon",
+      "name": "Demon",
+      "appliesTo": "entity",
+      "color": "#922b21"
+    },
+    {
+      "id": "tag.slime",
+      "name": "Slime",
+      "appliesTo": "entity",
+      "color": "#58d68d"
+    },
+    {
+      "id": "tag.star_vendor",
+      "name": "Star Vendor",
+      "appliesTo": "entity",
+      "color": "#f7dc6f"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space.harbor_gate",
+      "name": "Harbor Gate",
+      "tags": [
+        "tag.start"
+      ],
+      "description": "Where every contestant begins, and where the knocked-out return."
+    },
+    {
+      "id": "space.copper_steps",
+      "name": "Copper Steps",
+      "tags": [
+        "tag.coin"
+      ]
+    },
+    {
+      "id": "space.lagoon",
+      "name": "Lagoon",
+      "tags": [
+        "tag.blue"
+      ]
+    },
+    {
+      "id": "space.iron_dojo",
+      "name": "Iron Dojo",
+      "tags": [
+        "tag.dojo"
+      ]
+    },
+    {
+      "id": "space.market_row",
+      "name": "Market Row",
+      "tags": [
+        "tag.coin",
+        "tag.star_spot"
+      ]
+    },
+    {
+      "id": "space.east_crossing",
+      "name": "East Crossing",
+      "tags": [
+        "tag.star_spot"
+      ]
+    },
+    {
+      "id": "space.bramble_pass",
+      "name": "Bramble Pass",
+      "tags": [
+        "tag.hazard"
+      ]
+    },
+    {
+      "id": "space.coin_fountain",
+      "name": "Coin Fountain",
+      "tags": [
+        "tag.coin"
+      ]
+    },
+    {
+      "id": "space.slime_pit",
+      "name": "Slime Pit",
+      "tags": [
+        "tag.den"
+      ]
+    },
+    {
+      "id": "space.old_well",
+      "name": "Old Well",
+      "tags": [
+        "tag.well"
+      ],
+      "description": "Something glints at the bottom. Only the finder knows how much."
+    },
+    {
+      "id": "space.gear_bazaar",
+      "name": "Gear Bazaar",
+      "tags": [
+        "tag.shop"
+      ]
+    },
+    {
+      "id": "space.silver_steps",
+      "name": "Silver Steps",
+      "tags": [
+        "tag.coin"
+      ]
+    },
+    {
+      "id": "space.reef_shallows",
+      "name": "Reef Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.star_spot"
+      ]
+    },
+    {
+      "id": "space.gilded_idol",
+      "name": "Gilded Idol",
+      "tags": [
+        "tag.idol"
+      ],
+      "description": "A beautiful golden idol. Surely harmless."
+    },
+    {
+      "id": "space.watchtower",
+      "name": "Watchtower",
+      "tags": [
+        "tag.star_spot"
+      ]
+    },
+    {
+      "id": "space.stone_dojo",
+      "name": "Stone Dojo",
+      "tags": [
+        "tag.dojo"
+      ]
+    },
+    {
+      "id": "space.toll_bridge",
+      "name": "Toll Bridge",
+      "tags": [
+        "tag.coin"
+      ]
+    },
+    {
+      "id": "space.mossy_den",
+      "name": "Mossy Den",
+      "tags": [
+        "tag.den"
+      ]
+    },
+    {
+      "id": "space.tide_pools",
+      "name": "Tide Pools",
+      "tags": [
+        "tag.blue"
+      ]
+    },
+    {
+      "id": "space.cliff_path",
+      "name": "Cliff Path",
+      "tags": [
+        "tag.hazard",
+        "tag.star_spot"
+      ]
+    },
+    {
+      "id": "space.ember_road",
+      "name": "Ember Road",
+      "tags": [
+        "tag.rich_coin"
+      ]
+    },
+    {
+      "id": "space.ash_shrine",
+      "name": "Ash Shrine",
+      "tags": [
+        "tag.shrine"
+      ],
+      "description": "Power at a price: +60 Power, −15 HP."
+    },
+    {
+      "id": "space.demons_lair",
+      "name": "Demon's Lair",
+      "tags": [
+        "tag.lair"
+      ],
+      "description": "The Demon attacks anyone who lands here."
+    },
+    {
+      "id": "space.obsidian_dojo",
+      "name": "Obsidian Dojo",
+      "tags": [
+        "tag.dojo"
+      ]
+    },
+    {
+      "id": "space.cinder_flats",
+      "name": "Cinder Flats",
+      "tags": [
+        "tag.hazard"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "a": "space.harbor_gate",
+      "b": "space.copper_steps"
+    },
+    {
+      "a": "space.copper_steps",
+      "b": "space.lagoon"
+    },
+    {
+      "a": "space.lagoon",
+      "b": "space.iron_dojo"
+    },
+    {
+      "a": "space.iron_dojo",
+      "b": "space.market_row"
+    },
+    {
+      "a": "space.market_row",
+      "b": "space.east_crossing"
+    },
+    {
+      "a": "space.east_crossing",
+      "b": "space.bramble_pass"
+    },
+    {
+      "a": "space.bramble_pass",
+      "b": "space.coin_fountain"
+    },
+    {
+      "a": "space.coin_fountain",
+      "b": "space.slime_pit"
+    },
+    {
+      "a": "space.slime_pit",
+      "b": "space.old_well"
+    },
+    {
+      "a": "space.old_well",
+      "b": "space.gear_bazaar"
+    },
+    {
+      "a": "space.gear_bazaar",
+      "b": "space.silver_steps"
+    },
+    {
+      "a": "space.silver_steps",
+      "b": "space.reef_shallows"
+    },
+    {
+      "a": "space.reef_shallows",
+      "b": "space.gilded_idol"
+    },
+    {
+      "a": "space.gilded_idol",
+      "b": "space.watchtower"
+    },
+    {
+      "a": "space.watchtower",
+      "b": "space.stone_dojo"
+    },
+    {
+      "a": "space.stone_dojo",
+      "b": "space.toll_bridge"
+    },
+    {
+      "a": "space.toll_bridge",
+      "b": "space.mossy_den"
+    },
+    {
+      "a": "space.mossy_den",
+      "b": "space.tide_pools"
+    },
+    {
+      "a": "space.tide_pools",
+      "b": "space.cliff_path"
+    },
+    {
+      "a": "space.cliff_path",
+      "b": "space.harbor_gate"
+    },
+    {
+      "a": "space.east_crossing",
+      "b": "space.ember_road"
+    },
+    {
+      "a": "space.ember_road",
+      "b": "space.ash_shrine"
+    },
+    {
+      "a": "space.ash_shrine",
+      "b": "space.demons_lair"
+    },
+    {
+      "a": "space.demons_lair",
+      "b": "space.obsidian_dojo"
+    },
+    {
+      "a": "space.obsidian_dojo",
+      "b": "space.cinder_flats"
+    },
+    {
+      "a": "space.cinder_flats",
+      "b": "space.stone_dojo"
+    }
+  ],
+  "layout": {
+    "width": 1000,
+    "height": 760,
+    "positions": {
+      "space.harbor_gate": {
+        "x": 500,
+        "y": 70
+      },
+      "space.copper_steps": {
+        "x": 630,
+        "y": 85
+      },
+      "space.lagoon": {
+        "x": 747,
+        "y": 129
+      },
+      "space.iron_dojo": {
+        "x": 840,
+        "y": 198
+      },
+      "space.market_row": {
+        "x": 899,
+        "y": 284
+      },
+      "space.east_crossing": {
+        "x": 920,
+        "y": 380
+      },
+      "space.bramble_pass": {
+        "x": 899,
+        "y": 476
+      },
+      "space.coin_fountain": {
+        "x": 840,
+        "y": 562
+      },
+      "space.slime_pit": {
+        "x": 747,
+        "y": 631
+      },
+      "space.old_well": {
+        "x": 630,
+        "y": 675
+      },
+      "space.gear_bazaar": {
+        "x": 500,
+        "y": 690
+      },
+      "space.silver_steps": {
+        "x": 370,
+        "y": 675
+      },
+      "space.reef_shallows": {
+        "x": 253,
+        "y": 631
+      },
+      "space.gilded_idol": {
+        "x": 160,
+        "y": 562
+      },
+      "space.watchtower": {
+        "x": 101,
+        "y": 476
+      },
+      "space.stone_dojo": {
+        "x": 80,
+        "y": 380
+      },
+      "space.toll_bridge": {
+        "x": 101,
+        "y": 284
+      },
+      "space.mossy_den": {
+        "x": 160,
+        "y": 198
+      },
+      "space.tide_pools": {
+        "x": 253,
+        "y": 129
+      },
+      "space.cliff_path": {
+        "x": 370,
+        "y": 85
+      },
+      "space.ember_road": {
+        "x": 780,
+        "y": 380
+      },
+      "space.ash_shrine": {
+        "x": 640,
+        "y": 380
+      },
+      "space.demons_lair": {
+        "x": 500,
+        "y": 380
+      },
+      "space.obsidian_dojo": {
+        "x": 360,
+        "y": 380
+      },
+      "space.cinder_flats": {
+        "x": 220,
+        "y": 380
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "item.wooden_sword",
+      "name": "Wooden Sword",
+      "icon": "🗡️",
+      "description": "+60 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 60
+        }
+      ]
+    },
+    {
+      "id": "item.guardian_mail",
+      "name": "Guardian Mail",
+      "icon": "🛡️",
+      "description": "+100 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 100
+        }
+      ]
+    },
+    {
+      "id": "item.iron_sword",
+      "name": "Iron Sword",
+      "icon": "⚔️",
+      "description": "+150 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 150
+        }
+      ]
+    },
+    {
+      "id": "item.demon_blade",
+      "name": "Demon Blade",
+      "icon": "🔥",
+      "description": "+300 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 300
+        }
+      ]
+    }
+  ],
+  "shops": [
+    {
+      "id": "shop.bazaar",
+      "name": "Gear Bazaar",
+      "entries": [
+        {
+          "id": "entry.wooden_sword",
+          "grants": {
+            "item": "item.wooden_sword"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 6
+          }
+        },
+        {
+          "id": "entry.guardian_mail",
+          "grants": {
+            "item": "item.guardian_mail"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 12
+          }
+        },
+        {
+          "id": "entry.iron_sword",
+          "grants": {
+            "item": "item.iron_sword"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 15
+          }
+        },
+        {
+          "id": "entry.demon_blade",
+          "grants": {
+            "item": "item.demon_blade"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 32
+          }
+        }
+      ]
+    },
+    {
+      "id": "shop.stars",
+      "name": "Star Stall",
+      "entries": [
+        {
+          "id": "entry.star",
+          "grants": {
+            "resource": "res.stars",
+            "amount": 1
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 25
+          }
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "id": "enemy.slime",
+      "name": "Slime",
+      "icon": "🟢",
+      "tags": [
+        "tag.slime"
+      ],
+      "power": 60,
+      "maxHp": 30,
+      "regenPerRound": 0,
+      "respawnAfterRounds": 1,
+      "description": "Weak but worth training on.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 50
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ],
+      "spawns": [
+        "space.slime_pit",
+        "space.mossy_den"
+      ]
+    },
+    {
+      "id": "enemy.demon",
+      "name": "Demon",
+      "icon": "👹",
+      "tags": [
+        "tag.demon"
+      ],
+      "power": 500,
+      "maxHp": 300,
+      "regenPerRound": 20,
+      "respawnAfterRounds": 4,
+      "description": "Guards the center of the island. Worth two stars to whoever slays it.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 20
+        },
+        {
+          "op": "announce",
+          "text": "{actor} has slain the Demon!"
+        }
+      ],
+      "spawns": [
+        "space.demons_lair"
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "fixture.bazaar",
+      "name": "Gear Bazaar",
+      "icon": "🏪",
+      "shop": "shop.bazaar",
+      "start": {
+        "space": "space.gear_bazaar"
+      }
+    },
+    {
+      "id": "fixture.star_vendor",
+      "name": "Star Vendor",
+      "icon": "🌟",
+      "tags": [
+        "tag.star_vendor"
+      ],
+      "shop": "shop.stars",
+      "start": {
+        "randomSpaceTag": "tag.star_spot"
+      }
+    }
+  ],
+  "cast": [
+    {
+      "id": "cast.brine",
+      "name": "Captain Brine",
+      "icon": "🏴‍☠️",
+      "color": "#d35400",
+      "persona": {
+        "voice": "Theatrical pirate who brags in nautical metaphors and never apologizes.",
+        "traits": {
+          "risk": 8,
+          "aggression": 7,
+          "greed": 7,
+          "loyalty": 3,
+          "vindictiveness": 8,
+          "sociability": 7
+        },
+        "behaviors": [
+          "Picks fights when the odds favor you, then brags about it.",
+          "Saves gold for big purchases rather than small ones."
+        ]
+      }
+    },
+    {
+      "id": "cast.mira",
+      "name": "Mira the Meticulous",
+      "icon": "📚",
+      "color": "#2980b9",
+      "persona": {
+        "voice": "Precise scholar who calculates everything aloud and distrusts luck.",
+        "traits": {
+          "risk": 2,
+          "aggression": 3,
+          "greed": 5,
+          "loyalty": 7,
+          "vindictiveness": 2,
+          "sociability": 4
+        },
+        "behaviors": [
+          "Only fights when the numbers say you will almost surely win.",
+          "Buys equipment before taking risks."
+        ]
+      }
+    },
+    {
+      "id": "cast.gorp",
+      "name": "Gorp the Hungry",
+      "icon": "🐸",
+      "color": "#27ae60",
+      "persona": {
+        "voice": "Cheerful swamp creature obsessed with snacks and shiny things.",
+        "traits": {
+          "risk": 6,
+          "aggression": 4,
+          "greed": 9,
+          "loyalty": 5,
+          "vindictiveness": 3,
+          "sociability": 8
+        },
+        "behaviors": [
+          "Goes wherever the most gold is.",
+          "Cannot resist a Blue space."
+        ]
+      }
+    },
+    {
+      "id": "cast.vex",
+      "name": "Lady Vex",
+      "icon": "🗡️",
+      "color": "#8e44ad",
+      "persona": {
+        "voice": "Cold, ambitious duelist who speaks in short, cutting sentences.",
+        "traits": {
+          "risk": 7,
+          "aggression": 9,
+          "greed": 4,
+          "loyalty": 2,
+          "vindictiveness": 9,
+          "sociability": 3
+        },
+        "behaviors": [
+          "Trains relentlessly to grow stronger.",
+          "Hunts the strongest enemy she can beat."
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule.coin",
+      "name": "Coin Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.coin",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "rule.rich_coin",
+      "name": "Rich Coin Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.rich_coin",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "rule.blue_gold",
+      "name": "Blue Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.blue",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "rule.fish_blue_bananas",
+      "name": "Fishy Blue Bonus",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.blue"
+        }
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "hasTag",
+            "entity": "$actor",
+            "tag": "tag.fish"
+          },
+          {
+            "op": "not",
+            "cond": {
+              "op": "hasTag",
+              "entity": "$actor",
+              "tag": "tag.cursed"
+            }
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.bananas",
+          "amount": 2
+        }
+      ],
+      "limits": {
+        "maxPerTurn": 1
+      },
+      "provenance": {
+        "sourceText": "Whenever an uncursed contestant tagged as a fish lands on a blue space, give them two bananas."
+      }
+    },
+    {
+      "id": "rule.dojo",
+      "name": "Dojo Training",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dojo",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 40
+        }
+      ]
+    },
+    {
+      "id": "rule.shrine",
+      "name": "Ash Shrine",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.shrine",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 60
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": -15
+        }
+      ]
+    },
+    {
+      "id": "rule.hazard",
+      "name": "Hazard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.hazard",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": {
+            "op": "sub",
+            "a": 0,
+            "b": {
+              "op": "roll",
+              "count": 2,
+              "sides": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.old_well",
+      "name": "Old Well",
+      "description": "Finds a secret amount for your stash.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.well",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": {
+            "op": "roll",
+            "count": 1,
+            "sides": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.idol_curse",
+      "name": "Idol Curse",
+      "visibility": "hidden",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.idol",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": {
+            "op": "sub",
+            "a": 0,
+            "b": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "roll",
+                  "count": 1,
+                  "sides": 4
+                },
+                2
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.demon_ambush",
+      "name": "Demon Ambush",
+      "description": "The Demon attacks anyone who lands on its lair.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.lair",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "fight",
+          "attacker": {
+            "op": "filter",
+            "from": {
+              "op": "at",
+              "space": "$space",
+              "kind": "enemy"
+            },
+            "where": {
+              "op": "hasTag",
+              "entity": "$it",
+              "tag": "tag.demon"
+            }
+          },
+          "defender": "$actor"
+        }
+      ]
+    },
+    {
+      "id": "rule.star_vendor_moves",
+      "name": "Star Vendor Moves",
+      "description": "After selling a star, the vendor relocates to another star spot.",
+      "trigger": {
+        "event": "purchased",
+        "where": {
+          "shopEntry": "entry.star"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$target",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.star_spot",
+            "excludeSpaceOf": "$target"
+          }
+        },
+        {
+          "op": "announce",
+          "text": "The Star Vendor packs up and moves on."
+        }
+      ]
+    }
+  ]
+}

@@ -4,28 +4,32 @@ The first playable version is **M0–M3**. V1 is M0–M7. M8 is post-V1. Each mi
 runnable and `npm run check` green.
 
 ## M0 — Project setup
-- [ ] Single npm package, three tsconfig projects (core / server / web), Vite, Vitest
-- [ ] `.gitignore` additions (`/data/`), `.env.example`, README development section
-- [ ] Import-boundary test (engine cannot import React, Node built-ins, or other layers)
-- [ ] `/api/health` and a placeholder page served through Vite middleware (`npm run dev`)
+- [x] Single npm package, three tsconfig projects (core / server / web), Vite, Vitest
+- [x] `.gitignore` additions (`/data/`), `.env.example`, README development section
+- [x] Import-boundary test (engine cannot import React, Node built-ins, or other layers)
+- [x] `/api/health` and a placeholder page served through Vite middleware (`npm run dev`)
 
 **Done when:** fresh clone → `npm install && npm run check` passes; `npm run dev` serves a page that
 shows the server status.
 
 ## M1 — Headless engine with combat and progression
-- [ ] Zod schemas for definitions and state; version constants
-- [ ] Seeded RNG in state; operations with snapshot rollback; per-rule rollback points; budgets
-- [ ] Rule subset (§5 of ARCHITECTURE): triggers, conditions, numbers, selectors, effects, `maxPerTurn`
-- [ ] Compiler: reference checks, binding checks, static limits, rule index, cycle warnings
-- [ ] Power (stat) and HP (pool) resources; items with Power modifiers; inventory cap
-- [ ] Weighted combat wheel, configurable damage formula, recorded spins, exact fight-odds calculator
-- [ ] Enemies (regen, respawn, rewards); Demon lair ambush via rule; KO outcome for contestants
-- [ ] Turn machine: roll → move decision → landing → main decision (buy / attack / rest / pass)
-- [ ] Star Vendor that relocates; victory at 3 stars or round limit
-- [ ] "Star Chase" starter scenario with Dojos, Ash Shrine, Gear Shop, Slimes, Demon
-- [ ] Explain module: rule text and "why" traces
-- [ ] Heuristic controller (personality-weighted, uses fight odds)
-- [ ] `npm run sim` CLI with match report (rounds, winners, fights, win paths, decision counts)
+- [x] Zod schemas for definitions and state; version constants
+- [x] Seeded RNG in state; operations with snapshot rollback; per-rule rollback points; budgets
+- [x] Rule subset (§5 of ARCHITECTURE): triggers, conditions, numbers, selectors, effects, `maxPerTurn`
+- [x] Compiler: reference checks, binding checks, static limits, rule index, cycle warnings
+- [x] Power (stat) and HP (pool) resources; items with Power modifiers; inventory cap
+- [x] Weighted combat wheel, configurable damage formula, recorded spins, exact fight-odds calculator
+- [x] Enemies (regen, respawn, rewards); Demon lair ambush via rule; KO outcome for contestants
+- [x] Turn machine: roll → move decision → landing → main decision (buy / attack / rest / pass)
+- [x] Star Vendor that relocates; victory at 3 stars or round limit
+- [x] "Star Chase" starter scenario with Dojos, Ash Shrine, Gear Shop, Slimes, Demon
+- [x] Explain module: rule text and "why" traces
+- [x] Heuristic controller (personality-weighted, uses fight odds)
+- [x] `npm run sim` CLI with match report (rounds, winners, fights, win paths, decision counts)
+
+**Status:** done. `npm run sim -- --matches 1000 --seed accept`: 0 rule faults, 0 aborts, 1.74 real
+decisions per turn, median final effective Power 630, 0.58 Demon kills per match, wins spread across
+archetypes (power farmer 416, banker 367, gear-up 150, star chaser 81).
 
 **Done when:** 1,000 seeded sims finish without faults or aborts; the same seed gives the same state
 hash; ≥ 1.5 real decisions per turn with ≥ 2 options; wheel frequencies match shares statistically;
