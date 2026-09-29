@@ -201,6 +201,8 @@ The engine never equalizes an encounter, never scales enemies down, and never re
   `regenPerRound` setting.
 - The engine records every spin (`share`, `roll`, `winner`, `damage`, `hpAfter`). **The UI animation replays
   the recorded result**; it never computes outcomes. The contestant AI only decides whether to fight.
+  During live play the session pauses briefly per spin (speed setting) and the event log holds back
+  the fight's result until the wheel finishes, so the log does not spoil it.
 
 Examples of per-spin chance against a 500-Power demon: 80 → 13.8 %, 250 → 33.3 %, 500 → 50 %,
 1,000 → 66.7 %.
@@ -313,9 +315,10 @@ step, or a teleport that explicitly says `asLanding: true` (default false). Stay
 An operation is the atomic unit: an accepted decision, an automatic phase step, or a GM command.
 
 1. **Pre-check** (no state change): decision ID, state revision, actor, option membership, parameters.
-2. **Begin transaction.** The first version snapshots the state (`structuredClone`) as the rollback
-   point; this is simple and trivially correct at V1 scale. The `Tx` boundary allows a journal later if
-   profiling requires it.
+2. **Begin transaction.** The operation works on a deep copy of the state; each rule firing takes its
+   own copy as a rollback point. This is simple and trivially correct at V1 scale (an operation costs
+   well under a millisecond on the starter board); a mutation journal can replace it behind the same
+   boundary if profiling at M8 scale requires it.
 3. **Root firing:** pay costs first, then the action's effects.
 4. **Each effect** applies its change (with clamping) and records an event.
 5. **Reactions:** after a firing's whole effect list completes, for each emitted event in order,
@@ -426,7 +429,8 @@ never stalls on the AI.
   unset by default. The request shape is verified against the installed SDK; model-specific
   parameter support is verified on first live run (the OpenAI docs site is not reachable from the
   build environment).
-- Mock adapter for tests; heuristic controller when `OPENAI_API_KEY` is absent.
+- Mock adapter for tests and a scripted provider (`TTG_CONTESTANT_PROVIDER=mock`) that exercises
+  the whole model pipeline offline; heuristic controller when `OPENAI_API_KEY` is absent.
 - Natural-language authoring (M7) uses a separately configured model (`TTG_AUTHORING_MODEL`).
 - Metrics per call: input/output/cached/reasoning tokens, latency, attempts, outcome, estimated cost
   from a configurable price table. **Match duration is measured**, not assumed.

@@ -1,7 +1,7 @@
 import { applyToMind, chooseStrategy, decide, ProviderHealth, type ControllerConfig, type DecisionResult } from '../contestants/controller.ts';
 import { newMind, type ContestantMind } from '../contestants/mind.ts';
 import { castCandidates } from '../contestants/strategy.ts';
-import { advance, answerDecision, applyGmCommand, createMatch, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
+import { advance, answerDecision, applyGmCommand, createMatch, nextStepKind, type CompiledGame, type FiringRecord, type OpOutcome } from '../engine/index.ts';
 import { estimateCost, type Price } from '../llm/prices.ts';
 import type { LlmProvider, LlmUsage } from '../llm/port.ts';
 import type { GmCommand } from '../schema/commands.ts';
@@ -48,7 +48,7 @@ export interface OperationRecord {
 }
 
 export interface SessionListener {
-  onCommit?(record: OperationRecord, events: GameEvent[], state: GameState): void;
+  onCommit?(record: OperationRecord, events: GameEvent[], firings: FiringRecord[], state: GameState): void;
   onAiCall?(record: AiCallRecord): void;
   onStatus?(): void;
   onAbort?(message: string): void;
@@ -79,6 +79,7 @@ export class MatchSession {
   readonly deps: SessionDeps;
   state: GameState;
   readonly history: GameEvent[] = [];
+  readonly firings: FiringRecord[] = [];
   readonly operations: OperationRecord[] = [];
   readonly minds = new Map<string, ContestantMind>();
   readonly calls: AiCallRecord[] = [];
@@ -88,6 +89,8 @@ export class MatchSession {
   paused = true;
   running = false;
   stepDelayMs = 0;
+  /** Extra pause per combat spin so live viewers can watch the wheel. */
+  spinDelayMs = 0;
   abortedMessage: string | null = null;
   /** Wall-clock time spent running (not paused), for match-duration metrics. */
   activeMs = 0;
@@ -139,9 +142,10 @@ export class MatchSession {
   }
 
   /** Restores a saved match. */
-  static restore(game: CompiledGame, state: GameState, history: GameEvent[], minds: ContestantMind[], deps: SessionDeps, activeMs = 0): MatchSession {
+  static restore(game: CompiledGame, state: GameState, history: GameEvent[], firings: FiringRecord[], minds: ContestantMind[], deps: SessionDeps, activeMs = 0): MatchSession {
     const session = new MatchSession(game, state, deps);
     session.history.push(...history);
+    session.firings.push(...firings);
     for (const m of minds) session.minds.set(m.entityId, m);
     session.activeMs = activeMs;
     return session;
@@ -160,12 +164,17 @@ export class MatchSession {
     return this.inFlight ? (this.state.pendingDecision?.actor ?? null) : null;
   }
 
-  private commit(record: OperationRecord, events: GameEvent[]): void {
+  private commit(record: OperationRecord, events: GameEvent[], firings: FiringRecord[] = []): void {
     const rec = { ...record, eventCount: events.length, firstSeq: events[0]?.seq ?? null, lastSeq: events.at(-1)?.seq ?? null };
     this.history.push(...events);
+    this.firings.push(...firings);
     this.operations.push(rec);
-    for (const l of this.listeners) l.onCommit?.(rec, events, this.state);
+    this.lastSpins = events.filter((e) => e.type === 'spin').length;
+    for (const l of this.listeners) l.onCommit?.(rec, events, firings, this.state);
   }
+
+  /** Spins in the most recent operation (used to pace live viewing). */
+  private lastSpins = 0;
 
   private notifyStatus(): void {
     for (const l of this.listeners) l.onStatus?.();
@@ -174,7 +183,7 @@ export class MatchSession {
   private apply(out: OpOutcome, kind: OperationRecord['kind'], input: unknown): OpOutcome {
     if (out.ok) {
       this.state = out.state;
-      this.commit({ rev: out.state.rev, kind, input, eventCount: 0, firstSeq: null, lastSeq: null }, out.events);
+      this.commit({ rev: out.state.rev, kind, input, eventCount: 0, firstSeq: null, lastSeq: null }, out.events, out.firings);
     } else if (out.kind === 'aborted') {
       this.abortedMessage = out.message;
       this.paused = true;
@@ -297,9 +306,13 @@ export class MatchSession {
         while (!this.paused && !this.over) {
           const t0 = this.now();
           const r = await this.step();
+          if (r === 'aborted') {
+            this.activeMs += this.now() - t0;
+            break;
+          }
+          const pause = (r === 'progress' ? this.stepDelayMs : 0) + this.lastSpins * this.spinDelayMs;
+          if (pause > 0) await new Promise((res) => setTimeout(res, pause));
           this.activeMs += this.now() - t0;
-          if (r === 'aborted') break;
-          if (this.stepDelayMs > 0) await new Promise((res) => setTimeout(res, this.stepDelayMs));
         }
       } finally {
         this.running = false;

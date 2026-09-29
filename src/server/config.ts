@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
+  TTG_CONTESTANT_PROVIDER: z.enum(['auto', 'openai', 'mock', 'offline']).default('auto'),
   TTG_CONTESTANT_MODEL: z.string().default('gpt-6-luna'),
   TTG_CONTESTANT_REASONING_EFFORT: z.string().optional(),
   TTG_AUTHORING_MODEL: z.string().optional(),
@@ -11,6 +12,8 @@ const EnvSchema = z.object({
 
 export interface ServerConfig {
   openaiApiKey: string | null;
+  /** auto = OpenAI when a key is set, otherwise the offline controller. mock = scripted offline provider. */
+  contestantProvider: 'auto' | 'openai' | 'mock' | 'offline';
   contestantModel: string;
   contestantReasoningEffort: string | null;
   authoringModel: string | null;
@@ -29,6 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ServerConfig {
   const parsed = EnvSchema.parse(cleaned);
   return {
     openaiApiKey: parsed.OPENAI_API_KEY ?? null,
+    contestantProvider: parsed.TTG_CONTESTANT_PROVIDER,
     contestantModel: parsed.TTG_CONTESTANT_MODEL,
     contestantReasoningEffort: parsed.TTG_CONTESTANT_REASONING_EFFORT ?? null,
     authoringModel: parsed.TTG_AUTHORING_MODEL ?? null,

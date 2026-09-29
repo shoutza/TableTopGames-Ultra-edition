@@ -56,16 +56,23 @@ key); hidden-pair and failure tests pass; the report shows packet sizes, fallbac
 duration.
 
 ## M3 — GM app (first playable version)
-- [ ] Coordinator per match: engine loop, controllers, pause / resume / step, invalidation of
+- [x] Coordinator per match: engine loop, controllers, pause / resume / step, invalidation of
       outstanding decisions after GM edits
-- [ ] HTTP commands + SSE updates
-- [ ] Persistence: snapshot on round end and on save, `history.jsonl`, load after restart
-- [ ] React UI: SVG board, standings (Power, HP, gold, stars), event log with "why?" traces
-- [ ] Combat wheel animation replaying recorded spins
-- [ ] Contestant inspector (persona, strategy, plan, last packet) and "view as contestant"
-- [ ] GM interventions: adjust resource (HP, Power, gold…), add/remove tag, teleport (as-landing
+- [x] HTTP commands + SSE updates
+- [x] Persistence: snapshot on round end and on save, `history.jsonl`, load after restart
+- [x] React UI: SVG board, standings (Power, HP, gold, stars), event log with "why?" traces
+- [x] Combat wheel animation replaying recorded spins
+- [x] Contestant inspector (persona, strategy, plan, last packet) and "view as contestant"
+- [x] GM interventions: adjust resource (HP, Power, gold…), add/remove tag, teleport (as-landing
       checkbox), grant item, announce
-- [ ] Match duration and AI cost shown in the UI
+- [x] Match duration and AI cost shown in the UI
+
+**Status:** done. Verified in headless Chromium against the running app (scripted provider): at
+round 3 a contestant tagged Fish got no bananas from a non-landing teleport onto the Lagoon and +2 from a
+landing one, with the "why" trace showing the rule and its checks; a Demon fight played on the wheel
+with the log held back until the animation finished; after save → server restart → reload the state
+hash was identical and the match resumed. Live watching with `gpt-6-luna` still needs a first run on a
+machine with API access (the build environment cannot reach api.openai.com).
 
 **Done when:** the GM starts a match with 4 contestants, pauses in round 3, tags one as Fish, teleports
 it onto a Blue space with "counts as landing" off (no bananas) and then on (bananas, trace explains),

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,9 +20,7 @@ export function loadStarter(): CompiledGame {
   return loaded.game;
 }
 
-export function stateHash(state: GameState): string {
-  return createHash('sha256').update(JSON.stringify(state)).digest('hex').slice(0, 16);
-}
+export { stateHash } from '../server/hash.ts';
 
 export interface HeadlessResult {
   state: GameState;
