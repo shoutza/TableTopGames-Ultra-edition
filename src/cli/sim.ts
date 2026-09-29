@@ -1,10 +1,17 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { describeEvent, namesFor } from '../engine/index.ts';
+import { loadConfig } from '../server/config.ts';
+import { contestantPrice, contestantProvider, controllerConfig, scriptedProvider } from '../server/providers.ts';
+import { MatchSession } from '../server/session.ts';
 import { loadStarter, runHeadlessMatch, stateHash } from './headless.ts';
 
 /**
- * npm run sim -- [--matches N] [--seed S] [--log]
- * Runs headless matches with the offline heuristic player and prints a balance report.
+ * npm run sim -- [--matches N] [--seed S] [--log] [--controllers heuristic|llm|mock]
+ * heuristic: offline balance report over many matches.
+ * llm: one match with model-driven contestants (OPENAI_API_KEY), with a cost/latency report.
+ * mock: one match through the full model pipeline with a scripted offline provider.
  */
 
 const { values } = parseArgs({
@@ -12,10 +19,35 @@ const { values } = parseArgs({
     matches: { type: 'string', default: '1' },
     seed: { type: 'string', default: 'sim' },
     log: { type: 'boolean', default: false },
+    controllers: { type: 'string', default: 'heuristic' },
   },
 });
 
 const game = loadStarter();
+
+if (values.controllers === 'llm' || values.controllers === 'mock') {
+  const config = loadConfig(process.env);
+  const provider = values.controllers === 'mock' ? scriptedProvider() : contestantProvider(config);
+  if (!provider) console.warn('No OPENAI_API_KEY set: contestants will use the offline controller.');
+  const session = await MatchSession.create(game, { matchId: `sim-${values.seed}`, seed: values.seed }, { provider, config: controllerConfig(config), price: contestantPrice(config) });
+  for (const [id, mind] of session.minds) console.log(`${session.state.entities[id]?.name}: ${mind.strategy?.archetype} — ${mind.strategy?.summary}`);
+  const started = Date.now();
+  await session.runToEnd();
+  const names = namesFor(game, session.state);
+  if (values.log) for (const e of session.history) console.log(`[r${e.round}] ${describeEvent(e, names)}`);
+  const dir = path.join(config.dataDir, 'sim');
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${session.matchId}-ai-calls.jsonl`);
+  writeFileSync(file, session.calls.map((c) => JSON.stringify(c)).join('\n') + '\n');
+  const m = session.metrics();
+  console.log(`\nMatch ${session.matchId}: ${session.state.endReason ?? 'not finished'} after ${m.rounds} rounds · winners ${(session.state.winners ?? []).map((w) => names.entity(w)).join(', ')}`);
+  console.log(`wall clock ${((Date.now() - started) / 1000).toFixed(1)}s · model time ${(m.matchDurationMs / 1000).toFixed(1)}s`);
+  console.log(`decisions ${m.decisions} ${JSON.stringify(m.bySource)} · model requests ${m.modelRequests} · fallback rate ${(m.fallbackRate * 100).toFixed(1)}% · obsolete ${m.obsolete}`);
+  console.log(`tokens in ${m.usage.inputTokens} (cached ${m.usage.cachedInputTokens}) · out ${m.usage.outputTokens} (reasoning ${m.usage.reasoningTokens}) · est. cost ${m.costUsd === null ? 'unknown' : `$${m.costUsd.toFixed(4)}`}`);
+  console.log(`latency p50 ${m.latencyMs.p50}ms p95 ${m.latencyMs.p95}ms · packet tokens (est.) p50 ${m.packetTokens.p50} p95 ${m.packetTokens.p95}${m.providerTripped ? ' · PROVIDER CIRCUIT BREAKER TRIPPED' : ''}`);
+  console.log(`AI call log: ${file}`);
+  process.exit(0);
+}
 const n = Math.max(1, Number(values.matches));
 const core = game.def.settings.core;
 const victory = game.def.settings.victory.resource;

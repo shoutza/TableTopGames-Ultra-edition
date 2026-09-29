@@ -37,13 +37,19 @@ a looping ruleset is aborted, rolled back exactly and flagged by the compiler; t
 contestants gaining Power and at least some Demon defeats.
 
 ## M2 — AI contestants (headless)
-- [ ] `ContestantView` projection, event redaction, view-safe previews (combat odds included)
-- [ ] Persona, archetype casting, strategy selection, current plan, reconsider flags
-- [ ] Packet builder with token-size report
-- [ ] Fixed response schema, validation, one repair retry, heuristic fallback, circuit breaker
-- [ ] OpenAI Responses adapter (`gpt-6-luna`, configurable) and mock adapter
-- [ ] Call metrics (tokens, latency, attempts, outcome, estimated cost) written to `ai-calls.jsonl`
-- [ ] Hidden-information pair tests; mock failure-scenario tests
+- [x] `ContestantView` projection, event redaction, view-safe previews (combat odds included)
+- [x] Persona, archetype casting, strategy selection, current plan, reconsider flags
+- [x] Packet builder with token-size report
+- [x] Fixed response schema, validation, one repair retry, heuristic fallback, circuit breaker
+- [x] OpenAI Responses adapter (`gpt-6-luna`, configurable) and mock adapter
+- [x] Call metrics (tokens, latency, attempts, outcome, estimated cost) written to `ai-calls.jsonl`
+- [x] Hidden-information pair tests; mock failure-scenario tests
+
+**Status:** done, except a live run against the OpenAI API: `api.openai.com` is blocked by the build
+environment's egress policy. The adapter is verified against the installed `openai` SDK types and a fake
+`fetch`; `npm run sim -- --controllers mock` runs the full pipeline offline (repairs exercised, 0 %
+fallback, packet p50 ≈ 1.5k / p95 ≈ 2.0k estimated tokens); `--controllers llm` without a key falls back
+cleanly. First live run: set `OPENAI_API_KEY` and run `npm run sim -- --controllers llm`.
 
 **Done when:** `npm run sim -- --controllers llm` completes a match (or cleanly falls back without a
 key); hidden-pair and failure tests pass; the report shows packet sizes, fallback rate and match

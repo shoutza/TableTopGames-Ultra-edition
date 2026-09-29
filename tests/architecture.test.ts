@@ -16,7 +16,7 @@ const RULES: Record<string, { internal: string[]; packages: string[] }> = {
   visibility: { internal: ['visibility/', 'engine/', 'schema/'], packages: [] },
   contestants: {
     internal: ['contestants/', 'visibility/', 'schema/', 'llm/port.ts', 'engine/combat.ts', 'engine/explain.ts'],
-    packages: [],
+    packages: ['zod'],
   },
   shared: { internal: ['shared/', 'schema/'], packages: [] },
   web: { internal: ['web/', 'shared/', 'schema/'], packages: ['react', 'react-dom', 'zod'] },

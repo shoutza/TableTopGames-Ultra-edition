@@ -37,7 +37,7 @@ export function makeNames(source: NameSource, entityNames: (id: string) => strin
     entry: (id) => {
       const grants = source.shopEntries.get(id)?.entry.grants;
       if (!grants) return id;
-      return 'item' in grants ? names.item(grants.item) : `${grants.amount} ${names.resource(grants.resource)}`;
+      return 'item' in grants ? names.item(grants.item) : `${names.resource(grants.resource)} ×${grants.amount}`;
     },
   };
   return names;
@@ -64,6 +64,17 @@ function ref(r: EntityRef, n: Names, b?: BoundNames): string {
   return r === '$actor' ? 'they' : r === '$target' ? 'the target' : 'it';
 }
 
+/** Object form of a reference ("them" instead of "they"). */
+function refObj(r: EntityRef, n: Names, b?: BoundNames): string {
+  const s = ref(r, n, b);
+  return s === 'they' ? 'them' : s;
+}
+
+/** Picks the verb form that agrees with a subject ("they gain" / "Ann gains"). */
+function verb(subject: string, singular: string, plural: string): string {
+  return subject === 'they' || subject === 'you' ? plural : singular;
+}
+
 export function describeSpaceRef(r: SpaceRef, n: Names, b?: BoundNames): string {
   if (r === '$space') return b?.$space !== undefined ? n.space(b.$space) : 'that space';
   switch (r.op) {
@@ -87,8 +98,11 @@ export function describeSelector(s: Selector, n: Names, b?: BoundNames): string 
       return `${s.kind ? `every ${KIND_PLURAL[s.kind]}` : 'everyone'} at ${describeSpaceRef(s.space, n, b)}`;
     case 'withTag':
       return `every ${s.kind ? KIND_PLURAL[s.kind] : 'one'} tagged ${n.tag(s.tag)}`;
-    case 'filter':
-      return `${describeSelector(s.from, n, b)} who ${describeCond(s.where, n, b)}`;
+    case 'filter': {
+      const w = s.where;
+      if (w.op === 'hasTag' && w.entity === '$it') return `${describeSelector(s.from, n, b)} tagged ${n.tag(w.tag)}`;
+      return `${describeSelector(s.from, n, b)} where ${describeCond(w, n, b)}`;
+    }
     case 'random':
       return `${s.count} random ${describeSelector(s.from, n, b)}`;
   }
@@ -134,14 +148,20 @@ export function describeCond(c: Cond, n: Names, b?: BoundNames): string {
       return `(${c.conds.map((x) => describeCond(x, n, b)).join(' or ')})`;
     case 'not':
       return negate(c.cond, n, b);
-    case 'hasTag':
-      return `${ref(c.entity, n, b)} is tagged ${n.tag(c.tag)}`;
+    case 'hasTag': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'is', 'are')} tagged ${n.tag(c.tag)}`;
+    }
     case 'spaceHasTag':
       return `${describeSpaceRef(c.space, n, b)} is a ${n.tag(c.tag)} space`;
-    case 'isKind':
-      return `${ref(c.entity, n, b)} is a ${c.kind}`;
-    case 'holds':
-      return `${ref(c.entity, n, b)} holds ${n.item(c.item)}`;
+    case 'isKind': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'is', 'are')} a ${c.kind}`;
+    }
+    case 'holds': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'holds', 'hold')} ${n.item(c.item)}`;
+    }
     case 'compare':
       return `${describeNum(c.left, n, b)} ${c.cmp === '==' ? '=' : c.cmp === '!=' ? '≠' : c.cmp === '<=' ? '≤' : c.cmp === '>=' ? '≥' : c.cmp} ${describeNum(c.right, n, b)}`;
     case 'exists':
@@ -151,42 +171,69 @@ export function describeCond(c: Cond, n: Names, b?: BoundNames): string {
 
 function negate(c: Cond, n: Names, b?: BoundNames): string {
   switch (c.op) {
-    case 'hasTag':
-      return `${ref(c.entity, n, b)} is not tagged ${n.tag(c.tag)}`;
+    case 'hasTag': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'is', 'are')} not tagged ${n.tag(c.tag)}`;
+    }
     case 'spaceHasTag':
       return `${describeSpaceRef(c.space, n, b)} is not a ${n.tag(c.tag)} space`;
-    case 'isKind':
-      return `${ref(c.entity, n, b)} is not a ${c.kind}`;
-    case 'holds':
-      return `${ref(c.entity, n, b)} does not hold ${n.item(c.item)}`;
+    case 'isKind': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'is', 'are')} not a ${c.kind}`;
+    }
+    case 'holds': {
+      const who = ref(c.entity, n, b);
+      return `${who} ${verb(who, 'does', 'do')} not hold ${n.item(c.item)}`;
+    }
     default:
       return `not (${describeCond(c, n, b)})`;
   }
+}
+
+/** "0 − X" reads better as a loss of X. */
+function asLoss(x: Num): Num | null {
+  if (typeof x === 'number') return x < 0 ? -x : null;
+  if (x.op === 'sub' && x.a === 0) return x.b;
+  return null;
 }
 
 export function describeEffect(e: Effect, n: Names, b?: BoundNames): string {
   switch (e.op) {
     case 'changeResource': {
       const who = describeSelector(e.target, n, b);
-      if (typeof e.amount === 'number') {
-        return e.amount >= 0 ? `${who} gain ${e.amount} ${n.resource(e.resource)}` : `${who} lose ${-e.amount} ${n.resource(e.resource)}`;
-      }
-      return `${who}: ${n.resource(e.resource)} changes by ${describeNum(e.amount, n, b)}`;
+      const loss = asLoss(e.amount);
+      if (loss !== null) return `${who} ${verb(who, 'loses', 'lose')} ${describeNum(loss, n, b)} ${n.resource(e.resource)}`;
+      return `${who} ${verb(who, 'gains', 'gain')} ${describeNum(e.amount, n, b)} ${n.resource(e.resource)}`;
     }
-    case 'setResource':
-      return `${describeSelector(e.target, n, b)}: ${n.resource(e.resource)} becomes ${describeNum(e.value, n, b)}`;
-    case 'transfer':
-      return `${ref(e.from, n, b)} gives ${describeNum(e.amount, n, b)} ${n.resource(e.resource)} to ${ref(e.to, n, b)}${e.ifShort === 'skip' ? ' (only if they have enough)' : ''}`;
-    case 'addTag':
-      return `${describeSelector(e.target, n, b)} become tagged ${n.tag(e.tag)}`;
-    case 'removeTag':
-      return `${describeSelector(e.target, n, b)} lose the ${n.tag(e.tag)} tag`;
-    case 'teleport':
-      return `${describeSelector(e.target, n, b)} teleport to ${describeSpaceRef(e.to, n, b)}${e.asLanding ? ' (counts as landing)' : ' (not a landing)'}`;
-    case 'grantItem':
-      return `${ref(e.target, n, b)} receive ${e.count && e.count > 1 ? `${e.count}× ` : ''}${n.item(e.item)}`;
-    case 'fight':
-      return `${describeSelector(e.attacker, n, b)} attacks ${describeSelector(e.defender, n, b)} (combat wheel)`;
+    case 'setResource': {
+      const who = describeSelector(e.target, n, b);
+      return `${who === 'they' ? 'their' : `${who}'s`} ${n.resource(e.resource)} becomes ${describeNum(e.value, n, b)}`;
+    }
+    case 'transfer': {
+      const who = ref(e.from, n, b);
+      return `${who} ${verb(who, 'gives', 'give')} ${describeNum(e.amount, n, b)} ${n.resource(e.resource)} to ${refObj(e.to, n, b)}${e.ifShort === 'skip' ? ' (only if they have enough)' : ''}`;
+    }
+    case 'addTag': {
+      const who = describeSelector(e.target, n, b);
+      return `${who} ${verb(who, 'becomes', 'become')} tagged ${n.tag(e.tag)}`;
+    }
+    case 'removeTag': {
+      const who = describeSelector(e.target, n, b);
+      return `${who} ${verb(who, 'loses', 'lose')} the ${n.tag(e.tag)} tag`;
+    }
+    case 'teleport': {
+      const who = describeSelector(e.target, n, b);
+      return `${who} ${verb(who, 'teleports', 'teleport')} to ${describeSpaceRef(e.to, n, b)}${e.asLanding ? ' (counts as landing)' : ' (not a landing)'}`;
+    }
+    case 'grantItem': {
+      const who = ref(e.target, n, b);
+      return `${who} ${verb(who, 'receives', 'receive')} ${e.count && e.count > 1 ? `${e.count}× ` : ''}${n.item(e.item)}`;
+    }
+    case 'fight': {
+      const attacker = describeSelector(e.attacker, n, b);
+      const defender = describeSelector(e.defender, n, b);
+      return `${attacker} ${verb(attacker, 'attacks', 'attack')} ${defender === 'they' ? 'them' : defender} (combat wheel)`;
+    }
     case 'announce':
       return `announce "${e.text}"`;
     case 'if':
@@ -194,14 +241,17 @@ export function describeEffect(e: Effect, n: Names, b?: BoundNames): string {
     case 'forEach':
       return `for each of ${describeSelector(e.of, n, b)}: ${describeEffects(e.do, n, b)}`;
     case 'randomBranch': {
-      const total = e.branches.reduce((s, br) => s + br.weight, 0);
+      const total = e.branches.reduce((sum, br) => sum + br.weight, 0);
       return `at random: ${e.branches.map((br) => `${Math.round((br.weight / total) * 100)}% ${describeEffects(br.do, n, b) || 'nothing'}`).join('; or ')}`;
     }
   }
 }
 
-export function describeEffects(effects: Effect[], n: Names, b?: BoundNames): string {
-  return effects.map((e) => describeEffect(e, n, b)).join(', then ');
+export function describeEffects(effects: Effect[], n: Names, b?: BoundNames, options: { skipAnnouncements?: boolean } = {}): string {
+  return effects
+    .filter((e) => !(options.skipAnnouncements && e.op === 'announce'))
+    .map((e) => describeEffect(e, n, b))
+    .join(', then ');
 }
 
 export function describeTrigger(t: Trigger, n: Names): string {

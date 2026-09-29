@@ -184,7 +184,10 @@ function fightHint(game: CompiledGame, state: GameState, names: Names, me: strin
     theirPower,
     theirHp,
     odds: mineOdds,
-    rewards: enemyDef && enemyDef.rewards.length > 0 ? describeEffects(enemyDef.rewards, names, { $actor: me, $target: opponent }) : null,
+    rewards:
+      enemyDef && enemyDef.rewards.length > 0
+        ? describeEffects(enemyDef.rewards, { ...names, entity: (id) => (id === me ? 'you' : names.entity(id)) }, { $actor: me, $target: opponent }, { skipAnnouncements: true })
+        : null,
   };
 }
 
@@ -328,7 +331,7 @@ function previewOption(game: CompiledGame, redacted: GameState, names: Names, vi
 }
 
 /** Builds the viewer's view from authoritative state; hidden values never enter it. */
-export function buildContestantView(game: CompiledGame, state: GameState, viewer: string, history: GameEvent[], recentLimit = 12): ContestantView {
+export function buildContestantView(game: CompiledGame, state: GameState, viewer: string, history: GameEvent[], recentLimit = 80): ContestantView {
   const redacted = redactStateFor(game, state, viewer);
   const names = namesFor(game, redacted);
   const entities: ViewEntity[] = Object.values(redacted.entities).map((e) => {

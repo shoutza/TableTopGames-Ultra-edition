@@ -52,7 +52,7 @@ export function publicInfo(game: CompiledGame): PublicGameInfo {
       regenPerRound: e.regenPerRound,
       respawnAfterRounds: e.respawnAfterRounds,
       rewards: e.rewards,
-      rewardsText: describeEffects(e.rewards, names, {}),
+      rewardsText: describeEffects(e.rewards, names, {}, { skipAnnouncements: true }),
       description: e.description,
     })),
     rules: [...game.rules.values()]
