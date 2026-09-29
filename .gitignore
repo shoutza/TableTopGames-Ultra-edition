@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# --- TableTopGames Ultra Edition ---
+# Local match saves, histories and AI call logs (may contain full prompts)
+/data/
+# Generated web bundle and simulation reports
+/dist-web/
+/reports/
