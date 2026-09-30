@@ -27,6 +27,7 @@ provider. Local saves, event histories and AI call logs are written to `data/` (
 
 ```sh
 npm run sim -- --matches 200                 # balance report with the offline controller
+npm run sim -- --matches 200 --rounds 30     # longer matches (no early win) to hunt rule faults
 npm run sim -- --seed demo --log             # one match, full event log
 npm run sim -- --controllers mock            # one match through the model pipeline, offline
 npm run sim -- --controllers llm             # one match with gpt-6-luna (needs OPENAI_API_KEY)
@@ -38,7 +39,9 @@ npm run sim -- --controllers llm             # one match with gpt-6-luna (needs 
 2. Click a token or standings row to inspect it: stats (base vs. effective Power), items,
    personality, strategy, plan, and **View as contestant** (the exact packet its model sees).
 3. **GM tools** act on the selected entity: adjust or set resources, add/remove tags, teleport
-   (tick *counts as landing* to trigger landing rules), give items, announce. Tick *silent
+   (tick *counts as landing* to trigger landing rules), give items, apply or remove statuses,
+   transform (e.g. into Fish Form), make it draw a card (the GM sees the next card first), remove
+   it from the board, spawn an enemy or boss (the Kraken) on its space, announce. Tick *silent
    correction* to change state without triggering rules.
 4. Fights play on the combat wheel, replaying the engine's recorded spins. Click any log line to
    see why it happened (rule, triggering event, conditions checked).

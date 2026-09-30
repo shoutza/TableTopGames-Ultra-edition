@@ -1,7 +1,7 @@
 import type { Cond, EntityRef, Num, Selector, SpaceRef } from '../schema/rules.ts';
 import type { GameState } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
-import { effectiveValue, getEntity, orderedEntityIds } from './queries.ts';
+import { effectiveValue, getEntity, hasEffectiveTag, orderedEntityIds, statusOf } from './queries.ts';
 import { RuleFault, divide } from './util.ts';
 import { describeCond, namesFor } from './explain.ts';
 
@@ -22,6 +22,8 @@ export interface Bindings {
   $actor?: string | undefined;
   $target?: string | undefined;
   $it?: string | undefined;
+  /** Entity holding the item / status / enemy definition an attached rule belongs to. */
+  $holder?: string | undefined;
   $space?: string | undefined;
   amount?: number | undefined;
 }
@@ -90,7 +92,7 @@ export function evalSelector(env: EvalEnv, sel: Selector, b: Bindings): string[]
       case 'withTag':
         result = orderedEntityIds(env.state).filter((id) => {
           const e = env.state.entities[id];
-          return isSelectable(env, id) && e?.tags.includes(sel.tag) === true && (sel.kind === undefined || e.kind === sel.kind);
+          return e !== undefined && isSelectable(env, id) && hasEffectiveTag(env.game, e, sel.tag) && (sel.kind === undefined || e.kind === sel.kind);
         });
         break;
       case 'filter': {
@@ -105,6 +107,22 @@ export function evalSelector(env: EvalEnv, sel: Selector, b: Bindings): string[]
           const i = env.random(pool.length);
           result.push(pool.splice(i, 1)[0] as string);
         }
+        break;
+      }
+      case 'leader':
+      case 'trailer': {
+        // Active contestants with the most / fewest of a resource (base value); ties return everyone tied.
+        const scored = env.state.turnOrder
+          .filter((id) => isSelectable(env, id))
+          .map((id) => ({ id, v: env.state.entities[id]?.resources[sel.resource] }))
+          .filter((x): x is { id: string; v: number } => x.v !== undefined);
+        if (scored.length === 0) {
+          result = [];
+          break;
+        }
+        const best = sel.op === 'leader' ? Math.max(...scored.map((x) => x.v)) : Math.min(...scored.map((x) => x.v));
+        const winners = new Set(scored.filter((x) => x.v === best).map((x) => x.id));
+        result = orderedEntityIds(env.state).filter((id) => winners.has(id));
         break;
       }
     }
@@ -149,6 +167,8 @@ export function evalNum(env: EvalEnv, num: Num, b: Bindings): number {
     case 'amount':
       if (b.amount === undefined) throw new RuleFault('no amount in this context');
       return b.amount;
+    case 'stacks':
+      return statusOf(getEntity(env.state, evalEntityRef(env, num.of, b)), num.status)?.stacks ?? 0;
   }
 }
 
@@ -170,7 +190,7 @@ export function evalCond(env: EvalEnv, cond: Cond, b: Bindings, trace?: Array<{ 
     case 'not':
       return record(!evalCond(env, cond.cond, b));
     case 'hasTag':
-      return record(getEntity(env.state, evalEntityRef(env, cond.entity, b)).tags.includes(cond.tag));
+      return record(hasEffectiveTag(env.game, getEntity(env.state, evalEntityRef(env, cond.entity, b)), cond.tag));
     case 'spaceHasTag':
       return record(env.game.spaces.get(evalSpaceRef(env, cond.space, b))?.tags.includes(cond.tag) === true);
     case 'isKind':
@@ -188,5 +208,16 @@ export function evalCond(env: EvalEnv, cond: Cond, b: Bindings, trace?: Array<{ 
     }
     case 'exists':
       return record(evalSelector(env, cond.of, b).length > 0);
+    case 'hasStatus': {
+      const s = statusOf(getEntity(env.state, evalEntityRef(env, cond.entity, b)), cond.status);
+      return record(s !== undefined && s.stacks >= (cond.minStacks ?? 1));
+    }
+    case 'same':
+      return record(evalEntityRef(env, cond.a, b) === evalEntityRef(env, cond.b, b));
+    case 'sameSpace': {
+      const a = getEntity(env.state, evalEntityRef(env, cond.a, b)).spaceId;
+      const c = getEntity(env.state, evalEntityRef(env, cond.b, b)).spaceId;
+      return record(a !== null && a === c);
+    }
   }
 }

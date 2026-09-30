@@ -1,8 +1,12 @@
+import type { ReactionRule } from '../schema/rules.ts';
 import type { EventCause, GameEvent, GameState } from '../schema/state.ts';
 import type { CompiledGame, CompiledRule } from './compile.ts';
 import { OpContext, type FaultRecord, type FiringRecord } from './context.ts';
+import { issueNextDecision } from './decisions.ts';
 import { applyEffects, handleDefeat } from './effects.ts';
 import { evalCond, type Bindings } from './eval.ts';
+import { limitAllows, recordFiring } from './modifiers.ts';
+import { hasEffectiveTag, holdersOf } from './queries.ts';
 import { BudgetExceeded, InvalidInput, RuleFault, cloneJson } from './util.ts';
 
 /**
@@ -10,9 +14,10 @@ import { BudgetExceeded, InvalidInput, RuleFault, cloneJson } from './util.ts';
  *
  * - An operation works on a private copy of the state; it commits only if it finishes.
  * - A firing's effects all complete before any reaction to them runs.
- * - Reactions run depth-first, ordered by (priority, ruleset position).
+ * - Reactions run depth-first, ordered by (priority, ruleset position, holder).
  * - Conditions are evaluated when the rule is about to run.
  * - A faulting firing is rolled back on its own; exceeding a budget aborts the whole operation.
+ * - Every operation ends by issuing the next decision (queued choices first).
  */
 
 export type OpOutcome =
@@ -24,6 +29,7 @@ export function runOperation(game: CompiledGame, state: GameState, body: (ctx: O
   const ctx = new OpContext(game, cloneJson(state));
   try {
     body(ctx);
+    issueNextDecision(ctx);
     ctx.state.rev += 1;
     return { ok: true, state: ctx.state, events: ctx.events, firings: ctx.firings, faults: ctx.faults };
   } catch (err) {
@@ -41,31 +47,46 @@ export function runRoot(ctx: OpContext, fn: () => void, options: { reactions: bo
   stateChecks(ctx, options.reactions);
 }
 
-function bindingsFor(ev: GameEvent): Bindings {
+function bindingsFor(ctx: OpContext, ev: GameEvent): Bindings {
   switch (ev.type) {
     case 'landed':
     case 'left':
-      return { $actor: ev.entity, $space: ev.space };
     case 'entered':
       return { $actor: ev.entity, $space: ev.space };
     case 'turnStarted':
     case 'turnEnded':
+    case 'itemGained':
+    case 'itemLost':
       return { $actor: ev.entity };
+    case 'itemUsed':
+    case 'cardDrawn': {
+      const space = ctx.state.entities[ev.entity]?.spaceId;
+      return { $actor: ev.entity, ...(space ? { $space: space } : {}) };
+    }
+    case 'actionUsed': {
+      const space = ctx.state.entities[ev.entity]?.spaceId;
+      return { $actor: ev.entity, ...(ev.target !== null ? { $target: ev.target } : {}), ...(space ? { $space: space } : {}) };
+    }
     case 'resourceChanged':
       return { $target: ev.entity, amount: ev.to - ev.from };
     case 'purchased':
       return { $actor: ev.entity, $target: ev.fixture };
     case 'defeated':
-      return { $target: ev.entity, $actor: ev.by ?? undefined };
-    case 'itemGained':
-      return { $actor: ev.entity };
+      return { $target: ev.entity, ...(ev.by !== null ? { $actor: ev.by } : {}) };
+    case 'statusApplied':
+    case 'statusRemoved':
+      return { $target: ev.entity, amount: ev.stacks };
+    case 'damaged':
+      return { $target: ev.entity, ...(ev.by !== null ? { $actor: ev.by } : {}), amount: ev.amount };
+    case 'spawned':
+      return { $target: ev.entity, $space: ev.space };
     default:
       return {};
   }
 }
 
-function matchesWhere(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bindings): boolean {
-  const w = rule.def.trigger.where;
+function matchesWhere(ctx: OpContext, rule: ReactionRule, ev: GameEvent, b: Bindings): boolean {
+  const w = rule.trigger.where;
   if (!w) return true;
   const space = 'space' in ev && typeof ev.space === 'string' ? ev.space : undefined;
   if (w.space !== undefined && space !== w.space) return false;
@@ -77,23 +98,38 @@ function matchesWhere(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bind
   }
   if (w.actorKind !== undefined && (b.$actor === undefined || ctx.state.entities[b.$actor]?.kind !== w.actorKind)) return false;
   if (w.targetKind !== undefined && (b.$target === undefined || ctx.state.entities[b.$target]?.kind !== w.targetKind)) return false;
-  if (w.targetTag !== undefined && (b.$target === undefined || !ctx.state.entities[b.$target]?.tags.includes(w.targetTag))) return false;
-  if (w.item !== undefined && !(ev.type === 'itemGained' && ev.itemDef === w.item)) return false;
+  if (w.targetTag !== undefined) {
+    const target = b.$target !== undefined ? ctx.state.entities[b.$target] : undefined;
+    if (!target || !hasEffectiveTag(ctx.game, target, w.targetTag)) return false;
+  }
+  if (w.item !== undefined && !((ev.type === 'itemGained' || ev.type === 'itemLost' || ev.type === 'itemUsed') && ev.itemDef === w.item)) return false;
   if (w.shopEntry !== undefined && !(ev.type === 'purchased' && ev.entry === w.shopEntry)) return false;
+  if (w.status !== undefined && !((ev.type === 'statusApplied' || ev.type === 'statusRemoved') && ev.status === w.status)) return false;
+  if (w.deck !== undefined && !(ev.type === 'cardDrawn' && ev.deck === w.deck)) return false;
+  if (w.card !== undefined && !(ev.type === 'cardDrawn' && ev.card === w.card)) return false;
+  if (w.action !== undefined && !(ev.type === 'actionUsed' && ev.action === w.action)) return false;
+  if (w.enemy !== undefined) {
+    const subject = ev.type === 'spawned' ? ev.enemy : ev.type === 'defeated' ? ctx.state.entities[ev.entity]?.defId : undefined;
+    if (subject !== w.enemy) return false;
+  }
   return true;
-}
-
-function turnKey(state: GameState): string {
-  return `${state.round}:${state.turn.index}`;
 }
 
 export function runReactions(ctx: OpContext, events: GameEvent[], depth: number): void {
   for (const ev of events) {
     const candidates = ctx.game.ruleIndex.get(ev.type as never) ?? [];
     for (const rule of candidates) {
-      const b = bindingsFor(ev);
-      if (!matchesWhere(ctx, rule, ev, b)) continue;
-      fireRule(ctx, rule, ev, b, depth);
+      const def = rule.def as ReactionRule;
+      if (rule.owner) {
+        // Attached rules fire once per current holder, in stable holder order.
+        for (const holder of holdersOf(ctx.state, rule.owner)) {
+          const b: Bindings = { ...bindingsFor(ctx, ev), $holder: holder };
+          if (matchesWhere(ctx, def, ev, b)) fireRule(ctx, rule, ev, b, depth, holder);
+        }
+      } else {
+        const b = bindingsFor(ctx, ev);
+        if (matchesWhere(ctx, def, ev, b)) fireRule(ctx, rule, ev, b, depth, undefined);
+      }
     }
   }
 }
@@ -103,17 +139,14 @@ function fault(ctx: OpContext, rule: CompiledRule, ev: GameEvent, message: strin
   ctx.emit({ type: 'ruleFault', rule: rule.def.id, message }, { kind: 'rule', rule: rule.def.id, parent: ev.seq });
 }
 
-function fireRule(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bindings, depth: number): void {
-  const max = rule.def.limits?.maxPerTurn;
-  const counter = ctx.state.ruleCounters[rule.def.id];
-  const key = turnKey(ctx.state);
-  if (max !== undefined && counter && counter.turnKey === key && counter.count >= max) return;
-
+function fireRule(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bindings, depth: number, holder: string | undefined): void {
+  if (!limitAllows(ctx.state, rule, holder)) return;
+  const def = rule.def as ReactionRule;
   const checks: Array<{ text: string; ok: boolean }> = [];
   const rngBefore = [...ctx.state.rng] as GameState['rng'];
   let ok: boolean;
   try {
-    ok = rule.def.conditions ? evalCond(ctx, rule.def.conditions, b, checks) : true;
+    ok = def.conditions ? evalCond(ctx, def.conditions, b, checks) : true;
   } catch (err) {
     if (!(err instanceof RuleFault)) throw err;
     ctx.state.rng = rngBefore;
@@ -122,15 +155,15 @@ function fireRule(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bindings
   }
   if (!ok) return;
 
-  const firingId = ctx.countFiring(rule.def.id, depth);
+  const firingId = ctx.countFiring(def.id, depth);
   const sp = ctx.savepoint();
   try {
-    ctx.state.ruleCounters[rule.def.id] = { turnKey: key, count: counter && counter.turnKey === key ? counter.count + 1 : 1 };
+    recordFiring(ctx.state, rule, holder);
     const bindings: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(b)) if (v !== undefined) bindings[k] = v;
-    ctx.firings.push({ id: firingId, rule: rule.def.id, trigger: ev.seq, bindings, checks });
-    const cause: EventCause = { kind: 'rule', rule: rule.def.id, parent: ev.seq, firing: firingId };
-    const emitted = ctx.collect(() => applyEffects(ctx, rule.def.effects, b, cause));
+    ctx.firings.push({ id: firingId, rule: def.id, trigger: ev.seq, bindings, checks });
+    const cause: EventCause = { kind: 'rule', rule: def.id, parent: ev.seq, firing: firingId };
+    const emitted = ctx.collect(() => applyEffects(ctx, def.effects, b, cause));
     runReactions(ctx, emitted, depth + 1);
   } catch (err) {
     if (!(err instanceof RuleFault)) throw err;

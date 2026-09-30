@@ -89,6 +89,23 @@ export interface StatusDto {
   savedAt: string | null;
 }
 
+/** Values the engine derives per entity (the web app never runs engine code). */
+export interface DerivedDto {
+  /** Base tags plus tags granted by statuses. */
+  tags: string[];
+  /** Capabilities currently suppressed, and by which status or rule. */
+  suppressed: Array<{ capability: string; by: string }>;
+}
+
+/** Plain-language texts generated from the definition (the GM's view: hidden rules included). */
+export interface RulebookDto {
+  rules: Record<string, string>;
+  statuses: Record<string, string>;
+  items: Record<string, string>;
+  actions: Record<string, string>;
+  cards: Record<string, string>;
+}
+
 export interface MatchSnapshotDto {
   matchId: string;
   definition: GameDefinition;
@@ -96,8 +113,10 @@ export interface MatchSnapshotDto {
   events: EventDto[];
   firings: FiringDto[];
   minds: MindDto[];
-  /** Effective resource values (base + item modifiers) per entity. */
+  /** Effective resource values (base + item, status and continuous-rule modifiers) per entity. */
   effective: Record<string, Record<string, number>>;
+  derived: Record<string, DerivedDto>;
+  rulebook: RulebookDto;
   status: StatusDto;
   metrics: MetricsDto;
   aiCalls: AiCallDto[];
@@ -110,6 +129,7 @@ export interface MatchUpdateDto {
   firings: FiringDto[];
   minds: MindDto[];
   effective: Record<string, Record<string, number>>;
+  derived: Record<string, DerivedDto>;
   status: StatusDto;
   metrics: MetricsDto;
   aiCalls: AiCallDto[];

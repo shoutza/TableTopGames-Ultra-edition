@@ -23,7 +23,6 @@ interface Savepoint {
   eventCount: number;
   firingCount: number;
   collectorCount: number;
-  koThisOp: string[];
 }
 
 /**
@@ -36,13 +35,14 @@ export class OpContext {
   readonly events: GameEvent[] = [];
   readonly firings: FiringRecord[] = [];
   readonly faults: FaultRecord[] = [];
-  /** Contestants knocked out during this operation (their turn ends). */
-  koThisOp = new Set<string>();
   private readonly collectors: GameEvent[][] = [];
   private firingCount = 0;
   private readonly perRule = new Map<string, number>();
   private randomDraws = 0;
   private steps = 0;
+  private spawns = 0;
+  private choices = 0;
+  private loopIterations = 0;
   private nextFiringId = 1;
 
   constructor(game: CompiledGame, state: GameState) {
@@ -78,6 +78,8 @@ export class OpContext {
       if (vis === 'owner') return [body.entity];
       if (vis === 'gm') return 'gm';
     }
+    if ((body.type === 'statusApplied' || body.type === 'statusRemoved' || body.type === 'statusPrevented') && this.game.statuses.get(body.status)?.visibility === 'hidden') return 'gm';
+    if (body.type === 'choiceOffered') return [body.entity];
     return 'all';
   }
 
@@ -116,6 +118,21 @@ export class OpContext {
     if (this.steps > this.budgets.expressionSteps) throw new BudgetExceeded('expressionSteps', `more than ${this.budgets.expressionSteps} expression steps in one operation`);
   }
 
+  countSpawn(): void {
+    this.spawns += 1;
+    if (this.spawns > this.budgets.spawns) throw new BudgetExceeded('spawns', `more than ${this.budgets.spawns} entities spawned in one operation`);
+  }
+
+  countChoice(): void {
+    this.choices += 1;
+    if (this.choices > this.budgets.choices) throw new BudgetExceeded('choices', `more than ${this.budgets.choices} choices offered in one operation`);
+  }
+
+  countLoopIterations(n: number): void {
+    this.loopIterations += n;
+    if (this.loopIterations > this.budgets.loopIterations) throw new BudgetExceeded('loopIterations', `more than ${this.budgets.loopIterations} forEach iterations in one operation`);
+  }
+
   get selectorLimit(): number {
     return this.budgets.selectorSize;
   }
@@ -126,7 +143,6 @@ export class OpContext {
       eventCount: this.events.length,
       firingCount: this.firings.length,
       collectorCount: this.collectors[this.collectors.length - 1]?.length ?? 0,
-      koThisOp: [...this.koThisOp],
     };
   }
 
@@ -137,6 +153,5 @@ export class OpContext {
     this.firings.length = sp.firingCount;
     const top = this.collectors[this.collectors.length - 1];
     if (top) top.length = sp.collectorCount;
-    this.koThisOp = new Set(sp.koThisOp);
   }
 }

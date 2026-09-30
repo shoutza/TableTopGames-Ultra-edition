@@ -83,7 +83,11 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
         <div className="round">
           Round {state.round}/{def.settings.victory.roundLimit} · {state.phase}
           {active && state.phase !== 'gameOver' ? ` · ${state.entities[active]?.name}` : ''}
-          {thinkingName ? ` · 🤔 ${thinkingName} is thinking…` : pending ? ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind})` : ''}
+          {thinkingName
+            ? ` · 🤔 ${thinkingName} is thinking…`
+            : pending
+              ? ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind === 'choice' ? `choice: ${pending.prompt ?? ''}` : pending.kind})`
+              : ''}
         </div>
         <div className="controls">
           {status.running ? (

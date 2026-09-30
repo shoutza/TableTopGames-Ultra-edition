@@ -98,17 +98,22 @@ restore them. History and memories store IDs; names are rendered at display time
 | Concept | Representation |
 |---|---|
 | **ResourceDef** | `id, name, role: pool \| stat, appliesTo[], default, min, max, maxFrom?, visibility: public \| owner \| gm`. Integers only (±10⁹); changes clamp to bounds and events record requested vs applied. |
-| **Effective value** | `stat` resources: base value + Σ modifiers (items now; statuses/continuous rules later), then clamped. `pool` resources are plain stored amounts. |
+| **Effective value** | `stat` resources: base value + Σ modifiers from held items, statuses (× stacks) and continuous rules, then clamped. `pool` resources are plain stored amounts. |
 | **HP / Power** | Separate resources. `res.hp` is a pool bounded by `res.max_hp`; `res.power` is a stat whose effective value drives combat. |
-| **TagDef** | `id, name, appliesTo, visibility, color`. "Has tag" means base tags (+ status-granted tags from M4). |
-| **ItemDef / ItemInstance** | Def: `id, name, description, tags, modifiers[{resource, add}]`. Instance: `id, defId, holder`. Inventory capacity is a setting. |
+| **TagDef** | `id, name, appliesTo, color`. "Has tag" means **effective** tags: base tags + tags granted by statuses. |
+| **StatusDef / instance** | Def: `duration` (holder turns, or null = until removed), `stacking: refresh \| extend \| stack(maxStacks) \| ignore`, `grantsTags`, `modifiers` (per stack), `suppress` (capabilities), `visibility: public \| hidden`, `transformation` (offered to the GM as a template; one at a time — a new transformation ends the previous one), attached `rules`. Instance on the entity: `defId, stacks, remaining, fresh`. |
+| **Capabilities** | `takesTurns, moves, shops, attacks, attackable, usesItems, trades`. Contestants have all, enemies only `attackable`, fixtures none; statuses and continuous rules suppress them. |
+| **ItemDef / ItemInstance** | Def: `id, name, description, tags, modifiers[{resource, add}], concealed, use?{effects, consumed}, rules`. Instance: `id, defId, holder`. Inventory capacity is a setting. |
+| **DeckDef** | `id, name, cards[{id, name, count, effects}]`. The deck list is public; the draw order lives in the state and is hidden. |
+| **ActionDef** | Custom main actions: `where` (space / space tag), `requires` (view-safe condition), `cost`, `cooldownRounds`, optional `target {kind, range}`, `effects`. |
 | **Space / Connection / Layout** | Space: `id, name, tags, description`. Connection: `{a, b, directed}`. Layout (`x, y`) is stored separately, so moving a space on screen never changes movement. |
-| **Entity** | `id, kind: contestant \| enemy \| fixture, defId, name, spaceId, resources, tags, items, status: active \| defeated, respawnRound?, koTurns`. Fixtures host shops (e.g. the moving Star Vendor). |
-| **EnemyDef** | `id, name, power, maxHp, regenPerRound, respawnAfterRounds \| null, rewards: Effect[]`. Stats come only from data; the engine never rescales enemies. |
+| **Entity** | `id, kind: contestant \| enemy \| fixture, defId, name, spaceId, resources, tags, items, statuses, status: active \| defeated \| eliminated \| removed, respawnRound?, koTurns`. Fixtures host shops (e.g. the moving Star Vendor). Removed entities stay as tombstones. |
+| **EnemyDef** | `id, name, power, maxHp, regenPerRound, respawnAfterRounds \| null, rewards: Effect[], spawns (may be empty), boss, rules`. Stats come only from data; the engine never rescales enemies. |
 | **ShopDef** | Entries selling an item or a resource bundle for a price (`resource, amount`). |
 | **Rule** | See §5. |
 | **Event** | `seq, rev, round, type, data, cause {kind: action \| rule \| gm \| system, ruleId?, parentSeq?}, audience: all \| [ids] \| gm`. |
-| **Decision** | `id, actor, kind: move \| main, rev, options[{id, kind, label, params}]`. Stored in the state so saves include it. |
+| **Decision** | `id, actor, kind: move \| main \| choice, rev, options[{id, kind, label, params}]`. Options: move, buy (with its modified price), attack (enemy or contestant), use (item), act (custom action, optional target), rest, pass, choose. Stored in the state so saves include it. |
+| **Pending choice** | Queued by `offerChoice`: `chooser, prompt, options (label, requires, effects), default, saved bindings`. Answered in its own later operation. |
 | **Contestant mind** | Persona, strategy history, plan, memory (AI side, never readable by rules). |
 
 **Missing, deleted, renamed content.** Imported JSON with unknown fields or missing required fields is
@@ -119,34 +124,57 @@ proposals). Removed entities stay as tombstones for history. Renames never break
 
 ---
 
-## 5. Rule language (subset shipped in the first playable version)
+## 5. Rule language
 
 Rules are JSON, validated by Zod, compiled, and interpreted by trusted engine code.
 
-- **Kinds:** `reaction` now; `modifier` (pure before-event value transforms/prevention on damage,
-  resourceChange, price, moveRoll, statusApply) and `continuous` (additive, stratified) in M4.
+- **Kinds:**
+  - `reaction`: runs after an event; the only source of chains.
+  - `modifier`: a pure before-event transform of one value — `damage` (combat hits and the `damage`
+    effect), `resourceChange` (from rule effects and rewards; not payments, knockouts or GM edits),
+    `price` (shop prices, shown in the offered option), `moveRoll` and `statusApply` (duration or
+    immunity). Ops: `add`, `scale(num/den, rounding)`, `clampTo`, `prevent` (terminal). Optional
+    `consume`: one stack of a status, or the item carrying the rule — paid only when the modifier
+    changes the value. Applied in (priority, position, holder) order, at most once each per value.
+    Price and roll modifiers must be public with view-safe conditions (they are shown before acting).
+  - `continuous`: additive stat modifiers and capability suppression for the entities an `applies`
+    selector picks while a `when` condition holds. Conditions may read base values, tags, statuses,
+    positions and items, never effective stats or randomness (the compiler rejects both), so they are
+    evaluated on read in a single pass.
+- **Attached rules:** items, statuses and enemies carry rules active only while the item is held,
+  the status present or the enemy on the board, with `$holder` bound. They fire once per holder, and
+  their limits count per holder.
 - **Triggers:** `roundStarted`, `roundEnded`, `turnStarted`, `turnEnded`, `left`, `entered`, `landed`,
-  `resourceChanged{resource, direction}`, `purchased`, `defeated`, `itemGained`. Each trigger has static
-  `where` filters (e.g. `spaceTag`).
-- **Bindings:** `$actor` (mover, buyer, victor), `$target` (affected/defeated entity), `$space`,
-  `$amount`, `$it` (inside `forEach` / `filter`).
-- **Conditions:** `all`, `any`, `not`, `hasTag`, `spaceHasTag`, `isKind`, `holds`, `compare`.
+  `resourceChanged{resource, direction}`, `purchased`, `defeated`, `itemGained`, `itemLost`, `itemUsed`,
+  `statusApplied`, `statusRemoved`, `damaged`, `cardDrawn`, `actionUsed`, `spawned`, each with static
+  `where` filters (space tag, resource, status, deck, card, action, enemy …).
+- **Bindings:** `$actor` (mover, buyer, victor, damage source, chooser), `$target` (affected entity),
+  `$holder` (attached rules), `$space`, `$amount`, `$it` (inside `forEach` / `filter`).
+- **Conditions:** `all`, `any`, `not`, `hasTag`, `spaceHasTag`, `isKind`, `holds`, `compare`, `exists`,
+  `hasStatus(minStacks)`, `same`, `sameSpace`.
 - **Numbers:** literals, `res`, `stat` (effective), `roll`, `add`, `sub`, `mul`,
   `div` (rounding **required**: `floor | ceil | halfUp | towardZero`), `min`, `max`, `count`, `round`,
-  `bind`.
-- **Selectors:** bindings, `all(kind)`, `at(space)`, `withTag`, `filter`, `random`. Stable order, ≤ 64.
+  `amount`, `stacks`.
+- **Selectors:** bindings, `all(kind)`, `at(space)`, `withTag`, `filter`, `random`, `leader(resource)`,
+  `trailer(resource)`. Stable order, ≤ 64.
 - **Space refs:** `$space`, `space(id)`, `spaceOf(entity)`, `randomSpace(tag, excludeSpaceOf?)`.
 - **Effects:** `changeResource`, `setResource`, `transfer`, `addTag`, `removeTag`,
-  `teleport(asLanding)`, `grantItem`, `fight(attacker, defender)`, `announce`, `if`, `forEach`,
-  `randomBranch`.
-- **Limits:** `maxPerTurn`; each rule fires at most once per (event, binding). Static limits per rule:
-  ≤ 64 expression nodes, nesting ≤ 4, ≤ 12 effects.
+  `teleport(asLanding)`, `grantItem`, `transferItem`, `loseItem`, `fight(attacker, defender)`,
+  `damage`, `applyStatus(stacks, duration?)`, `removeStatus`, `spawn(enemy, at, count ≤ 3)`, `remove`,
+  `drawCard(deck, for)`, `offerChoice(to, prompt, 2–4 options with requires + effects, default)`,
+  `announce`, `if`, `forEach`, `randomBranch`.
+- **Limits:** `maxPerTurn`, `maxPerRound`, `maxPerGame`, `cooldownRounds`; each rule fires at most once
+  per (event, binding, holder). Static limits per rule: ≤ 64 expression nodes, nesting ≤ 4, ≤ 12 effects.
 - **Visibility:** `public` or `hidden` (traps: effects are seen, cause shown as "unknown effect").
+  Requirements that decide what a contestant is offered (action `requires`, choice `requires`,
+  price and roll modifiers) must be **view-safe**: they may read only the chooser's own secrets and
+  public data; the compiler rejects anything else.
 
 Customization categories: mechanically defined rules (engine executes), cosmetic changes (names,
 descriptions, colors), and GM-adjudicated situations (GM applies explicit results via commands;
 `askGm` and freeform attempts arrive in M6). "Become a fish" is a tag; any gameplay consequences are
-separate rules or a visible transformation template (M4).
+separate rules or the visible **Fish Form** transformation template (a status: tagged Fish, −1 Move,
+cannot shop, 3 turns).
 
 ### Example
 
@@ -171,8 +199,8 @@ separate rules or a visible transformation template (M4).
 ```
 
 Rendered: *"Whenever a contestant lands on a Blue space, if they are tagged Fish and not tagged Cursed:
-they gain 2 Bananas. At most once per turn."* (Statuses such as "Cursed" arrive in M4; the starter uses a
-tag.)
+they gain 2 Bananas. At most once per turn."* Tags granted by statuses count, so a contestant in Fish
+Form gets the bananas, and the Cursed status grants the Cursed tag.
 
 ---
 
@@ -245,26 +273,42 @@ wins the fight 99.4 % of the time.
 
 ### 6.4 Defeat outcomes (settings)
 
-- **Contestant at 0 HP → knocked out:** loses `ko.goldLossPercent` (50 %, rounded down) of gold,
-  teleports to the start space (not a landing), HP restored to max, skips `ko.skipTurns` (1) turns.
-  Its current turn ends.
-- **Enemy at 0 HP → defeated:** its `rewards` effects run with `$actor` = victor; it becomes inactive
-  and respawns at full HP after `respawnAfterRounds` rounds (or never).
+- **Contestant at 0 HP → knocked out** (`ko.mode: respawn`): loses `ko.goldLossPercent` (50 %, rounded
+  down) of gold — to the contestant who won the fight when `ko.lootToVictor` — teleports to the start
+  space (not a landing), its statuses end (`ko.clearStatuses`, default on; transformations
+  included), HP restored to max, skips `ko.skipTurns` (1) turns. If it was its own turn, the turn
+  ends.
+- **Elimination mode** (`ko.mode: eliminate`): the contestant leaves the match for good (statuses
+  cleared, no further turns or turn events); eliminated contestants cannot win, and the last
+  contestant standing wins at the next checkpoint.
+- **Enemy at 0 HP → defeated:** its `rewards` effects run with `$actor` = victor; its statuses are
+  cleared; it becomes inactive and respawns at full HP after `respawnAfterRounds` rounds (or never).
 - Defeat by non-combat damage (e.g. hazards) uses the same outcome with no victor.
 
-### 6.5 Who fights (first playable version)
+### 6.5 Who fights
 
-- A contestant may **attack an active enemy on its space** as its main action.
-- Rules may start fights with the `fight` effect. The starter Demon ambushes any contestant that lands
-  on its lair.
-- Contestant-vs-contestant combat, retreats, bosses with phases and complex statuses: M4.
+- A contestant may **attack an active, attackable enemy on its space** as its main action, and (with
+  `combat.pvp`) **another contestant on its space** who is not recovering from a knockout.
+- Rules may start fights with the `fight` effect (the starter Demon ambushes anyone who lands on its
+  lair; the Kraken boss grabs anyone who lands on its space). A defender that cannot be attacked
+  (smoke, sanctuary) is not fought.
+- **Damage modifiers** apply to every hit (shields absorb whole hits, one stack each). The wheel
+  shares and base damage are fixed when the fight starts; statuses gained during the fight (e.g. a
+  boss becoming enraged) matter from the next fight.
+- **Bosses** are enemies with `boss: true`, usually no starting space (spawned by the GM or by a
+  rule/card) and attached rules for phases (the Kraken becomes Enraged below half HP).
 
 ### 6.6 Odds shown to contestants
 
 The engine computes exact fight-outcome probabilities (dynamic programming over wins/losses) from
-**visible** Powers and HP. Every combat option in a decision packet states the per-spin chance, damage
-both ways, hits needed, the outcome probabilities, and the rewards. The same calculator powers the
-fallback player and the GM UI. Hidden modifiers (later milestones) are never included in previews.
+**visible** Powers and HP, including public damage modifiers as per-hit damage sequences (a shield
+with 2 stacks absorbs the first two hits). Every combat option in a decision packet states the
+per-spin chance, damage both ways, hits needed, the outcome probabilities, and the rewards (for PvP:
+the gold at stake both ways). Hidden modifiers and hidden statuses are never included in previews.
+
+**Threats.** For every move option the packet lists rivals who could reach that space on their
+next turn (the chance their roll gets there) and the knockout odds if they attack, weighted by how
+favorable the fight would be for them; the fallback player prices this in.
 
 ---
 
@@ -273,21 +317,32 @@ fallback player and the GM UI. Hidden modifiers (later milestones) are never inc
 Data in `content/starter/star-chase.json`, fully configurable.
 
 - **Board:** 20-space outer ring plus a 5-space inner shortcut through the Demon's Lair (25 spaces).
-- **Economy:** Coin spaces (+3 gold), Blue spaces (+2 gold; Fishy Blue Bonus), Hazards (lose 2d6 HP),
-  a hidden trap (a public-looking space whose hidden rule costs gold), and a private "Stash" resource
-  found at the Old Well.
+- **Economy:** Coin spaces (+3 gold), Blue spaces (+2 gold; Fishy Blue Bonus; Go Fishing), Hazards
+  (2d6 damage), a hidden trap (the Gilded Idol's hidden rule costs gold), and a private "Stash" found at
+  the Old Well. Bananas buy potions, charms or gold at the Banana Stand.
 - **Stars:** a Star Vendor fixture sells a Star for 25 gold and relocates to a random star spot after each
   sale. **Victory:** 3 stars at the end of a round, otherwise most stars after round 20 (ties: gold,
-  then shared).
-- **Power sources:** Dojos (+40 Power), Ash Shrine (+60 Power, −15 HP), Gear Shop (Wooden Sword +60 for
+  then Stash, then shared).
+- **Power sources:** Dojos (+40 Power), Ash Shrine (+60 Power, −15 HP), Gear Bazaar (Wooden Sword +60 for
   6 gold, Guardian Mail +100 for 12, Iron Sword +150 for 15, Demon Blade +300 for 32; carry at most 3),
   Slimes (60 Power, 30 HP; +50 Power and +3 gold when defeated, respawn next round).
 - **The goal enemy:** Demon (500 Power, 300 HP, regenerates 20/round, respawns after 4 rounds). Defeating
   it grants **2 stars** and 20 gold. It ambushes anyone who lands on its lair.
+- **Mechanics breadth (M4):** a Move stat (added to rolls); Mystery spaces that draw from the 17-card
+  Island Events deck (treasure, blessings, curses, Fish Form, a merchant and a crossroads **choice**, a
+  storm, a concealed Lucky Coin, poison, and the Kraken); statuses Blessed, Cursed, Shielded (each stack
+  absorbs a hit), Poisoned (damage at the end of your turn, per stack), Smoke Cloud (cannot be
+  attacked), Stunned, Enraged; usable items (Healing Potion, Smoke Bomb, Shield Charm); custom actions
+  Pickpocket (target a contestant here, 50 % steal / 50 % caught), Pray at the Shrine (4 gold →
+  Shielded ×2) and Go Fishing; continuous rules Fish Out of Water (−40 Power off Blue spaces while
+  tagged Fish) and Harbor Sanctuary (nobody can be attacked at the start space); PvP with loot; the
+  **Kraken** boss (900 Power, 600 HP, grabs anyone landing on its space, enraged +300 Power below half
+  HP, 2 stars, never returns).
 - **Contestants** start with 80 Power, 100/100 HP, 10 gold.
 
 This creates the intended strategic choices: buy stars early vs invest in gear, farm power vs chase
-the vendor, and decide when you are strong enough to take the Demon.
+the vendor, decide when you are strong enough to take the Demon — and now also when to gamble on a
+Mystery space, when to spend on protection, and whom to avoid.
 
 ---
 
@@ -297,16 +352,28 @@ the vendor, and decide when you are strong enough to take the Demon.
 
 1. **Round start** (auto): round counter, enemy respawns, `roundStarted` reactions.
 2. **Each contestant, in turn order** (drawn from the match seed):
-   1. **Turn start** (auto): `turnStarted` reactions. A knocked-out contestant skips the turn.
-   2. **Roll** (auto): 1d6 movement, public.
-   3. **Move decision:** any space reachable in 0..N steps (staying is an option). Single-option
-      decisions resolve without a model call.
+   1. **Turn start** (auto): `turnStarted` reactions. A knocked-out or stunned (`takesTurns`
+      suppressed) contestant skips the turn (`turnSkipped`; its turn still ends, so end-of-turn
+      effects such as poison still tick). Eliminated contestants are passed over silently.
+   2. **Roll** (auto): 1d6 + the `movement.bonus` stat (Move), then `moveRoll` modifiers; public.
+   3. **Move decision:** any space reachable in 0..N steps (staying is an option; only staying when
+      `moves` is suppressed). Single-option decisions resolve without a model call.
    4. **Move** (operation): shortest path (stable tie-break); events `left`, `moved`, `entered`, and
       `landed` if ≥ 1 step. Intermediate spaces fire nothing in V1.
-   5. **Main decision:** buy (one shop entry at a fixture on this space), attack an enemy here, rest
-      (+40 HP), or pass. Skipped if the contestant was knocked out during the move.
-   6. **Turn end** (auto): `turnEnded` reactions.
-3. **Round end** (auto): `roundEnded` reactions, enemy regeneration, victory checkpoint, round limit.
+   5. **Main decision:** buy (one shop entry at a fixture on this space, at the modified price),
+      attack an enemy or contestant here, use an item, a custom action, rest (+40 HP), or pass.
+      Skipped if the contestant was knocked out during its turn.
+   6. **Turn end** (auto): `turnEnded` reactions, then the contestant's statuses count down (so a
+      status's end-of-turn effect still fires on its last turn).
+3. **Round end** (auto): enemy regeneration, `roundEnded` reactions, statuses of enemies and fixtures
+   count down, victory checkpoint, round limit.
+
+**Queued choices** are answered before the phase decision, in order, each in its own operation. A
+choice whose chooser can no longer answer (eliminated, nothing legal) resolves to its default in the
+next automatic step. Every operation ends by issuing the next decision with a fresh id.
+
+**Status durations** count the holder's own turns (enemies and fixtures: rounds) and skip the
+countdown at the end of the turn (or round) in which the status was applied.
 
 **Entering vs landing.** `entered` = any arrival (walk or teleport). `landed` = the end of a walk of ≥ 1
 step, or a teleport that explicitly says `asLanding: true` (default false). Staying fires nothing.
@@ -332,11 +399,14 @@ An operation is the atomic unit: an accepted decision, an automatic phase step, 
    and the GM sees the partial trace.
 9. **Commit:** revision + 1, events appended to history, UI notified.
 
-Pending choices (`offerChoice`, M4) are deferred to the end of the current operation and answered as
-their own operations; a choice is a commit boundary.
+Pending choices (`offerChoice`) are queued with their bindings, deferred to the end of the current
+operation and answered as their own operations; a choice is a commit boundary. Card effects,
+choice effects, item uses and custom actions each run with their own rollback point, like a rule
+firing.
 
 **Budgets per operation (defaults):** 200 rule firings, 20 firings of any single rule, 500 events,
-depth 24, 256 random draws, 20,000 expression steps, selector size 64.
+depth 24, 256 random draws, 20,000 expression steps, selector size 64, 10 spawned entities, 4 new
+choices, 256 `forEach` iterations.
 
 **Cycle analysis:** the compiler derives what each rule's trigger reads and what its effects can emit,
 builds a rule→rule graph, and reports cycles as warnings. Runtime budgets remain the safeguard.
@@ -353,13 +423,20 @@ its event (die values, wheel rolls).
 
 | Data | Owner | Others |
 |---|---|---|
-| Positions, public resources, tags, public rules, enemy Power/HP, items held | ✓ | ✓ |
+| Positions, public resources, tags, public statuses, public rules, enemy Power/HP, items held | ✓ | ✓ |
 | `owner` resources (Stash) | value | existence only |
-| Hidden rules | ✗ | ✗ (effects visible as "unknown effect") |
+| Concealed items (Lucky Coin) | ✓ | "a concealed item" (count visible, bonus hidden) |
+| Hidden statuses (secret curses) | ✗ | ✗ (modifiers excluded from every view) |
+| Hidden rules (incl. hidden modifiers and continuous rules) | ✗ | ✗ (effects visible as "unknown effect") |
+| Choices offered by hidden rules | labels only | ✗ |
+| Deck order | ✗ | ✗ (pile sizes, deck list and discards are public) |
 | RNG state, future rolls | ✗ | ✗ |
 | Others' numeric traits, strategy, plan, memory | own only | ✗ |
 
 - `ContestantView` is its own type; the packet builder and fallback player cannot reach `GameState`.
+- Views are computed with a contestant-facing copy of the game (`viewGame`) from which hidden rules
+  are removed, so hidden modifiers and continuous rules never affect effective values, odds or prices
+  shown to contestants.
 - Every event type has a redactor producing the version an audience may see.
 - Previews and odds use only view data. Legality for contestants depends only on visible data; hidden
   effects happen during resolution (an attempt can fail) rather than hiding options.
@@ -373,7 +450,7 @@ its event (die values, wheel rolls).
 
 | Edit class | Examples | When | Effect on waiting decisions |
 |---|---|---|---|
-| GM intervention | adjust/set resource, add/remove tag, teleport (as-landing checkbox), grant/remove item, announce | Between operations, running or paused | Pending decision re-issued with a new ID; in-flight model request aborted. Reactions fire unless "silent". |
+| GM intervention | adjust/set resource, add/remove tag, teleport (as-landing checkbox), grant/remove item, apply/remove status, transform (template), spawn enemy or boss, remove entity, make a contestant draw a card, announce | Between operations, running or paused | Pending decision re-issued with a new ID; in-flight model request aborted. Reactions fire unless "silent". |
 | Definition change | rules, items, enemies, victory (M6) | Paused only, as a proposal | All decisions invalidated |
 
 **Saves** (`data/matches/<id>/`): `snapshot.json` (engine, rules-language and save-format versions,
@@ -383,6 +460,8 @@ a moment after every committed operation, so a crash loses at most a fraction of
 `ai-calls.jsonl` (packets, responses, usage, latency, outcome). Loading uses the snapshot.
 Re-simulating recorded inputs with the same engine version reproduces the same state hashes (used by
 tests and, later, rewind). Replaying recorded results (without re-running rules) serves display and audit.
+Older save formats are upgraded by explicit, step-by-step migrations (format 1 → 2 is covered by a
+committed fixture from the first playable version); newer formats are refused.
 
 ---
 
@@ -409,10 +488,18 @@ tests and, later, rewind). Replaying recorded results (without re-running rules)
 
 ### 11.2 Decision packets (target 800–1,800 tokens)
 
-System instructions → rules digest (victory, loop, key public rules) → persona, strategy, plan, own
-state → standings → recent visible events → options with engine-computed consequences. Combat options
-include per-spin chance, damage both ways, outcome probabilities and rewards; move options note shops,
-enemies (with odds if you would be ambushed), training and known rule effects.
+Instructions: how to answer → rules digest (victory, loop, public rules, statuses, actions, shops,
+enemies, deck list) → persona. The shared rulebook comes before the persona so every contestant of a
+match sends the same long prefix (providers cache identical prefixes). Input: strategy, plan, own
+state (statuses, what you currently cannot do) → standings → recent visible events → options with
+engine-computed consequences. Combat options include per-spin chance, damage both ways, outcome
+probabilities and rewards; move options note shops, enemies (with odds if you would be ambushed),
+training, card draws, known rule effects and threats; choices, item uses and custom actions list
+their effects with probabilities. Texts in the digest are generated tersely from the structured
+definitions ("landing on a Coin space: +3 Gold").
+
+Measured with the M4 starter (mock pipeline, 3 matches): packet p50 ≈ 2.0k, p95 ≈ 2.5k estimated
+tokens, of which ≈ 1.4k is the stable, cacheable instructions.
 
 ### 11.3 Responses, validation, fallback
 

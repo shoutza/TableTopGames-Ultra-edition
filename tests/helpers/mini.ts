@@ -1,13 +1,17 @@
 import { advance, answerDecision, compileGame, createMatch, nextStepKind, type CompiledGame, type OpOutcome } from '../../src/engine/index.ts';
+import type { z } from 'zod';
 import { GameDefinitionSchema, type GameDefinitionInput } from '../../src/schema/definition.ts';
-import type { RuleDef } from '../../src/schema/rules.ts';
+import type { RuleDefSchema } from '../../src/schema/rules.ts';
 import type { GameEvent, GameState } from '../../src/schema/state.ts';
+
+/** Any rule input (reaction, modifier or continuous); the name defaults to the id. */
+export type TestRule = z.input<typeof RuleDefSchema> extends infer T ? (T extends unknown ? Omit<T, 'name'> & { name?: string } : never) : never;
 
 /**
  * A tiny line board for rule tests: s0 (start) — s1 — s2 (blue) — s3 — s4 (lair) — s5.
  * Two contestants (Ann, Bob), one enemy "Ogre" at s4 (Power 100, HP 50), a shop at s1.
  */
-export function miniDefinition(overrides: { rules?: Array<Partial<RuleDef> & Pick<RuleDef, 'id' | 'trigger' | 'effects'>>; mutate?: (d: GameDefinitionInput) => void } = {}): GameDefinitionInput {
+export function miniDefinition(overrides: { rules?: TestRule[]; mutate?: (d: GameDefinitionInput) => void } = {}): GameDefinitionInput {
   const spaces = ['s0', 's1', 's2', 's3', 's4', 's5'];
   const def: GameDefinitionInput = {
     id: 'mini',

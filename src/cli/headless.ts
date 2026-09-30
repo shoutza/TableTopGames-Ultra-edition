@@ -13,8 +13,16 @@ import { buildContestantView } from '../visibility/view.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function loadStarter(): CompiledGame {
-  const json: unknown = JSON.parse(readFileSync(path.join(repoRoot, 'content/starter/star-chase.json'), 'utf8'));
+/**
+ * Loads the starter scenario. `rounds` forces full-length games of that many rounds (no early
+ * victory), which exercises more of the content in long simulations.
+ */
+export function loadStarter(options: { rounds?: number | undefined } = {}): CompiledGame {
+  const json = JSON.parse(readFileSync(path.join(repoRoot, 'content/starter/star-chase.json'), 'utf8')) as { settings: { victory: { roundLimit: number; threshold: number } } };
+  if (options.rounds !== undefined) {
+    json.settings.victory.roundLimit = options.rounds;
+    json.settings.victory.threshold = 99;
+  }
   const loaded = loadGame(json);
   if (!loaded.ok) throw new Error(`starter scenario invalid:\n${loaded.errors.join('\n')}`);
   return loaded.game;
@@ -31,6 +39,8 @@ export interface HeadlessResult {
   faults: number;
   aborted: string | null;
   operations: number;
+  /** Wall-clock milliseconds of each engine operation (excluding the fallback player's thinking). */
+  opMs: number[];
 }
 
 export function runHeadlessMatch(game: CompiledGame, seed: string, options: { maxOperations?: number } = {}): HeadlessResult {
@@ -54,12 +64,16 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
   let forced = 0;
   let faults = 0;
   let operations = 0;
+  const opMs: number[] = [];
   const max = options.maxOperations ?? 20_000;
   while (nextStepKind(state) !== 'gameOver' && operations < max) {
     operations++;
     let out;
-    if (nextStepKind(state) === 'auto') out = advance(game, state);
-    else {
+    if (nextStepKind(state) === 'auto') {
+      const t0 = performance.now();
+      out = advance(game, state);
+      opMs.push(performance.now() - t0);
+    } else {
       const decision = state.pendingDecision;
       if (!decision) throw new Error('missing decision');
       decisions++;
@@ -73,15 +87,17 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
         if (!persona) throw new Error('persona missing');
         optionId = chooseHeuristic(view, info, persona, archetypes.get(decision.actor) ?? null).optionId;
       }
+      const t0 = performance.now();
       out = answerDecision(game, state, { decisionId: decision.id, optionId });
+      opMs.push(performance.now() - t0);
     }
     if (!out.ok) {
-      if (out.kind === 'aborted') return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: out.message, operations };
+      if (out.kind === 'aborted') return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: out.message, operations, opMs };
       throw new Error(`operation rejected: ${out.message}`);
     }
     state = out.state;
     events.push(...out.events);
     faults += out.faults.length;
   }
-  return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: null, operations };
+  return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: null, operations, opMs };
 }

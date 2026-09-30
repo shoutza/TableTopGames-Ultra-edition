@@ -3,16 +3,30 @@ import { CompileError, compileGame, type CompiledGame, type Diagnostic } from '.
 
 /** Public engine API. Everything is synchronous and deterministic. */
 
-export { compileGame, CompileError, findRuleCycles, TRIGGER_BINDINGS } from './compile.ts';
-export type { CompiledGame, CompiledRule, Diagnostic } from './compile.ts';
+export { compileGame, CompileError, findRuleCycles, TRIGGER_BINDINGS, MODIFIER_BINDINGS } from './compile.ts';
+export type { CompiledGame, CompiledRule, Diagnostic, RuleOwner } from './compile.ts';
 export type { FiringRecord, FaultRecord } from './context.ts';
 export type { OpOutcome } from './resolve.ts';
-export { createMatch, advance, answerDecision, nextStepKind, moveOptions, mainOptions, checkVictory, rankContestants } from './turn.ts';
+export { createMatch, advance, answerDecision, nextStepKind, checkVictory, rankContestants } from './turn.ts';
 export type { DecisionAnswer, MatchSetup, StepKind } from './turn.ts';
+export { moveOptions, mainOptions, choiceOptions, buyPrice, actionAvailable, actionTargets, attackTargets, CheckEnv } from './decisions.ts';
 export { applyGmCommand } from './gm.ts';
-export { effectiveValue, activeContestantId, reachableSpaces, shortestPath, orderedEntityIds } from './queries.ts';
-export { describeEvent, describeRule, describeEffects, describeCond, describeTrigger, makeNames, namesFor } from './explain.ts';
-export type { Names } from './explain.ts';
+export {
+  effectiveValue,
+  effectiveTags,
+  hasEffectiveTag,
+  hasCapability,
+  suppressedCapabilities,
+  activeContestantId,
+  reachableSpaces,
+  shortestPath,
+  orderedEntityIds,
+  holdersOf,
+} from './queries.ts';
+export { computeModifiers } from './modifiers.ts';
+export type { ModifierSubject, ModStep } from './modifiers.ts';
+export { describeEvent, describeRule, describeEffects, describeEffect, describeCond, describeTrigger, describeStatus, describeCapabilityLoss, makeNames, namesFor } from './explain.ts';
+export type { Names, NameSource } from './explain.ts';
 export { damageFor, fightOdds, spinChance, formatPercent } from './combat.ts';
 export type { FightOdds, FightInput, DamageSettings } from './combat.ts';
 export { cloneJson } from './util.ts';

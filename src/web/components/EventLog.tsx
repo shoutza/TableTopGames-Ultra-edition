@@ -19,6 +19,12 @@ function causeLabel(data: MatchData, e: EventDto): string {
       return 'GM intervention';
     case 'reward':
       return `reward for defeating ${c.entity ? (data.state.entities[c.entity]?.name ?? c.entity) : 'an enemy'}`;
+    case 'card': {
+      const card = data.definition.decks.flatMap((d) => d.cards).find((x) => x.id === c.card);
+      return `card “${card?.name ?? c.card ?? '?'}” drawn by ${c.entity ? (data.state.entities[c.entity]?.name ?? c.entity) : 'someone'}`;
+    }
+    case 'choice':
+      return `choice made by ${c.entity ? (data.state.entities[c.entity]?.name ?? c.entity) : 'a contestant'}${c.rule ? ` (offered by rule “${ruleName(c.rule)}”${hidden(c.rule) ? ' 🔒 hidden' : ''})` : ''}`;
     case 'system':
       return 'game system';
   }

@@ -2,9 +2,23 @@ import { useState } from 'react';
 import type { GameDefinition } from '../../schema/definition.ts';
 import type { ContestantViewResponse, MindDto } from '../../shared/api.ts';
 import { api, type MatchData } from '../api.ts';
-import { activeId, entityColor, entityIcon, formatMs, formatUsd, resourceName, spaceName } from '../format.ts';
+import { activeId, entityColor, entityIcon, formatMs, formatUsd, resourceName, spaceName, statusLabel, transformationOf } from '../format.ts';
 
 /** Standings, entity inspector and the AI panel. */
+
+const CAPABILITY_TEXT: Record<string, string> = {
+  takesTurns: 'take turns',
+  moves: 'move',
+  shops: 'shop',
+  attacks: 'attack',
+  attackable: 'be attacked',
+  usesItems: 'use items',
+  trades: 'trade',
+};
+
+function capabilityText(c: string): string {
+  return CAPABILITY_TEXT[c] ?? c;
+}
 
 export function Standings({ data, onSelect, selected }: { data: MatchData; onSelect: (id: string) => void; selected: string | null }) {
   const { definition: def, state, effective, minds } = data;
@@ -22,6 +36,7 @@ export function Standings({ data, onSelect, selected }: { data: MatchData; onSel
           <th title="Effective Power">⚡</th>
           <th>HP</th>
           <th>Items</th>
+          <th>Status</th>
           <th>Strategy</th>
         </tr>
       </thead>
@@ -37,6 +52,7 @@ export function Standings({ data, onSelect, selected }: { data: MatchData; onSel
                 <span className="dot" style={{ background: entityColor(def, e) }} /> {entityIcon(def, e)} {e.name}
                 {id === active && state.phase !== 'gameOver' ? ' ◀' : ''}
                 {e.koTurns > 0 ? ' 💫' : ''}
+                {e.status === 'eliminated' ? ' ☠️' : ''}
                 {state.winners?.includes(id) ? ' 🏆' : ''}
               </td>
               <td>{v[victory] ?? 0}</td>
@@ -46,6 +62,7 @@ export function Standings({ data, onSelect, selected }: { data: MatchData; onSel
                 {v[core.hp] ?? 0}/{v[core.maxHp] ?? 0}
               </td>
               <td>{e.items.map((i) => def.items.find((x) => x.id === state.items[i]?.defId)?.icon ?? '•').join('') || '—'}</td>
+              <td title={e.statuses.map((st) => statusLabel(def, st)).join(', ')}>{e.statuses.map((st) => def.statuses.find((x) => x.id === st.defId)?.icon ?? '•').join('') || '—'}</td>
               <td title={mind?.plan ? `Plan: ${mind.plan}` : ''}>{mind?.strategy?.archetype ?? '—'}</td>
             </tr>
           );
@@ -95,6 +112,7 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
   const e = data.state.entities[entityId];
   if (!e) return <p className="muted">Unknown entity.</p>;
   const v = data.effective[entityId] ?? {};
+  const derived = data.derived[entityId];
   const mind = data.minds.find((m) => m.entityId === entityId);
   const cast = def.cast.find((c) => c.id === e.defId);
   const enemy = def.enemies.find((x) => x.id === e.defId);
@@ -108,7 +126,10 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
       <p>
         At <b>{spaceName(def, e.spaceId)}</b>
         {e.status === 'defeated' ? ` · defeated${e.respawnRound !== null ? `, returns round ${e.respawnRound}` : ''}` : ''}
+        {e.status === 'eliminated' ? ' · eliminated' : ''}
+        {e.status === 'removed' ? ' · removed from the board' : ''}
         {e.koTurns > 0 ? ` · knocked out (${e.koTurns} turn to skip)` : ''}
+        {transformationOf(def, e) ? ` · transformed: ${transformationOf(def, e)?.name}` : ''}
       </p>
       {Object.keys(e.resources).length > 0 && (
         <table className="kv">
@@ -127,17 +148,38 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
         </table>
       )}
       {e.items.length > 0 && (
-        <p>
-          Items:{' '}
-          {e.items
-            .map((i) => {
+        <div className="block">
+          <h4>Items</h4>
+          <ul className="plain">
+            {e.items.map((i) => {
               const d = def.items.find((x) => x.id === data.state.items[i]?.defId);
-              return `${d?.icon ?? ''} ${d?.name ?? i} (${d?.modifiers.map((m) => `+${m.add} ${resourceName(def, m.resource)}`).join(', ') ?? ''})`;
-            })
-            .join(' · ')}
-        </p>
+              return (
+                <li key={i}>
+                  {d?.icon ?? '•'} <b>{d?.name ?? i}</b>
+                  {d?.concealed ? ' 🔒 concealed' : ''} <span className="muted">— {d ? data.rulebook.items[d.id] : ''}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
-      {e.tags.length > 0 && <p>Tags: {e.tags.map((t) => def.tags.find((x) => x.id === t)?.name ?? t).join(', ')}</p>}
+      {e.statuses.length > 0 && (
+        <div className="block">
+          <h4>Statuses</h4>
+          <ul className="plain">
+            {e.statuses.map((st) => (
+              <li key={st.id}>
+                {statusLabel(def, st)}
+                {def.statuses.find((x) => x.id === st.defId)?.visibility === 'hidden' ? ' 🔒 hidden' : ''}
+                {st.fresh ? <span className="muted"> · applied this turn</span> : null}
+                <div className="muted">{data.rulebook.statuses[st.defId]}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(derived?.suppressed.length ?? 0) > 0 && <p className="warn">Cannot: {derived?.suppressed.map((x) => `${capabilityText(x.capability)} (${x.by})`).join('; ')}</p>}
+      {(derived?.tags.length ?? 0) > 0 && <p>Tags: {derived?.tags.map((t) => `${def.tags.find((x) => x.id === t)?.name ?? t}${e.tags.includes(t) ? '' : ' (from status)'}`).join(', ')}</p>}
       {cast && (
         <div className="block">
           <h4>Personality</h4>
@@ -153,10 +195,15 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
       {mind && <StrategyBlock mind={mind} />}
       {enemy && (
         <div className="block">
-          <h4>Enemy</h4>
+          <h4>{enemy.boss ? 'Boss 👑' : 'Enemy'}</h4>
           <p>
             Regenerates {enemy.regenPerRound} HP/round · {enemy.respawnAfterRounds ? `returns ${enemy.respawnAfterRounds} round(s) after defeat` : 'does not return'}
           </p>
+          {enemy.rules.map((r) => (
+            <p key={r.id} className="muted">
+              <b>{r.name}</b>: {data.rulebook.rules[r.id]}
+            </p>
+          ))}
           {enemy.description && <p className="muted">{enemy.description}</p>}
         </div>
       )}

@@ -1,8 +1,8 @@
 {
   "id": "star-chase",
   "name": "Star Chase",
-  "description": "Collect gold, buy stars from the wandering Star Vendor, and grow strong enough to slay the Demon for two stars of your own.",
-  "rulesLanguageVersion": 1,
+  "description": "Collect gold, buy stars from the wandering Star Vendor, and grow strong enough to slay the Demon for two stars of your own. Mystery spaces deal island events; rivals can ambush you for your gold.",
+  "rulesLanguageVersion": 2,
   "settings": {
     "core": {
       "hp": "res.hp",
@@ -12,7 +12,8 @@
     },
     "startSpace": "space.harbor_gate",
     "movement": {
-      "die": 6
+      "die": 6,
+      "bonus": "res.move"
     },
     "inventoryCapacity": 3,
     "rest": {
@@ -25,11 +26,14 @@
         "min": 1,
         "max": 100
       },
-      "maxSpinsPerFight": 8
+      "maxSpinsPerFight": 8,
+      "pvp": true
     },
     "ko": {
       "goldLossPercent": 50,
-      "skipTurns": 1
+      "skipTurns": 1,
+      "lootToVictor": true,
+      "mode": "respawn"
     },
     "victory": {
       "resource": "res.stars",
@@ -83,6 +87,18 @@
       "icon": "⚡"
     },
     {
+      "id": "res.move",
+      "name": "Move",
+      "role": "stat",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": -3,
+      "max": 3,
+      "icon": "👣"
+    },
+    {
       "id": "res.gold",
       "name": "Gold",
       "role": "pool",
@@ -92,7 +108,8 @@
       "default": 10,
       "min": 0,
       "max": 9999,
-      "icon": "🪙"
+      "icon": "🪙",
+      "tradeable": true
     },
     {
       "id": "res.stars",
@@ -116,7 +133,8 @@
       "default": 0,
       "min": 0,
       "max": 99,
-      "icon": "🍌"
+      "icon": "🍌",
+      "tradeable": true
     },
     {
       "id": "res.stash",
@@ -241,6 +259,18 @@
       "name": "Star Vendor",
       "appliesTo": "entity",
       "color": "#f7dc6f"
+    },
+    {
+      "id": "tag.event",
+      "name": "Mystery",
+      "appliesTo": "space",
+      "color": "#e84393"
+    },
+    {
+      "id": "tag.kraken",
+      "name": "Kraken",
+      "appliesTo": "entity",
+      "color": "#1abc9c"
     }
   ],
   "spaces": [
@@ -264,7 +294,8 @@
       "name": "Lagoon",
       "tags": [
         "tag.blue"
-      ]
+      ],
+      "description": "A calm blue lagoon. The Banana Stand trades bananas for supplies."
     },
     {
       "id": "space.iron_dojo",
@@ -285,7 +316,8 @@
       "id": "space.east_crossing",
       "name": "East Crossing",
       "tags": [
-        "tag.star_spot"
+        "tag.star_spot",
+        "tag.event"
       ]
     },
     {
@@ -351,7 +383,8 @@
       "id": "space.watchtower",
       "name": "Watchtower",
       "tags": [
-        "tag.star_spot"
+        "tag.star_spot",
+        "tag.event"
       ]
     },
     {
@@ -386,7 +419,7 @@
       "id": "space.cliff_path",
       "name": "Cliff Path",
       "tags": [
-        "tag.hazard",
+        "tag.event",
         "tag.star_spot"
       ]
     },
@@ -688,6 +721,239 @@
           "add": 300
         }
       ]
+    },
+    {
+      "id": "item.healing_potion",
+      "name": "Healing Potion",
+      "icon": "🧪",
+      "description": "Drink to restore 50 HP.",
+      "use": {
+        "label": "Drink Healing Potion",
+        "effects": [
+          {
+            "op": "changeResource",
+            "target": "$actor",
+            "resource": "res.hp",
+            "amount": 50
+          }
+        ],
+        "consumed": true
+      }
+    },
+    {
+      "id": "item.smoke_bomb",
+      "name": "Smoke Bomb",
+      "icon": "💣",
+      "description": "Vanish in smoke: nobody can attack you until your next turn ends.",
+      "use": {
+        "label": "Throw Smoke Bomb",
+        "effects": [
+          {
+            "op": "applyStatus",
+            "target": "$actor",
+            "status": "status.smoke"
+          }
+        ],
+        "consumed": true
+      }
+    },
+    {
+      "id": "item.shield_charm",
+      "name": "Shield Charm",
+      "icon": "🧿",
+      "description": "Break it to become Shielded ×2.",
+      "use": {
+        "label": "Break Shield Charm",
+        "effects": [
+          {
+            "op": "applyStatus",
+            "target": "$actor",
+            "status": "status.shielded",
+            "stacks": 2
+          }
+        ],
+        "consumed": true
+      }
+    },
+    {
+      "id": "item.lucky_coin",
+      "name": "Lucky Coin",
+      "icon": "🪙",
+      "concealed": true,
+      "description": "Whoever holds it gains 1 extra gold whenever they gain gold. Others cannot see it.",
+      "rules": [
+        {
+          "id": "rule.lucky_coin",
+          "name": "Lucky Coin",
+          "kind": "modifier",
+          "on": "resourceChange",
+          "where": {
+            "resource": "res.gold",
+            "direction": "gain"
+          },
+          "conditions": {
+            "op": "same",
+            "a": "$target",
+            "b": "$holder"
+          },
+          "modify": {
+            "op": "add",
+            "amount": 1
+          }
+        }
+      ]
+    }
+  ],
+  "statuses": [
+    {
+      "id": "status.fish_form",
+      "name": "Fish Form",
+      "icon": "🐟",
+      "transformation": true,
+      "description": "Turned into a fish: tagged Fish, −1 Move, cannot shop.",
+      "duration": 3,
+      "stacking": "refresh",
+      "grantsTags": [
+        "tag.fish"
+      ],
+      "modifiers": [
+        {
+          "resource": "res.move",
+          "add": -1
+        }
+      ],
+      "suppress": [
+        "shops"
+      ]
+    },
+    {
+      "id": "status.blessed",
+      "name": "Blessed",
+      "icon": "✨",
+      "duration": 3,
+      "stacking": "refresh",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 100
+        }
+      ]
+    },
+    {
+      "id": "status.cursed",
+      "name": "Cursed",
+      "icon": "💀",
+      "duration": 3,
+      "stacking": "extend",
+      "grantsTags": [
+        "tag.cursed"
+      ],
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -50
+        }
+      ]
+    },
+    {
+      "id": "status.shielded",
+      "name": "Shielded",
+      "icon": "🛡️",
+      "duration": 4,
+      "stacking": "stack",
+      "maxStacks": 3,
+      "description": "Each stack absorbs one hit completely.",
+      "rules": [
+        {
+          "id": "rule.shield_absorbs",
+          "name": "Shield",
+          "kind": "modifier",
+          "on": "damage",
+          "conditions": {
+            "op": "same",
+            "a": "$target",
+            "b": "$holder"
+          },
+          "modify": {
+            "op": "prevent"
+          },
+          "consume": {
+            "status": "status.shielded"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status.poisoned",
+      "name": "Poisoned",
+      "icon": "🤢",
+      "duration": 3,
+      "stacking": "stack",
+      "maxStacks": 3,
+      "rules": [
+        {
+          "id": "rule.poison_ticks",
+          "name": "Poison",
+          "trigger": {
+            "event": "turnEnded"
+          },
+          "conditions": {
+            "op": "same",
+            "a": "$actor",
+            "b": "$holder"
+          },
+          "effects": [
+            {
+              "op": "damage",
+              "target": "$holder",
+              "amount": {
+                "op": "mul",
+                "args": [
+                  5,
+                  {
+                    "op": "stacks",
+                    "of": "$holder",
+                    "status": "status.poisoned"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "status.smoke",
+      "name": "Smoke Cloud",
+      "icon": "💨",
+      "duration": 1,
+      "stacking": "refresh",
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "status.stunned",
+      "name": "Stunned",
+      "icon": "😵",
+      "duration": 1,
+      "stacking": "ignore",
+      "suppress": [
+        "takesTurns"
+      ]
+    },
+    {
+      "id": "status.enraged",
+      "name": "Enraged",
+      "icon": "😡",
+      "duration": null,
+      "stacking": "ignore",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 300
+        }
+      ]
     }
   ],
   "shops": [
@@ -734,6 +1000,36 @@
             "resource": "res.gold",
             "amount": 32
           }
+        },
+        {
+          "id": "entry.healing_potion",
+          "grants": {
+            "item": "item.healing_potion"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 5
+          }
+        },
+        {
+          "id": "entry.smoke_bomb",
+          "grants": {
+            "item": "item.smoke_bomb"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 6
+          }
+        },
+        {
+          "id": "entry.shield_charm",
+          "grants": {
+            "item": "item.shield_charm"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 8
+          }
         }
       ]
     },
@@ -750,6 +1046,43 @@
           "price": {
             "resource": "res.gold",
             "amount": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "shop.banana_stand",
+      "name": "Banana Stand",
+      "entries": [
+        {
+          "id": "entry.banana_potion",
+          "grants": {
+            "item": "item.healing_potion"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 2
+          }
+        },
+        {
+          "id": "entry.banana_charm",
+          "grants": {
+            "item": "item.shield_charm"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 3
+          }
+        },
+        {
+          "id": "entry.banana_gold",
+          "grants": {
+            "resource": "res.gold",
+            "amount": 6
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 2
           }
         }
       ]
@@ -820,6 +1153,112 @@
       "spawns": [
         "space.demons_lair"
       ]
+    },
+    {
+      "id": "enemy.kraken",
+      "name": "Kraken",
+      "icon": "🦑",
+      "boss": true,
+      "tags": [
+        "tag.kraken"
+      ],
+      "power": 900,
+      "maxHp": 600,
+      "regenPerRound": 30,
+      "respawnAfterRounds": null,
+      "description": "A boss from the deep. Attacks anyone who lands next to it; enraged below half HP.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 30
+        },
+        {
+          "op": "announce",
+          "text": "{actor} has defeated the Kraken!"
+        }
+      ],
+      "spawns": [],
+      "rules": [
+        {
+          "id": "rule.kraken_grab",
+          "name": "Tentacle Grab",
+          "trigger": {
+            "event": "landed",
+            "where": {
+              "actorKind": "contestant"
+            }
+          },
+          "conditions": {
+            "op": "sameSpace",
+            "a": "$actor",
+            "b": "$holder"
+          },
+          "effects": [
+            {
+              "op": "fight",
+              "attacker": "$holder",
+              "defender": "$actor"
+            }
+          ]
+        },
+        {
+          "id": "rule.kraken_rage",
+          "name": "Kraken Rage",
+          "trigger": {
+            "event": "damaged"
+          },
+          "conditions": {
+            "op": "all",
+            "conds": [
+              {
+                "op": "same",
+                "a": "$target",
+                "b": "$holder"
+              },
+              {
+                "op": "compare",
+                "left": {
+                  "op": "res",
+                  "of": "$holder",
+                  "resource": "res.hp"
+                },
+                "cmp": "<=",
+                "right": 300
+              },
+              {
+                "op": "not",
+                "cond": {
+                  "op": "hasStatus",
+                  "entity": "$holder",
+                  "status": "status.enraged"
+                }
+              }
+            ]
+          },
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$holder",
+              "status": "status.enraged"
+            },
+            {
+              "op": "announce",
+              "text": "The Kraken is enraged! (+300 Power)"
+            }
+          ],
+          "limits": {
+            "maxPerGame": 1
+          }
+        }
+      ]
     }
   ],
   "fixtures": [
@@ -843,6 +1282,453 @@
       "start": {
         "randomSpaceTag": "tag.star_spot"
       }
+    },
+    {
+      "id": "fixture.banana_stand",
+      "name": "Banana Stand",
+      "icon": "🍌",
+      "shop": "shop.banana_stand",
+      "start": {
+        "space": "space.lagoon"
+      }
+    }
+  ],
+  "decks": [
+    {
+      "id": "deck.island",
+      "name": "Island Events",
+      "description": "drawn on Mystery spaces",
+      "cards": [
+        {
+          "id": "card.treasure",
+          "name": "Buried Treasure",
+          "count": 3,
+          "effects": [
+            {
+              "op": "changeResource",
+              "target": "$actor",
+              "resource": "res.gold",
+              "amount": {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "roll",
+                    "count": 1,
+                    "sides": 6
+                  },
+                  2
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "card.blessing",
+          "name": "Tide's Blessing",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.blessed"
+            }
+          ]
+        },
+        {
+          "id": "card.witch",
+          "name": "Witch's Joke",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.fish_form"
+            },
+            {
+              "op": "announce",
+              "text": "A witch cackles. {actor} is now a fish!"
+            }
+          ]
+        },
+        {
+          "id": "card.whisper",
+          "name": "Idol's Whisper",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.cursed"
+            }
+          ]
+        },
+        {
+          "id": "card.merchant",
+          "name": "Wandering Merchant",
+          "count": 2,
+          "effects": [
+            {
+              "op": "offerChoice",
+              "to": "$actor",
+              "prompt": "A merchant offers you a deal.",
+              "options": [
+                {
+                  "id": "charm",
+                  "label": "Buy a Shield Charm for 6 gold",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": -6
+                    },
+                    {
+                      "op": "grantItem",
+                      "target": "$actor",
+                      "item": "item.shield_charm"
+                    }
+                  ],
+                  "requires": {
+                    "op": "compare",
+                    "left": {
+                      "op": "res",
+                      "of": "$actor",
+                      "resource": "res.gold"
+                    },
+                    "cmp": ">=",
+                    "right": 6
+                  }
+                },
+                {
+                  "id": "potion",
+                  "label": "Buy a Healing Potion for 3 gold",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": -3
+                    },
+                    {
+                      "op": "grantItem",
+                      "target": "$actor",
+                      "item": "item.healing_potion"
+                    }
+                  ],
+                  "requires": {
+                    "op": "compare",
+                    "left": {
+                      "op": "res",
+                      "of": "$actor",
+                      "resource": "res.gold"
+                    },
+                    "cmp": ">=",
+                    "right": 3
+                  }
+                },
+                {
+                  "id": "decline",
+                  "label": "Decline",
+                  "effects": []
+                }
+              ],
+              "default": "decline"
+            }
+          ]
+        },
+        {
+          "id": "card.crossroads",
+          "name": "Crossroads Deal",
+          "count": 2,
+          "effects": [
+            {
+              "op": "offerChoice",
+              "to": "$actor",
+              "prompt": "A stranger offers power for blood.",
+              "options": [
+                {
+                  "id": "power",
+                  "label": "Take 20 damage for +80 Power",
+                  "effects": [
+                    {
+                      "op": "damage",
+                      "target": "$actor",
+                      "amount": 20
+                    },
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.power",
+                      "amount": 80
+                    }
+                  ]
+                },
+                {
+                  "id": "gold",
+                  "label": "Take 4 gold instead",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": 4
+                    }
+                  ]
+                }
+              ],
+              "default": "gold"
+            }
+          ]
+        },
+        {
+          "id": "card.storm",
+          "name": "Storm",
+          "count": 1,
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "op": "all",
+                "kind": "contestant"
+              },
+              "do": [
+                {
+                  "op": "damage",
+                  "target": "$it",
+                  "amount": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "roll",
+                        "count": 1,
+                        "sides": 6
+                      },
+                      2
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "announce",
+              "text": "A storm lashes the whole island."
+            }
+          ]
+        },
+        {
+          "id": "card.lucky_find",
+          "name": "Lucky Find",
+          "count": 1,
+          "effects": [
+            {
+              "op": "grantItem",
+              "target": "$actor",
+              "item": "item.lucky_coin"
+            }
+          ]
+        },
+        {
+          "id": "card.snake",
+          "name": "Snake Bite",
+          "count": 1,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.poisoned",
+              "stacks": 2
+            }
+          ]
+        },
+        {
+          "id": "card.kraken",
+          "name": "Kraken Rises",
+          "count": 1,
+          "effects": [
+            {
+              "op": "if",
+              "cond": {
+                "op": "exists",
+                "of": {
+                  "op": "withTag",
+                  "tag": "tag.kraken",
+                  "kind": "enemy"
+                }
+              },
+              "then": [
+                {
+                  "op": "changeResource",
+                  "target": "$actor",
+                  "resource": "res.gold",
+                  "amount": 3
+                }
+              ],
+              "else": [
+                {
+                  "op": "spawn",
+                  "enemy": "enemy.kraken",
+                  "at": {
+                    "op": "randomSpace",
+                    "tag": "tag.blue"
+                  }
+                },
+                {
+                  "op": "announce",
+                  "text": "The sea boils: the Kraken rises!"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "action.pickpocket",
+      "name": "Pickpocket",
+      "icon": "🫳",
+      "description": "Try to lift some gold from a contestant on your space.",
+      "target": {
+        "kind": "contestant",
+        "range": "here"
+      },
+      "cooldownRounds": 3,
+      "effects": [
+        {
+          "op": "randomBranch",
+          "branches": [
+            {
+              "weight": 1,
+              "do": [
+                {
+                  "op": "transfer",
+                  "from": "$target",
+                  "to": "$actor",
+                  "resource": "res.gold",
+                  "amount": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "roll",
+                        "count": 1,
+                        "sides": 4
+                      },
+                      1
+                    ]
+                  }
+                },
+                {
+                  "op": "announce",
+                  "text": "{actor} picks {target}'s pocket!"
+                }
+              ]
+            },
+            {
+              "weight": 1,
+              "do": [
+                {
+                  "op": "damage",
+                  "target": "$actor",
+                  "amount": 10
+                },
+                {
+                  "op": "announce",
+                  "text": "{target} catches {actor} red-handed."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "action.pray",
+      "name": "Pray at the Shrine",
+      "icon": "🙏",
+      "description": "Offer gold for protection.",
+      "where": {
+        "spaceTag": "tag.shrine"
+      },
+      "cost": {
+        "resource": "res.gold",
+        "amount": 4
+      },
+      "cooldownRounds": 2,
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded",
+          "stacks": 2
+        }
+      ]
+    },
+    {
+      "id": "action.fish",
+      "name": "Go Fishing",
+      "icon": "🎣",
+      "description": "Cast a line from a blue space.",
+      "where": {
+        "spaceTag": "tag.blue"
+      },
+      "cooldownRounds": 1,
+      "effects": [
+        {
+          "op": "if",
+          "cond": {
+            "op": "hasTag",
+            "entity": "$actor",
+            "tag": "tag.fish"
+          },
+          "then": [
+            {
+              "op": "changeResource",
+              "target": "$actor",
+              "resource": "res.bananas",
+              "amount": 2
+            }
+          ],
+          "else": [
+            {
+              "op": "randomBranch",
+              "branches": [
+                {
+                  "weight": 3,
+                  "do": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": 3
+                    }
+                  ]
+                },
+                {
+                  "weight": 1,
+                  "do": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.bananas",
+                      "amount": 1
+                    }
+                  ]
+                },
+                {
+                  "weight": 2,
+                  "do": [
+                    {
+                      "op": "announce",
+                      "text": "Nothing bites."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "cast": [
@@ -1092,17 +1978,12 @@
       },
       "effects": [
         {
-          "op": "changeResource",
+          "op": "damage",
           "target": "$actor",
-          "resource": "res.hp",
           "amount": {
-            "op": "sub",
-            "a": 0,
-            "b": {
-              "op": "roll",
-              "count": 2,
-              "sides": 6
-            }
+            "op": "roll",
+            "count": 2,
+            "sides": 6
           }
         }
       ]
@@ -1220,6 +2101,72 @@
           "op": "announce",
           "text": "The Star Vendor packs up and moves on."
         }
+      ]
+    },
+    {
+      "id": "rule.mystery",
+      "name": "Mystery Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.event",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "drawCard",
+          "deck": "deck.island",
+          "for": "$actor"
+        }
+      ]
+    },
+    {
+      "id": "rule.fish_out_of_water",
+      "name": "Fish Out of Water",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.fish",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "not",
+        "cond": {
+          "op": "spaceHasTag",
+          "space": {
+            "op": "spaceOf",
+            "entity": "$it"
+          },
+          "tag": "tag.blue"
+        }
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -40
+        }
+      ]
+    },
+    {
+      "id": "rule.sanctuary",
+      "name": "Harbor Sanctuary",
+      "kind": "continuous",
+      "description": "Nobody can be attacked at Harbor Gate.",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.start"
+      },
+      "suppress": [
+        "attackable"
       ]
     }
   ]

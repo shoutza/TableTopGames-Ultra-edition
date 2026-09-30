@@ -1,5 +1,7 @@
+import type { Capability } from '../schema/rules.ts';
 import type { Entity, GameState } from '../schema/state.ts';
-import type { CompiledGame } from './compile.ts';
+import type { CompiledGame, RuleOwner } from './compile.ts';
+import { continuousEffects } from './continuous.ts';
 import { RuleFault, clamp } from './util.ts';
 
 /** Read helpers over GameState. Pure; never mutate. */
@@ -37,8 +39,9 @@ export function resourceBounds(game: CompiledGame, state: GameState, entity: Ent
 }
 
 /**
- * Effective value: stats add modifiers from held items; pools are the stored amount.
- * Returns undefined if the entity does not have this resource (never an implicit 0).
+ * Effective value: stats add modifiers from held items, statuses (per stack) and continuous rules,
+ * then clamp; pools are the stored amount. Returns undefined if the entity does not have this
+ * resource (never an implicit 0).
  */
 export function effectiveValue(game: CompiledGame, state: GameState, entity: Entity, resourceId: string): number | undefined {
   const base = entity.resources[resourceId];
@@ -52,6 +55,11 @@ export function effectiveValue(game: CompiledGame, state: GameState, entity: Ent
     const itemDef = item ? game.items.get(item.defId) : undefined;
     for (const m of itemDef?.modifiers ?? []) if (m.resource === resourceId) total += m.add;
   }
+  for (const s of entity.statuses) {
+    const statusDef = game.statuses.get(s.defId);
+    for (const m of statusDef?.modifiers ?? []) if (m.resource === resourceId) total += m.add * s.stacks;
+  }
+  if (game.continuous.length > 0) total += continuousEffects(game, state, entity).modifiers.get(resourceId) ?? 0;
   const max = def.max ?? Number.MAX_SAFE_INTEGER;
   return clamp(total, def.min, max);
 }
@@ -62,12 +70,69 @@ export function requireValue(game: CompiledGame, state: GameState, entity: Entit
   return v;
 }
 
+/** Base tags plus tags granted by the entity's statuses. */
+export function effectiveTags(game: CompiledGame, entity: Entity): string[] {
+  if (entity.statuses.length === 0) return entity.tags;
+  const out = [...entity.tags];
+  for (const s of entity.statuses) for (const t of game.statuses.get(s.defId)?.grantsTags ?? []) if (!out.includes(t)) out.push(t);
+  return out;
+}
+
+export function hasEffectiveTag(game: CompiledGame, entity: Entity, tag: string): boolean {
+  if (entity.tags.includes(tag)) return true;
+  for (const s of entity.statuses) if (game.statuses.get(s.defId)?.grantsTags.includes(tag)) return true;
+  return false;
+}
+
+const DEFAULT_CAPABILITIES: Record<Entity['kind'], ReadonlySet<Capability>> = {
+  contestant: new Set(['takesTurns', 'moves', 'shops', 'attacks', 'attackable', 'usesItems', 'trades']),
+  enemy: new Set(['attackable']),
+  fixture: new Set(),
+};
+
+/** Capabilities suppressed by statuses and continuous rules, with the name of what suppresses them. */
+export function suppressedCapabilities(game: CompiledGame, state: GameState, entity: Entity): Map<Capability, string> {
+  const out = new Map<Capability, string>();
+  for (const s of entity.statuses) {
+    const def = game.statuses.get(s.defId);
+    for (const c of def?.suppress ?? []) if (!out.has(c)) out.set(c, def?.name ?? s.defId);
+  }
+  if (game.continuous.length > 0) for (const [c, by] of continuousEffects(game, state, entity).suppress) if (!out.has(c)) out.set(c, by);
+  return out;
+}
+
+export function hasCapability(game: CompiledGame, state: GameState, entity: Entity, capability: Capability): boolean {
+  if (entity.status !== 'active' || !DEFAULT_CAPABILITIES[entity.kind].has(capability)) return false;
+  for (const s of entity.statuses) if (game.statuses.get(s.defId)?.suppress.includes(capability)) return false;
+  if (game.continuous.length > 0 && continuousEffects(game, state, entity).suppress.has(capability)) return false;
+  return true;
+}
+
+export function statusOf(entity: Entity, statusId: string): Entity['statuses'][number] | undefined {
+  return entity.statuses.find((s) => s.defId === statusId);
+}
+
+/** Entities an attached rule currently applies to, in stable order. */
+export function holdersOf(state: GameState, owner: RuleOwner): string[] {
+  const out: string[] = [];
+  for (const id of orderedEntityIds(state)) {
+    const e = state.entities[id];
+    if (!e || e.status !== 'active') continue;
+    if (owner.kind === 'enemy') {
+      if (e.kind === 'enemy' && e.defId === owner.defId) out.push(id);
+    } else if (owner.kind === 'status') {
+      if (e.statuses.some((s) => s.defId === owner.defId)) out.push(id);
+    } else if (e.items.some((itemId) => state.items[itemId]?.defId === owner.defId)) out.push(id);
+  }
+  return out;
+}
+
 /** Spaces reachable in 0..maxSteps steps, with their distance, in BFS order (stable). */
 export function reachableSpaces(game: CompiledGame, from: string, maxSteps: number): Map<string, number> {
   const dist = new Map<string, number>([[from, 0]]);
   const queue = [from];
-  while (queue.length > 0) {
-    const cur = queue.shift() as string;
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head] as string;
     const d = dist.get(cur) as number;
     if (d >= maxSteps) continue;
     for (const next of game.adjacency.get(cur) ?? []) {
@@ -86,8 +151,8 @@ export function shortestPath(game: CompiledGame, from: string, to: string): stri
   const parent = new Map<string, string>();
   const seen = new Set([from]);
   const queue = [from];
-  while (queue.length > 0) {
-    const cur = queue.shift() as string;
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head] as string;
     for (const next of game.adjacency.get(cur) ?? []) {
       if (seen.has(next)) continue;
       seen.add(next);

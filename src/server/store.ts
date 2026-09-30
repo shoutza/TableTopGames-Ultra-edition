@@ -19,7 +19,7 @@ import type { AiCallRecord, OperationRecord } from './session.ts';
 export const SnapshotSchema = z.object({
   saveFormatVersion: z.literal(SAVE_FORMAT_VERSION),
   engineVersion: z.string(),
-  rulesLanguageVersion: z.literal(RULES_LANGUAGE_VERSION),
+  rulesLanguageVersion: z.union([z.literal(1), z.literal(RULES_LANGUAGE_VERSION)]),
   savedAt: z.string(),
   scenario: z.string(),
   definition: z.unknown(),
@@ -36,6 +36,37 @@ const HistoryLineSchema = z.object({
   events: z.array(GameEventSchema),
   firings: z.array(z.unknown()).default([]),
 });
+
+type Json = Record<string, unknown>;
+
+/**
+ * Explicit, step-by-step save migrations. Version 1 (first playable version) → 2 (M4): rule
+ * counters gained per-round/per-game/cooldown fields, attack options name their `target`, buy
+ * options carry their price; new state fields (statuses, decks, choice queue, cooldowns) get
+ * their schema defaults.
+ */
+export function migrateSnapshot(raw: Json): Json {
+  const version = raw['saveFormatVersion'];
+  if (version === SAVE_FORMAT_VERSION) return raw;
+  if (version !== 1) throw new Error(`save format ${String(version)} cannot be migrated`);
+  const state = (raw['state'] ?? {}) as Json;
+  const counters = (state['ruleCounters'] ?? {}) as Record<string, Json>;
+  for (const [key, c] of Object.entries(counters)) {
+    if ('count' in c) counters[key] = { turnKey: c['turnKey'], turnCount: c['count'], round: -1, roundCount: 0, total: c['count'], lastRound: -1000 };
+  }
+  const definition = (raw['definition'] ?? {}) as { shops?: Array<{ entries: Array<{ id: string; price: { amount: number } }> }> };
+  const prices = new Map((definition.shops ?? []).flatMap((shop) => shop.entries.map((e) => [e.id, e.price.amount] as const)));
+  const pending = state['pendingDecision'] as { options?: Json[] } | null | undefined;
+  for (const option of pending?.options ?? []) {
+    if (option['kind'] === 'attack' && 'enemy' in option) {
+      option['target'] = option['enemy'];
+      delete option['enemy'];
+    }
+    if (option['kind'] === 'buy' && !('price' in option)) option['price'] = prices.get(String(option['entry'])) ?? 0;
+  }
+  state['formatVersion'] = SAVE_FORMAT_VERSION;
+  return { ...raw, state, saveFormatVersion: SAVE_FORMAT_VERSION };
+}
 
 export interface LoadedMatch {
   snapshot: Snapshot;
@@ -107,10 +138,10 @@ export class MatchStore {
 
   load(matchId: string): LoadedMatch {
     const dir = this.dir(matchId);
-    const raw: unknown = JSON.parse(readFileSync(path.join(dir, 'snapshot.json'), 'utf8'));
-    const version = (raw as { saveFormatVersion?: unknown }).saveFormatVersion;
+    const raw = JSON.parse(readFileSync(path.join(dir, 'snapshot.json'), 'utf8')) as Json;
+    const version = raw['saveFormatVersion'];
     if (typeof version === 'number' && version > SAVE_FORMAT_VERSION) throw new Error(`save format ${version} is newer than this app supports (${SAVE_FORMAT_VERSION})`);
-    const snapshot = SnapshotSchema.parse(raw);
+    const snapshot = SnapshotSchema.parse(migrateSnapshot(raw));
     const definition = GameDefinitionSchema.parse(snapshot.definition);
     const events: GameEvent[] = [];
     const firings: FiringRecord[] = [];

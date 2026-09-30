@@ -3,7 +3,8 @@ import { loadStarter } from '../src/cli/headless.ts';
 import { chooseHeuristic } from '../src/contestants/heuristic.ts';
 import { newMind } from '../src/contestants/mind.ts';
 import { buildDecisionPacket } from '../src/contestants/packet.ts';
-import { advance, answerDecision, cloneJson, compileGame, createMatch, nextStepKind, type CompiledGame } from '../src/engine/index.ts';
+import { advance, answerDecision, applyGmCommand, cloneJson, compileGame, createMatch, nextStepKind, type CompiledGame } from '../src/engine/index.ts';
+import { GmCommandSchema } from '../src/schema/commands.ts';
 import { GameDefinitionSchema } from '../src/schema/definition.ts';
 import type { GameEvent, GameState } from '../src/schema/state.ts';
 import { publicInfo } from '../src/visibility/public-info.ts';
@@ -145,12 +146,89 @@ describe('combat odds in packets', () => {
     const moved = cloneJson(state);
     (moved.entities[actor] as { spaceId: string | null }).spaceId = slime?.spaceId ?? null;
     moved.phase = 'main';
-    moved.pendingDecision = { id: 'd1', actor, kind: 'main', issuedRev: 1, options: [{ id: `atk:${slime?.id}`, kind: 'attack', enemy: slime?.id as string, label: 'Attack Slime' }, { id: 'pass', kind: 'pass', label: 'Pass' }] };
+    moved.pendingDecision = { id: 'd1', actor, kind: 'main', issuedRev: 1, options: [{ id: `atk:${slime?.id}`, kind: 'attack', target: slime?.id as string, label: 'Attack Slime' }, { id: 'pass', kind: 'pass', label: 'Pass' }] };
     const p = packetFor(starter, moved, events, actor);
     expect(p.text).toContain('you win each spin 57.1%');
     expect(p.text).toContain('you hit for 33');
     expect(p.text).toContain('it hits for 19');
     expect(p.text).toMatch(/you win 99\.\d%/);
     expect(p.text).toContain('Reward: you gain 50 Power, then you gain 3 Gold.');
+  });
+});
+
+describe('hidden-information pairs for M4 mechanics', () => {
+  const base = playUntil(starter, 'pairs-m4', 160);
+  const viewer = base.state.pendingDecision?.actor as string;
+  const other = base.state.turnOrder.find((id) => id !== viewer) as string;
+
+  function withItem(state: GameState, holder: string, defId: string): GameState {
+    const s = cloneJson(state);
+    s.counters.item += 1;
+    const id = `i${s.counters.item}`;
+    s.items[id] = { id, defId, holder };
+    (s.entities[holder] as { items: string[] }).items.push(id);
+    return s;
+  }
+
+  it('which concealed item another contestant holds does not change the packet', () => {
+    // Two concealed items with different bonuses; only their holder may know which is which.
+    const def = cloneJson(starter.def);
+    def.items.push({ id: 'item.cursed_coin', name: 'Cursed Coin', concealed: true, tags: [], modifiers: [{ resource: 'res.power', add: -30 }], rules: [] });
+    const g = compileGame(GameDefinitionSchema.parse(def));
+    const a = packetFor(g, withItem(base.state, other, 'item.lucky_coin'), base.events, viewer);
+    const b = packetFor(g, withItem(base.state, other, 'item.cursed_coin'), base.events, viewer);
+    expect(b).toEqual(a);
+    expect(a.text).toContain('a concealed item');
+  });
+
+  it('the order of the draw pile does not change the packet (its size and the discards do)', () => {
+    const shuffled = cloneJson(base.state);
+    const pile = shuffled.decks['deck.island'];
+    if (!pile) throw new Error('no deck');
+    pile.draw = [...pile.draw].reverse();
+    expect(packetFor(starter, shuffled, base.events, viewer)).toEqual(packetFor(starter, base.state, base.events, viewer));
+  });
+
+  it('a hidden status (on anyone) does not change the packet', () => {
+    const def = cloneJson(starter.def);
+    def.statuses.push({ id: 'status.secret_hex', name: 'Secret Hex', duration: null, stacking: 'ignore', maxStacks: 1, grantsTags: [], modifiers: [{ resource: 'res.power', add: -60 }], suppress: [], visibility: 'hidden', transformation: false, rules: [] });
+    const g = compileGame(GameDefinitionSchema.parse(def));
+    for (const target of [viewer, other]) {
+      const hexed = cloneJson(base.state);
+      (hexed.entities[target] as { statuses: GameState['entities'][string]['statuses'] }).statuses.push({ id: 's99', defId: 'status.secret_hex', stacks: 1, remaining: null, fresh: false });
+      expect(packetFor(g, hexed, base.events, viewer)).toEqual(packetFor(g, base.state, base.events, viewer));
+    }
+  });
+
+  it('Fish Form is explained in the packet: −1 Move on the roll and no shopping', () => {
+    const created = createMatch(starter, { matchId: 'fish', seed: 'fish-form' });
+    if (!created.ok) throw new Error('create failed');
+    let state = created.state;
+    const events = [...created.events];
+    while (nextStepKind(state) === 'auto') {
+      const out = advance(starter, state);
+      if (!out.ok) throw new Error(out.message);
+      state = out.state;
+      events.push(...out.events);
+    }
+    const actor = state.pendingDecision?.actor as string;
+    const fish = applyGmCommand(starter, state, GmCommandSchema.parse({ type: 'applyStatus', entity: actor, status: 'status.fish_form' }));
+    if (!fish.ok) throw new Error('fish');
+    // Answer this move, then play to the actor's next move decision so the roll includes −1 Move.
+    state = fish.state;
+    events.push(...fish.events);
+    for (let i = 0; i < 200 && !(state.pendingDecision?.kind === 'move' && state.pendingDecision.actor === actor && state.round > 1); i++) {
+      const out =
+        nextStepKind(state) === 'auto'
+          ? advance(starter, state)
+          : answerDecision(starter, state, { decisionId: state.pendingDecision?.id as string, optionId: state.pendingDecision?.options.find((o) => o.kind === 'pass' || (o.kind === 'move' && o.steps === 0))?.id ?? (state.pendingDecision?.options[0]?.id as string) });
+      if (!out.ok) throw new Error(out.message);
+      state = out.state;
+      events.push(...out.events);
+    }
+    const p = packetFor(starter, state, events, actor);
+    expect(p.text).toMatch(/Statuses: Fish Form \(\d turns? left\)/);
+    expect(p.text).toMatch(/You rolled \d; −1 Move \(Fish Form\) → move up to \d steps?\./);
+    expect(p.text).toContain('Right now you cannot shop (Fish Form)');
   });
 });

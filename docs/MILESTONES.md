@@ -88,9 +88,45 @@ save, and continues with an identical state hash.
 - [x] `npm run build` writes the web bundle to `dist-web/`; `npm start` serves it without Vite
 
 ## M4 — Mechanics breadth
-Statuses (durations, stacking, granted tags, capability suppression), transformation templates,
-contestant-vs-contestant combat, bosses and GM enemy spawning, event deck with pending choices, custom
-actions, before-modifiers and continuous modifiers, item/status-attached rules, cooldowns.
+- [x] Statuses: durations in the holder's turns (enemies: rounds), stacking (refresh / extend /
+      stack / ignore), granted tags, per-stack modifiers, capability suppression, hidden statuses;
+      a knockout ends them (`ko.clearStatuses`)
+- [x] Transformation templates, one at a time (Fish Form: tagged Fish, −1 Move, no shopping)
+- [x] Before-modifiers on damage, resource changes, prices, movement rolls and status application
+      (add / scale / clampTo / prevent in priority order, paid with a status stack or the item);
+      price and roll modifiers must be public and view-safe
+- [x] Continuous rules: stat modifiers and capability suppression, evaluated on read (no effective
+      stats, no randomness)
+- [x] Rules attached to items, statuses and enemies (`$holder`, limits per holder); limits per
+      turn / round / game and cooldowns
+- [x] Contestant-vs-contestant combat with loot to the victor, elimination mode, threat previews
+- [x] Bosses and enemy spawning (GM tool, `spawn` effect, event card); removing entities
+- [x] Event deck (hidden order, public counts, card-counting hints) and pending choices answered in
+      their own operations, with defaults when nobody can answer
+- [x] Custom actions (location, cost, cooldown, optional target); usable and concealed items
+- [x] Save format 2 with a migration from format 1, tested on a real save from the first playable
+      version
+- [x] Starter content: Mystery spaces with a 17-card Island Events deck, 8 statuses, potions, smoke
+      bombs, shield charms, a concealed Lucky Coin, a Banana Stand, the Kraken boss, pickpocket /
+      pray / fish actions, a harbor sanctuary
+- [x] GM tools: apply / remove status (with stacks), transform, draw a card (the GM sees the next
+      card), spawn enemy, remove
+
+**Status:** done. 62 rule-interaction scenarios (`tests/scenarios.test.ts`) pass alongside the 11
+rule tests from M1. With Fish Form applied, the move preview and packet show −1 Move on the roll and
+"Right now you cannot shop (Fish Form)". A boss scenario plays spawn → wounded → enraged → defeated
+→ rewards → never returns. In headless Chromium the GM spawned the Kraken, shielded a contestant and
+teleported it onto the boss; the wheel showed the shields absorbing two hits before the knockout.
+`npm run sim -- --matches 200 --rounds 30`: 0 rule faults, 0 aborts, operation p99 0.27 ms (max
+6.3 ms). `npm run sim -- --matches 1000 --seed accept`: 0 faults, 0 aborts, 1.78 real decisions per
+turn, median effective Power 560, 0.45 Demon kills, 3.1 PvP fights and 3.1 knockouts per match,
+operation p99 0.24 ms; wins by archetype: power farmer 407, star chaser 302, gear-up 210, banker 101
+(the banker is weakest; to revisit in the balance pass). Packets through the model pipeline: p50 ≈
+2.0k / p95 ≈ 2.6k estimated tokens, with the shared rulebook first as a cacheable prefix.
+
+**Done when:** about 60 rule-interaction scenarios pass; with Fish Form applied, previews show −1
+Move and no shop access; a boss fight works end to end; 30-round sims on the starter content have 0
+rule faults; operations run at p99 < 10 ms.
 
 ## M5 — Social layer
 Private objectives (templates, rewards in stars), trading with one counteroffer, commitments and

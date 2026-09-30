@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EffectSchema, EntityKindSchema, RuleDefSchema } from './rules.ts';
+import { CapabilitySchema, CondSchema, EffectSchema, EntityKindSchema, RuleDefSchema } from './rules.ts';
 import { PersonaSchema } from './persona.ts';
 import { RULES_LANGUAGE_VERSION } from './versions.ts';
 
@@ -26,6 +26,8 @@ export const ResourceDefSchema = z.strictObject({
   maxFrom: Id.optional(),
   visibility: z.enum(['public', 'owner', 'gm']).default('public'),
   icon: Icon,
+  /** Contestants may exchange this resource in trades. */
+  tradeable: z.boolean().default(false),
 });
 export type ResourceDef = z.infer<typeof ResourceDefSchema>;
 
@@ -60,6 +62,8 @@ export const LayoutSchema = z.strictObject({
 });
 export type Layout = z.infer<typeof LayoutSchema>;
 
+const StatModifierSchema = z.strictObject({ resource: Id, add: Int });
+
 export const ItemDefSchema = z.strictObject({
   id: Id,
   name: Name,
@@ -67,9 +71,48 @@ export const ItemDefSchema = z.strictObject({
   description: z.string().max(300).optional(),
   tags: z.array(Id).max(8).default([]),
   /** Passive modifiers to stat resources while held (e.g. +150 Power). */
-  modifiers: z.array(z.strictObject({ resource: Id, add: Int })).max(4).default([]),
+  modifiers: z.array(StatModifierSchema).max(4).default([]),
+  /** Other contestants see only "a concealed item" (and none of its modifiers). */
+  concealed: z.boolean().default(false),
+  /** Optional use action (a main action); $actor and $holder are the user. */
+  use: z
+    .strictObject({
+      label: z.string().min(1).max(60).optional(),
+      effects: z.array(EffectSchema).min(1).max(12),
+      consumed: z.boolean().default(true),
+    })
+    .optional(),
+  /** Rules active only while the item is held ($holder = the holder). */
+  rules: z.array(RuleDefSchema).max(8).default([]),
 });
 export type ItemDef = z.infer<typeof ItemDefSchema>;
+
+/**
+ * Timed statuses. Durations count the holder's own turns (enemies and fixtures: rounds) and do not
+ * count down at the end of the turn in which the status was applied.
+ */
+export const StatusDefSchema = z.strictObject({
+  id: Id,
+  name: Name,
+  icon: Icon,
+  description: z.string().max(300).optional(),
+  /** Holder turns the status lasts; null = until removed. */
+  duration: z.number().int().min(1).max(99).nullable(),
+  /** Re-applying: refresh the duration, extend it, add a stack (and refresh), or ignore. */
+  stacking: z.enum(['refresh', 'extend', 'stack', 'ignore']).default('refresh'),
+  maxStacks: z.number().int().min(1).max(99).default(1),
+  /** Tags the holder counts as having while the status lasts (effective tags). */
+  grantsTags: z.array(Id).max(8).default([]),
+  /** Stat modifiers per stack. */
+  modifiers: z.array(StatModifierSchema).max(4).default([]),
+  suppress: z.array(CapabilitySchema).max(8).default([]),
+  /** Hidden statuses (secret curses) are invisible to every contestant, including the holder. */
+  visibility: z.enum(['public', 'hidden']).default('public'),
+  /** Offered to the GM as a transformation template ("turn into a fish"). */
+  transformation: z.boolean().default(false),
+  rules: z.array(RuleDefSchema).max(8).default([]),
+});
+export type StatusDef = z.infer<typeof StatusDefSchema>;
 
 export const ShopEntrySchema = z.strictObject({
   id: Id,
@@ -98,9 +141,51 @@ export const EnemyDefSchema = z.strictObject({
   respawnAfterRounds: z.number().int().min(1).nullable(),
   /** Effects run when defeated, with $actor = victor and $target = this enemy. */
   rewards: z.array(EffectSchema).max(12).default([]),
-  spawns: z.array(Id).min(1).max(20),
+  /** Spaces where copies start. Empty for enemies that only appear when spawned (bosses). */
+  spawns: z.array(Id).max(20),
+  boss: z.boolean().default(false),
+  /** Rules active while this enemy is on the board ($holder = the enemy). */
+  rules: z.array(RuleDefSchema).max(8).default([]),
 });
 export type EnemyDef = z.infer<typeof EnemyDefSchema>;
+
+export const CardDefSchema = z.strictObject({
+  id: Id,
+  name: Name,
+  text: z.string().max(300).optional(),
+  count: z.number().int().min(1).max(10).default(1),
+  /** Run for the drawer ($actor, $space = the drawer's space). */
+  effects: z.array(EffectSchema).min(1).max(12),
+});
+export type CardDef = z.infer<typeof CardDefSchema>;
+
+/** A shuffled deck: card order is hidden, the list of cards and the pile sizes are public. */
+export const DeckDefSchema = z.strictObject({
+  id: Id,
+  name: Name,
+  description: z.string().max(300).optional(),
+  cards: z.array(CardDefSchema).min(1).max(40),
+});
+export type DeckDef = z.infer<typeof DeckDefSchema>;
+
+/**
+ * Custom main actions. Availability (location, requirements, cost, cooldown) is decided from
+ * data the contestant can see; effects run with $actor = the user, $target = the chosen target.
+ */
+export const ActionDefSchema = z.strictObject({
+  id: Id,
+  name: Name,
+  icon: Icon,
+  description: z.string().max(300).optional(),
+  where: z.strictObject({ spaceTag: Id.optional(), space: Id.optional() }).optional(),
+  requires: CondSchema.optional(),
+  cost: z.strictObject({ resource: Id, amount: z.number().int().min(1) }).optional(),
+  /** The same contestant can use the action again this many rounds later. */
+  cooldownRounds: z.number().int().min(1).max(50).optional(),
+  target: z.strictObject({ kind: EntityKindSchema, range: z.enum(['here', 'anywhere']) }).optional(),
+  effects: z.array(EffectSchema).min(1).max(12),
+});
+export type ActionDef = z.infer<typeof ActionDefSchema>;
 
 export const FixtureDefSchema = z.strictObject({
   id: Id,
@@ -139,6 +224,12 @@ export const BudgetSettingsSchema = z.strictObject({
   randomDraws: z.number().int().min(1).default(256),
   expressionSteps: z.number().int().min(1).default(20_000),
   selectorSize: z.number().int().min(1).default(64),
+  /** Entities created by spawn effects in one operation. */
+  spawns: z.number().int().min(0).default(10),
+  /** Choices queued by one operation. */
+  choices: z.number().int().min(0).default(4),
+  /** Total forEach iterations in one operation. */
+  loopIterations: z.number().int().min(1).default(256),
 });
 export type BudgetSettings = z.infer<typeof BudgetSettingsSchema>;
 
@@ -146,16 +237,28 @@ export const SettingsSchema = z.strictObject({
   /** Which resources play the core roles the engine needs to know about. */
   core: z.strictObject({ hp: Id, maxHp: Id, power: Id, gold: Id }),
   startSpace: Id,
-  movement: z.strictObject({ die: z.number().int().min(2).max(20) }),
+  movement: z.strictObject({
+    die: z.number().int().min(2).max(20),
+    /** Optional stat added to every movement roll (e.g. a Move stat that statuses lower). */
+    bonus: Id.optional(),
+  }),
   inventoryCapacity: z.number().int().min(0).max(20),
   rest: z.strictObject({ heal: z.number().int().min(0) }),
   combat: z.strictObject({
     damage: DamageSettingsSchema,
     maxSpinsPerFight: z.number().int().min(1).max(50),
+    /** Contestants may attack other contestants on their space. */
+    pvp: z.boolean().default(true),
   }),
   ko: z.strictObject({
     goldLossPercent: z.number().int().min(0).max(100),
     skipTurns: z.number().int().min(0).max(5),
+    /** Gold lost in a knockout goes to the contestant who won the fight. */
+    lootToVictor: z.boolean().default(true),
+    /** respawn: back to start after skipping turns. eliminate: out of the match for good. */
+    mode: z.enum(['respawn', 'eliminate']).default('respawn'),
+    /** A knockout ends all of the contestant's statuses (transformations included). */
+    clearStatuses: z.boolean().default(true),
   }),
   victory: z.strictObject({
     resource: Id,
@@ -172,6 +275,9 @@ export const SettingsSchema = z.strictObject({
     randomDraws: 256,
     expressionSteps: 20_000,
     selectorSize: 64,
+    spawns: 10,
+    choices: 4,
+    loopIterations: 256,
   }),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -180,7 +286,8 @@ export const GameDefinitionSchema = z.strictObject({
   id: Id,
   name: Name,
   description: z.string().max(2000).default(''),
-  rulesLanguageVersion: z.literal(RULES_LANGUAGE_VERSION),
+  /** Version 1 definitions are valid version 2 definitions (version 2 only added primitives). */
+  rulesLanguageVersion: z.union([z.literal(1), z.literal(RULES_LANGUAGE_VERSION)]).transform(() => RULES_LANGUAGE_VERSION),
   settings: SettingsSchema,
   resources: z.array(ResourceDefSchema).min(1).max(64),
   tags: z.array(TagDefSchema).max(128).default([]),
@@ -188,9 +295,12 @@ export const GameDefinitionSchema = z.strictObject({
   connections: z.array(ConnectionDefSchema).min(1).max(2000),
   layout: LayoutSchema,
   items: z.array(ItemDefSchema).max(256).default([]),
+  statuses: z.array(StatusDefSchema).max(128).default([]),
   shops: z.array(ShopDefSchema).max(32).default([]),
   enemies: z.array(EnemyDefSchema).max(64).default([]),
   fixtures: z.array(FixtureDefSchema).max(32).default([]),
+  decks: z.array(DeckDefSchema).max(16).default([]),
+  actions: z.array(ActionDefSchema).max(32).default([]),
   cast: z.array(CastMemberSchema).min(1).max(8),
   rules: z.array(RuleDefSchema).max(256).default([]),
 });

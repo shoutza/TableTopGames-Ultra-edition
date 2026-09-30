@@ -48,7 +48,7 @@ function merge(prev: MatchData, u: MatchUpdateDto): MatchData {
   const bySeq = new Map(prev.bySeq);
   for (const e of u.events) bySeq.set(e.seq, e);
   const aiCalls: AiCallDto[] = [...prev.aiCalls, ...u.aiCalls].slice(-300);
-  return { ...prev, state: u.state, events: [...prev.events, ...u.events], firings, bySeq, minds: u.minds, effective: u.effective, status: u.status, metrics: u.metrics, aiCalls };
+  return { ...prev, state: u.state, events: [...prev.events, ...u.events], firings, bySeq, minds: u.minds, effective: u.effective, derived: u.derived, status: u.status, metrics: u.metrics, aiCalls };
 }
 
 /**

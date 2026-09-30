@@ -474,3 +474,12 @@ pre {
 .why ol {
   padding-left: 18px;
 }
+
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+ul.plain li {
+  padding: 2px 0;
+}

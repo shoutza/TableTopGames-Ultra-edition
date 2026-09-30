@@ -20,7 +20,23 @@ export function spaceName(def: GameDefinition, id: string | null): string {
   return def.spaces.find((s) => s.id === id)?.name ?? id;
 }
 
+/** A transformation status changes how the token looks (e.g. 🐟 while in Fish Form). */
+export function transformationOf(def: GameDefinition, e: Entity): { name: string; icon: string } | null {
+  for (const s of e.statuses) {
+    const d = def.statuses.find((x) => x.id === s.defId);
+    if (d?.transformation) return { name: d.name, icon: d.icon ?? '✨' };
+  }
+  return null;
+}
+
+export function statusLabel(def: GameDefinition, s: Entity['statuses'][number]): string {
+  const d = def.statuses.find((x) => x.id === s.defId);
+  return `${d?.icon ?? '•'} ${d?.name ?? s.defId}${s.stacks > 1 ? ` ×${s.stacks}` : ''}${s.remaining !== null ? ` (${s.remaining})` : ''}`;
+}
+
 export function entityIcon(def: GameDefinition, e: Entity): string {
+  const t = transformationOf(def, e);
+  if (t) return t.icon;
   if (e.kind === 'contestant') return def.cast.find((c) => c.id === e.defId)?.icon ?? e.name.slice(0, 1);
   if (e.kind === 'enemy') return def.enemies.find((x) => x.id === e.defId)?.icon ?? '👾';
   return def.fixtures.find((x) => x.id === e.defId)?.icon ?? '🏷️';

@@ -1,13 +1,14 @@
-import { mkdtempSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loadStarter } from '../src/cli/headless.ts';
 import { DEFAULT_CONTROLLER_CONFIG } from '../src/contestants/controller.ts';
 import { loadGame } from '../src/engine/index.ts';
 import { stateHash } from '../src/server/hash.ts';
 import { MatchSession } from '../src/server/session.ts';
-import { MatchStore } from '../src/server/store.ts';
+import { MatchStore, migrateSnapshot } from '../src/server/store.ts';
 
 const starter = loadStarter();
 const deps = { provider: null, config: DEFAULT_CONTROLLER_CONFIG, price: null };
@@ -69,5 +70,34 @@ describe('saves', () => {
     const text = readFileSync(path.join(dir, 'matches/persist/snapshot.json'), 'utf8') + readFileSync(path.join(dir, 'matches/persist/history.jsonl'), 'utf8');
     expect(text).not.toMatch(/sk-[A-Za-z0-9]/);
     expect(text).not.toMatch(/OPENAI_API_KEY/);
+  });
+});
+
+describe('save migrations', () => {
+  it('loads a format-1 save (first playable version), migrates it and plays on to the end', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ttg-'));
+    mkdirSync(path.join(dir, 'matches/v1fixture'), { recursive: true });
+    copyFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/save-v1/snapshot.json'), path.join(dir, 'matches/v1fixture/snapshot.json'));
+    const loaded = new MatchStore(dir).load('v1fixture');
+    expect(loaded.snapshot.saveFormatVersion).toBe(2);
+    const attack = loaded.snapshot.state.pendingDecision?.options.find((o) => o.kind === 'attack');
+    expect(attack && attack.kind === 'attack' ? attack.target : null).toBe('e6');
+    expect(Object.values(loaded.snapshot.state.ruleCounters).every((c) => typeof c.turnCount === 'number')).toBe(true);
+    const compiled = loadGame(loaded.definition);
+    if (!compiled.ok) throw new Error(compiled.errors.join('; '));
+    const session = MatchSession.restore(compiled.game, loaded.snapshot.state, loaded.events, loaded.firings, loaded.snapshot.minds, deps);
+    await session.runToEnd();
+    expect(session.over).toBe(true);
+    expect(session.state.winners?.length).toBeGreaterThan(0);
+  });
+
+  it('migrates buy options by adding the price from the saved definition', () => {
+    const raw = {
+      saveFormatVersion: 1,
+      definition: { shops: [{ entries: [{ id: 'entry.x', price: { amount: 7 } }] }] },
+      state: { ruleCounters: {}, pendingDecision: { options: [{ id: 'buy:e9:entry.x', kind: 'buy', label: 'Buy', fixture: 'e9', entry: 'entry.x' }] } },
+    };
+    const migrated = migrateSnapshot(raw) as { state: { pendingDecision: { options: Array<{ price: number }> } } };
+    expect(migrated.state.pendingDecision.options[0]?.price).toBe(7);
   });
 });

@@ -3,13 +3,16 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import { z } from 'zod';
-import { describeEvent, effectiveValue, loadGame, namesFor, type CompiledGame, type FiringRecord } from '../engine/index.ts';
+import { describeEvent, describeRule, describeStatus, effectiveTags, effectiveValue, loadGame, namesFor, suppressedCapabilities, type CompiledGame, type FiringRecord } from '../engine/index.ts';
+import { summarizeEffects } from '../engine/explain.ts';
+import { describeItem } from '../visibility/view.ts';
 import { GmCommandSchema } from '../schema/commands.ts';
 import type { GameEvent } from '../schema/state.ts';
 import { ENGINE_VERSION, RULES_LANGUAGE_VERSION } from '../schema/versions.ts';
 import type {
   AiCallDto,
   ContestantViewResponse,
+  DerivedDto,
   EventDto,
   FiringDto,
   HealthResponse,
@@ -17,6 +20,7 @@ import type {
   MatchSnapshotDto,
   MatchUpdateDto,
   MindDto,
+  RulebookDto,
   Speed,
   StatusDto,
 } from '../shared/api.ts';
@@ -146,6 +150,28 @@ export class GmApp {
     return out;
   }
 
+  private derived(h: Hosted): Record<string, DerivedDto> {
+    const { game, state } = h.session;
+    const out: Record<string, DerivedDto> = {};
+    for (const e of Object.values(state.entities)) {
+      if (e.status === 'removed') continue;
+      out[e.id] = { tags: [...effectiveTags(game, e)], suppressed: [...suppressedCapabilities(game, state, e)].map(([capability, by]) => ({ capability, by })) };
+    }
+    return out;
+  }
+
+  private rulebook(h: Hosted): RulebookDto {
+    const { game, state } = h.session;
+    const names = namesFor(game, state);
+    return {
+      rules: Object.fromEntries([...game.rules.values()].map((r) => [r.def.id, describeRule(r.def, names)])),
+      statuses: Object.fromEntries(game.def.statuses.map((st) => [st.id, describeStatus(st, names)])),
+      items: Object.fromEntries(game.def.items.map((i) => [i.id, describeItem(i, names)])),
+      actions: Object.fromEntries(game.def.actions.map((a) => [a.id, summarizeEffects(a.effects, names)])),
+      cards: Object.fromEntries(game.def.decks.flatMap((d) => d.cards.map((c) => [c.id, summarizeEffects(c.effects, names)] as const))),
+    };
+  }
+
   private status(h: Hosted): StatusDto {
     const s = h.session;
     return {
@@ -189,6 +215,8 @@ export class GmApp {
       firings: s.firings as FiringDto[],
       minds: this.minds(h),
       effective: this.effective(h),
+      derived: this.derived(h),
+      rulebook: this.rulebook(h),
       status: this.status(h),
       metrics: s.metrics(),
       aiCalls: s.calls.slice(-300) as AiCallDto[],
@@ -212,6 +240,7 @@ export class GmApp {
       firings: s.firings.slice(h.sentFirings) as FiringDto[],
       minds: this.minds(h),
       effective: this.effective(h),
+      derived: this.derived(h),
       status: this.status(h),
       metrics: s.metrics(),
       aiCalls: s.calls.slice(h.sentCalls) as AiCallDto[],

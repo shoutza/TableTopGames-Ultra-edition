@@ -8,7 +8,8 @@ import { MatchSession } from '../server/session.ts';
 import { loadStarter, runHeadlessMatch, stateHash } from './headless.ts';
 
 /**
- * npm run sim -- [--matches N] [--seed S] [--log] [--controllers heuristic|llm|mock]
+ * npm run sim -- [--matches N] [--seed S] [--log] [--controllers heuristic|llm|mock] [--rounds N]
+ * --rounds N plays every match for exactly N rounds (no early victory).
  * heuristic: offline balance report over many matches.
  * llm: one match with model-driven contestants (OPENAI_API_KEY), with a cost/latency report.
  * mock: one match through the full model pipeline with a scripted offline provider.
@@ -20,10 +21,11 @@ const { values } = parseArgs({
     seed: { type: 'string', default: 'sim' },
     log: { type: 'boolean', default: false },
     controllers: { type: 'string', default: 'heuristic' },
+    rounds: { type: 'string' },
   },
 });
 
-const game = loadStarter();
+const game = loadStarter({ rounds: values.rounds !== undefined ? Number(values.rounds) : undefined });
 
 if (values.controllers === 'llm' || values.controllers === 'mock') {
   const config = loadConfig(process.env);
@@ -70,6 +72,14 @@ interface Totals {
   aborted: number;
   winsByArchetype: Record<string, number>;
   ms: number;
+  opMs: number[];
+  cards: number;
+  statuses: number;
+  actions: number;
+  itemUses: number;
+  choices: number;
+  pvpFights: number;
+  bossSpawns: number;
 }
 
 const t: Totals = {
@@ -90,6 +100,14 @@ const t: Totals = {
   aborted: 0,
   winsByArchetype: {},
   ms: 0,
+  opMs: [],
+  cards: 0,
+  statuses: 0,
+  actions: 0,
+  itemUses: 0,
+  choices: 0,
+  pvpFights: 0,
+  bossSpawns: 0,
 };
 
 for (let i = 0; i < n; i++) {
@@ -105,7 +123,14 @@ for (let i = 0; i < n; i++) {
     if (e.type === 'fightStarted') {
       t.fights++;
       if (isDemon(e.attacker) || isDemon(e.defender)) t.demonFights++;
+      if (s.entities[e.attacker]?.kind === 'contestant' && s.entities[e.defender]?.kind === 'contestant') t.pvpFights++;
     }
+    if (e.type === 'cardDrawn') t.cards++;
+    if (e.type === 'statusApplied') t.statuses++;
+    if (e.type === 'actionUsed') t.actions++;
+    if (e.type === 'itemUsed') t.itemUses++;
+    if (e.type === 'choiceMade') t.choices++;
+    if (e.type === 'spawned' && e.boss) t.bossSpawns++;
     if (e.type === 'defeated' && isDemon(e.entity)) t.demonKills++;
     if (e.type === 'defeated' && s.entities[e.entity]?.defId === 'enemy.slime') t.slimeKills++;
     if (e.type === 'knockedOut') t.kos++;
@@ -128,6 +153,7 @@ for (let i = 0; i < n; i++) {
   }
   t.decisions += r.decisions;
   t.forced += r.forcedDecisions;
+  for (const ms of r.opMs) t.opMs.push(ms);
   t.faults += r.faults;
   if (r.aborted) t.aborted++;
   if (n === 1) {
@@ -153,5 +179,9 @@ console.log(`fights/match ${avg(t.fights)} · demon fights ${avg(t.demonFights)}
 console.log(`stars bought ${avg(t.starsBought)} · gear bought ${avg(t.gearBought)}`);
 console.log(`final effective power: median ${sorted[Math.floor(sorted.length / 2)]} · p90 ${sorted[Math.floor(sorted.length * 0.9)]} · max ${sorted[sorted.length - 1]}`);
 console.log(`decisions ${t.decisions} · forced ${t.forced} · real decisions per turn ${((t.decisions - t.forced) / Math.max(1, t.turns)).toFixed(2)}`);
+console.log(`cards ${avg(t.cards)} · statuses applied ${avg(t.statuses)} · actions ${avg(t.actions)} · item uses ${avg(t.itemUses)} · choices ${avg(t.choices)} · PvP fights ${avg(t.pvpFights)} · boss spawns ${avg(t.bossSpawns)}`);
+const ops = [...t.opMs].sort((a, b) => a - b);
+const q = (p: number) => (ops[Math.min(ops.length - 1, Math.floor(ops.length * p))] ?? 0).toFixed(2);
+console.log(`engine operations ${ops.length}: p50 ${q(0.5)} ms · p99 ${q(0.99)} ms · max ${(ops[ops.length - 1] ?? 0).toFixed(2)} ms`);
 console.log(`rule faults ${t.faults} · aborted operations ${t.aborted}`);
 console.log(`wins by archetype ${JSON.stringify(t.winsByArchetype)}`);

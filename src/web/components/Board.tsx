@@ -1,6 +1,6 @@
 import type { GameDefinition } from '../../schema/definition.ts';
 import type { Entity, GameState } from '../../schema/state.ts';
-import { activeId, entityColor, entityIcon, tagColor } from '../format.ts';
+import { activeId, entityColor, entityIcon, statusLabel, tagColor, transformationOf } from '../format.ts';
 
 interface Props {
   def: GameDefinition;
@@ -23,7 +23,7 @@ export function Board({ def, state, effective, selectedEntity, selectedSpace, th
   const maxHp = def.settings.core.maxHp;
   const bySpace = new Map<string, Entity[]>();
   for (const e of Object.values(state.entities)) {
-    if (e.spaceId === null) continue;
+    if (e.spaceId === null || e.status === 'removed' || e.status === 'eliminated') continue;
     const list = bySpace.get(e.spaceId) ?? [];
     list.push(e);
     bySpace.set(e.spaceId, list);
@@ -61,6 +61,13 @@ export function Board({ def, state, effective, selectedEntity, selectedSpace, th
           const x = p.x + Math.cos(angle) * spread;
           const y = p.y + Math.sin(angle) * spread;
           const defeated = e.status === 'defeated';
+          const boss = e.kind === 'enemy' && def.enemies.find((x) => x.id === e.defId)?.boss === true;
+          // Badges for up to three non-transformation statuses.
+          const badges = e.statuses
+            .map((st) => def.statuses.find((x) => x.id === st.defId))
+            .filter((d) => d !== undefined && !d.transformation)
+            .slice(0, 3)
+            .map((d) => d?.icon ?? '•');
           const vals = effective[e.id] ?? {};
           const hpFrac = e.kind !== 'fixture' && vals[maxHp] ? Math.max(0, Math.min(1, (vals[hp] ?? 0) / (vals[maxHp] ?? 1))) : null;
           const classes = ['token', e.kind, e.id === selectedEntity ? 'selected' : '', e.id === active ? 'active' : '', e.id === thinking ? 'thinking' : '', defeated ? 'defeated' : '']
@@ -76,16 +83,21 @@ export function Board({ def, state, effective, selectedEntity, selectedSpace, th
                 onSelectEntity(e.id);
               }}
             >
-              <title>{`${e.name}${defeated ? ' (defeated)' : ''}${e.tags.length ? `\nTags: ${e.tags.join(', ')}` : ''}`}</title>
-              <circle r={13} fill={e.kind === 'contestant' ? entityColor(def, e) : 'var(--token-bg)'} stroke={entityColor(def, e)} />
+              <title>{`${e.name}${defeated ? ' (defeated)' : ''}${transformationOf(def, e) ? ` — ${transformationOf(def, e)?.name}` : ''}${e.statuses.length ? `\n${e.statuses.map((st) => statusLabel(def, st)).join(', ')}` : ''}${e.tags.length ? `\nTags: ${e.tags.join(', ')}` : ''}`}</title>
+              <circle r={boss ? 16 : 13} fill={e.kind === 'contestant' ? entityColor(def, e) : 'var(--token-bg)'} stroke={entityColor(def, e)} />
               <text className="token-icon" textAnchor="middle" dy="0.35em">
                 {entityIcon(def, e)}
               </text>
-              {e.tags.includes('tag.fish') && (
-                <text className="token-badge" x={10} y={-9}>
-                  🐟
+              {boss && (
+                <text className="token-badge" x={-6} y={-15}>
+                  👑
                 </text>
               )}
+              {badges.map((icon, bi) => (
+                <text key={bi} className="token-badge" x={10} y={-9 + bi * 9}>
+                  {icon}
+                </text>
+              ))}
               {hpFrac !== null && !defeated && (
                 <g className="hpbar" transform="translate(-13 16)">
                   <rect width={26} height={4} className="hp-bg" />
