@@ -20,8 +20,14 @@ export interface SectionProps {
   focus: number | null;
 }
 
-type Entry = Json & { id: string; name: string };
-type FormProps = { entry: Entry; set: (key: string, v: unknown) => void; def: Json; path: Array<string | number> };
+export type Entry = Json & { id: string; name: string };
+export type FormProps = { entry: Entry; set: (key: string, v: unknown) => void; def: Json; path: Array<string | number> };
+
+/** A ready-made entry to start from (built against the current draft, e.g. its core resources). */
+export interface EntryTemplate {
+  label: string;
+  make: (def: Json) => Json & { name: string };
+}
 
 const HELP: Record<string, string> = {
   resources: 'Numbers entities have. Pools are stored amounts (Gold, HP); stats are base values that items, statuses and rules modify (Power, Move).',
@@ -41,7 +47,7 @@ const HELP: Record<string, string> = {
 /** Ids of entries created in this editor session: they follow the entry's name until something refers to them. */
 const freshIds = new Set<string>();
 
-export function ListSection({ section, def, edit, focus, title, form }: SectionProps & { section: string; title: string; form: (p: FormProps) => ReactNode }) {
+export function ListSection({ section, def, edit, focus, title, form, templates }: SectionProps & { section: string; title: string; form: (p: FormProps) => ReactNode; templates?: EntryTemplate[] }) {
   const env = useEnv();
   const entries = (def[section] ?? []) as Entry[];
   const [selected, setSelected] = useState(0);
@@ -131,6 +137,28 @@ export function ListSection({ section, def, edit, focus, title, form }: SectionP
           })}
         </ul>
         {!env.readOnly && <button onClick={add}>+ New {title.replace(/s$/, '').toLowerCase()}</button>}
+        {!env.readOnly && templates && templates.length > 0 && (
+          <select
+            className="template-pick"
+            value=""
+            onChange={(e) => {
+              const t = templates.find((x) => x.label === e.target.value);
+              if (!t) return;
+              const made = t.make(def);
+              const created = { ...made, id: uniqueId(ID_PREFIX[section] ?? section, made.name, allIds(def)) };
+              freshIds.add(created.id);
+              setList([...entries, created as Entry]);
+              setSelected(entries.length);
+            }}
+          >
+            <option value="">+ from a template…</option>
+            {templates.map((t) => (
+              <option key={t.label} value={t.label}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="form-col">
         {!entry && <p className="muted">Nothing here yet.</p>}
@@ -164,7 +192,7 @@ export function ListSection({ section, def, edit, focus, title, form }: SectionP
 
 // --- per-section forms ---------------------------------------------------------------------------
 
-function IconField({ entry, set }: { entry: Entry; set: (k: string, v: unknown) => void }) {
+export function IconField({ entry, set }: { entry: Entry; set: (k: string, v: unknown) => void }) {
   return (
     <Row label="Icon" help="An emoji or a short symbol (up to 8 characters).">
       <TextInput value={entry['icon'] as string | undefined} max={8} onChange={(v) => set('icon', v || undefined)} />
@@ -172,7 +200,7 @@ function IconField({ entry, set }: { entry: Entry; set: (k: string, v: unknown) 
   );
 }
 
-function Description({ entry, set, max = 300 }: { entry: Entry; set: (k: string, v: unknown) => void; max?: number }) {
+export function Description({ entry, set, max = 300 }: { entry: Entry; set: (k: string, v: unknown) => void; max?: number }) {
   return (
     <Row label="Description">
       <TextInput multiline max={max} value={entry['description'] as string | undefined} onChange={(v) => set('description', v || undefined)} />
@@ -180,7 +208,7 @@ function Description({ entry, set, max = 300 }: { entry: Entry; set: (k: string,
   );
 }
 
-function StatModifiers({ value, onChange, label = 'Stat modifiers' }: { value: Json[] | undefined; onChange: (v: Json[]) => void; label?: string }) {
+export function StatModifiers({ value, onChange, label = 'Stat modifiers' }: { value: Json[] | undefined; onChange: (v: Json[]) => void; label?: string }) {
   const env = useEnv();
   const list = value ?? [];
   return (
@@ -204,7 +232,7 @@ function StatModifiers({ value, onChange, label = 'Stat modifiers' }: { value: J
 }
 
 /** Rules attached to an item, status or enemy ($holder = its holder). */
-function AttachedRules({ entry, set, path, def }: FormProps) {
+export function AttachedRules({ entry, set, path, def }: FormProps) {
   const env = useEnv();
   const rules = (entry['rules'] ?? []) as Entry[];
   const [open, setOpen] = useState<number | null>(null);
@@ -302,56 +330,6 @@ function TagForm({ entry, set }: FormProps) {
       </Row>
       <Description entry={entry} set={set} />
     </div>
-  );
-}
-
-function ItemForm(p: FormProps) {
-  const { entry, set } = p;
-  const env = useEnv();
-  const use = entry['use'] as Json | undefined;
-  return (
-    <>
-      <div className="ed-grid">
-        <IconField entry={entry} set={set} />
-        <Description entry={entry} set={set} />
-        <Row label="Tags">
-          <RefMulti section="entityTags" value={entry['tags'] as string[] | undefined} max={8} onChange={(v) => set('tags', v)} />
-        </Row>
-        <StatModifiers value={entry['modifiers'] as Json[] | undefined} onChange={(v) => set('modifiers', v)} label="While held" />
-        <Row label="Concealed" help="Other contestants only see “a concealed item”.">
-          <Checkbox label="hidden from rivals" value={entry['concealed'] === true} onChange={(v) => set('concealed', v || undefined)} />
-        </Row>
-        <Row label="Tradeable">
-          <Checkbox label="can change hands in trades" value={entry['tradeable'] !== false} onChange={(v) => set('tradeable', v ? undefined : false)} />
-        </Row>
-      </div>
-      <div className="ed-block">
-        <div className="ed-block-title">
-          Use action{' '}
-          {!env.readOnly &&
-            (use ? (
-              <button className="icon opt-x" onClick={() => set('use', undefined)}>
-                ×
-              </button>
-            ) : (
-              <button className="add-opt" onClick={() => set('use', { effects: [{ op: 'changeResource', target: '$actor', resource: env.catalog.resources[0]?.id ?? '', amount: 10 }], consumed: true })}>
-                + can be used
-              </button>
-            ))}
-        </div>
-        {use && (
-          <>
-            <div className="ed-inline-row">
-              <span className="ed-label">button label</span>
-              <TextInput value={use['label'] as string | undefined} max={60} onChange={(v) => set('use', { ...use, label: v || undefined })} />
-              <Checkbox label="used up" value={use['consumed'] !== false} onChange={(v) => set('use', { ...use, consumed: v })} />
-            </div>
-            <EffectList value={(use['effects'] as unknown[] | undefined) ?? []} onChange={(v) => set('use', { ...use, effects: v })} />
-          </>
-        )}
-      </div>
-      <AttachedRules {...p} />
-    </>
   );
 }
 
@@ -773,7 +751,6 @@ function CastForm({ entry, set }: FormProps) {
 export const SECTION_FORMS: Record<string, { title: string; form: (p: FormProps) => ReactNode }> = {
   resources: { title: 'Resources', form: (p) => <ResourceForm {...p} /> },
   tags: { title: 'Tags', form: (p) => <TagForm {...p} /> },
-  items: { title: 'Items', form: (p) => <ItemForm {...p} /> },
   statuses: { title: 'Statuses', form: (p) => <StatusForm {...p} /> },
   shops: { title: 'Shops', form: (p) => <ShopForm {...p} /> },
   fixtures: { title: 'Fixtures', form: (p) => <FixtureForm {...p} /> },

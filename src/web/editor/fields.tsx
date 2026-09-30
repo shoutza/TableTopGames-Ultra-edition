@@ -27,12 +27,16 @@ export function issuesUnder(issues: CheckIssue[], path: Path): CheckIssue[] {
   return issues.filter((i) => i.path !== null && path.every((p, k) => i.path?.[k] === p));
 }
 
-export function Row({ label, help, children }: { label: string; help?: string | undefined; children: ReactNode }) {
+/**
+ * A labelled form row. It is a <div>, not a <label>: many rows hold several buttons or checkboxes,
+ * and a label would re-send clicks to its first control (and labels must not nest).
+ */
+export function Row({ label, help, children }: { label: string; help?: string | undefined; children: ReactNode; plain?: boolean }) {
   return (
-    <label className="ed-row" title={help}>
+    <div className="ed-row" title={help}>
       <span className="ed-label">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 

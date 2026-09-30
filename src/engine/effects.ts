@@ -208,6 +208,23 @@ function pickItem(ctx: OpContext, entityId: string, spec: string): string | unde
   return entity.items.find((id) => ctx.state.items[id]?.defId === spec);
 }
 
+/** Moves a specific held item (with its charges) to another contestant; false when it does not fit. */
+export function moveItemInstance(ctx: OpContext, fromId: string, itemId: string, toId: string, cause: EventCause): boolean {
+  const to = getEntity(ctx.state, toId);
+  const item = ctx.state.items[itemId];
+  if (!item || item.holder !== fromId) throw new RuleFault(`${getEntity(ctx.state, fromId).name} does not hold item ${itemId}`);
+  if (to.kind !== 'contestant') throw new RuleFault(`${to.name} cannot hold items`);
+  const plan = receivePlan(ctx.game, ctx.state, to, item.defId);
+  if (plan === null) return false;
+  const { defId, charges } = item;
+  removeItem(ctx, fromId, itemId, cause, 'given');
+  ctx.state.items[itemId] = { id: itemId, defId, holder: toId, equipped: false, charges };
+  to.items.push(itemId);
+  ctx.emit({ type: 'itemGained', entity: toId, item: itemId, itemDef: defId }, cause);
+  if (plan === 'equip') setEquipped(ctx, toId, itemId, true, cause);
+  return true;
+}
+
 /** Moves one item to another contestant. Nothing happens if there is no such item or no room. */
 export function transferItem(ctx: OpContext, fromId: string, toId: string, spec: string, cause: EventCause): void {
   const to = getEntity(ctx.state, toId);

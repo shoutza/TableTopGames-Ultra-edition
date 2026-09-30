@@ -1,5 +1,5 @@
 import { compileGame, CompileError, type CompiledGame, type Diagnostic } from '../engine/compile.ts';
-import { describeObjective, describeRule, describeStatus, makeNames, summarizeEffects } from '../engine/explain.ts';
+import { describeItem, describeObjective, describeRule, describeStatus, makeNames, summarizeEffects } from '../engine/explain.ts';
 import { GameDefinitionSchema } from '../schema/definition.ts';
 import type { CheckIssue, CheckResult } from '../schema/proposal.ts';
 
@@ -58,7 +58,7 @@ function textsFor(game: CompiledGame): Record<string, string> {
   for (const st of game.def.statuses) safe(`statuses:${st.id}`, () => describeStatus(st, n));
   for (const o of game.def.objectives) safe(`objectives:${o.id}`, () => describeObjective(o, n));
   for (const a of game.def.actions) safe(`actions:${a.id}`, () => summarizeEffects(a.effects, n));
-  for (const i of game.def.items) if (i.use) safe(`items:${i.id}`, () => summarizeEffects(i.use?.effects ?? [], n));
+  for (const i of game.def.items) safe(`items:${i.id}`, () => describeItem(i, n));
   for (const d of game.def.decks) for (const c of d.cards) safe(`cards:${c.id}`, () => summarizeEffects(c.effects, n));
   for (const e of game.def.enemies) safe(`enemies:${e.id}`, () => summarizeEffects(e.rewards, n) || 'no reward');
   return out;

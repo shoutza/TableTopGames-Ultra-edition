@@ -1,7 +1,7 @@
 import type { GmCommand } from '../schema/commands.ts';
 import type { EventCause, GameState } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
-import { addTag, applyStatus, changeResource, drawCard, grantItem, removeEntity, removeItem, removeStatus, removeTag, setEquipped, setResource, spawnEnemy, teleport } from './effects.ts';
+import { addTag, applyStatus, changeResource, drawCard, grantItem, moveItemInstance, removeEntity, removeItem, removeStatus, removeTag, setEquipped, setResource, spawnEnemy, teleport } from './effects.ts';
 import { canUnequip, equipPlan } from './inventory.ts';
 import { namesFor } from './explain.ts';
 import { assignObjective } from './objectives.ts';
@@ -61,6 +61,16 @@ export function applyGmCommand(game: CompiledGame, state: GameState, cmd: GmComm
             summary(`take ${names.item(ctx.state.items[cmd.item]?.defId ?? cmd.item)} from ${names.entity(cmd.entity)}`);
             removeItem(ctx, cmd.entity, cmd.item, cause);
             return;
+          case 'moveItem': {
+            const from = getEntity(ctx.state, cmd.entity);
+            const to = getEntity(ctx.state, cmd.to);
+            const item = ctx.state.items[cmd.item];
+            if (!item || item.holder !== cmd.entity) throw new InvalidInput(`${from.name} does not hold that item`);
+            if (to.kind !== 'contestant' || cmd.to === cmd.entity) throw new InvalidInput('give it to another contestant');
+            summary(`give ${names.item(item.defId)} from ${names.entity(cmd.entity)} to ${names.entity(cmd.to)}`);
+            if (!moveItemInstance(ctx, cmd.entity, cmd.item, cmd.to, cause)) throw new InvalidInput(`${to.name} has no room for it`);
+            return;
+          }
           case 'equipItem': {
             const entity = getEntity(ctx.state, cmd.entity);
             const item = ctx.state.items[cmd.item];

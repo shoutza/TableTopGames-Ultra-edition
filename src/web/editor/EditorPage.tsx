@@ -7,6 +7,7 @@ import { BoardEditor } from './BoardEditor.tsx';
 import { EditorContext, JsonBox, type EditorEnv } from './fields.tsx';
 import { catalogOf, sectionOf, type Json } from './model.ts';
 import { ProposalDialog } from './ProposalDialog.tsx';
+import { ItemsSection } from './ItemWorkshop.tsx';
 import { ListSection, RulesSection, SECTION_FORMS } from './Sections.tsx';
 import { SettingsEditor } from './SettingsEditor.tsx';
 
@@ -450,6 +451,7 @@ export function EditorPage({ target, onClose, onPlay }: { target: EditorTarget; 
             {section === 'overview' && <SettingsEditor def={draft} edit={edit} check={check} idLocked={target.kind === 'match' || savedId !== null} />}
             {section === 'board' && <BoardEditor def={draft} edit={edit} />}
             {section === 'rules' && <RulesSection {...props} />}
+            {section === 'items' && <ItemsSection {...props} />}
             {SECTION_FORMS[section] && <ListSection key={section} {...props} section={section} title={SECTION_FORMS[section].title} form={SECTION_FORMS[section].form} />}
             {section === 'json' && (
               <div>

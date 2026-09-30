@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { GmCommandInput } from '../../schema/commands.ts';
 import { api, type MatchData } from '../api.ts';
 import { resourceName } from '../format.ts';
+import { InventoryPanel } from './Inventory.tsx';
 
 /**
  * GM interventions for the selected entity. Each one is an engine operation: rules react to it
@@ -14,7 +15,6 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
   const [resource, setResource] = useState(def.settings.core.hp);
   const [amount, setAmount] = useState('10');
   const [tag, setTag] = useState(def.tags.find((t) => t.appliesTo === 'entity')?.id ?? '');
-  const [item, setItem] = useState(def.items[0]?.id ?? '');
   const [space, setSpace] = useState(def.spaces[0]?.id ?? '');
   const [asLanding, setAsLanding] = useState(false);
   const [silent, setSilent] = useState(false);
@@ -212,22 +212,9 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
         </div>
       )}
       {spawn}
-      {entity.kind === 'contestant' && (
+      {entity.kind === 'contestant' && entityId && (
         <div className="tool">
-          <h4>Items</h4>
-          <select value={item} onChange={(e) => setItem(e.target.value)}>
-            {def.items.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.icon} {i.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={() => run({ type: 'grantItem', entity: entityId, item, silent }, `give ${item}`)}>Give</button>
-          {entity.items.map((i) => (
-            <button key={i} className="chip" onClick={() => run({ type: 'removeItem', entity: entityId, item: i, silent }, `remove ${i}`)}>
-              ✕ {def.items.find((x) => x.id === data.state.items[i]?.defId)?.name ?? i}
-            </button>
-          ))}
+          <InventoryPanel data={data} entityId={entityId} gm={run} silent={silent} />
         </div>
       )}
       {announce}

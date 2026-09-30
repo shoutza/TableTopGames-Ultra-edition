@@ -1,5 +1,5 @@
 import type { CompiledGame } from '../engine/compile.ts';
-import { attachedRuleText, describeCapabilityLoss, describeObjectiveGoal, describePromise, describeRule, describeStatus, namesFor, summarizeEffects, type Names } from '../engine/explain.ts';
+import { attachedRuleText, describeCapabilityLoss, describeItem, describeObjectiveGoal, describePromise, describeRule, describeStatus, namesFor, summarizeEffects, type Names } from '../engine/explain.ts';
 import { bagSpacesUsed, equippedIn, receivePlan } from '../engine/inventory.ts';
 import { effectiveTags, effectiveValue, hasCapability, reachableSpaces, suppressedCapabilities } from '../engine/queries.ts';
 import { isTradeableItem, isTradeableResource, tradePartners, termsView } from '../engine/trade.ts';
@@ -307,26 +307,6 @@ function tradeableHoldings(game: CompiledGame, state: GameState, id: string): Vi
 }
 
 /** Plain-language summary of an item's bonuses, use and attached rules. */
-export function describeItem(item: ItemDef, names: Names): string {
-  const use = item.use;
-  const useBits = use
-    ? [
-        use.target ? `on ${use.target.range === 'here' ? `a ${use.target.kind} here` : `any ${use.target.kind}`}` : '',
-        use.consumed ? (use.charges !== undefined && use.charges > 1 ? `${use.charges} uses` : 'once') : '',
-        use.free ? 'free action' : '',
-        use.cooldownRounds !== undefined ? `every ${use.cooldownRounds} rounds` : '',
-      ].filter(Boolean)
-    : [];
-  const parts = [
-    ...(item.slot !== undefined ? [`worn (${item.slot.replace(/^[a-z]+\./, '')})`] : []),
-    ...item.modifiers.map((m) => `${m.add >= 0 ? '+' : ''}${m.add} ${names.resource(m.resource)}${item.slot !== undefined ? ' while worn' : ''}`),
-    ...(use ? [`use${useBits.length ? ` (${useBits.join(', ')})` : ''}: ${summarizeEffects(use.effects, names)}`] : []),
-    ...item.rules.filter((r) => r.visibility === 'public').map((r) => attachedRuleText(r, names)),
-    ...(item.stackSize > 1 ? [`stacks ${item.stackSize} per space`] : []),
-    ...(item.concealed ? ['others cannot see it'] : []),
-  ];
-  return parts.join('; ') || (item.description ?? '');
-}
 
 /** How the viewer's effective stats change if items are put on / taken off or removed. */
 function statChanges(scope: HintScope, equipped: Record<string, boolean>, removed: string[]): StatChange[] {
@@ -703,4 +683,4 @@ export function publicRuleTexts(game: CompiledGame, state: GameState, viewer: st
     .map((r) => ({ id: r.def.id, name: r.def.name, text: describeRule(r.def, names) }));
 }
 
-export { describeCapabilityLoss };
+export { describeCapabilityLoss, describeItem };

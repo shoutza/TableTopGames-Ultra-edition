@@ -1118,3 +1118,144 @@ ul.changelog {
   list-style: none;
   padding: 0;
 }
+
+/* Inventory */
+.inventory h4 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.inv-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.inv-slot {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+.inv-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+.inv-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+.inv-name {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+}
+.inv-text {
+  flex-basis: 100%;
+}
+.inv-actions {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  white-space: nowrap;
+}
+.inv-actions select {
+  max-width: 100px;
+  padding: 1px 4px;
+}
+
+/* Item workshop */
+.template-pick {
+  margin-top: 6px;
+  width: 100%;
+}
+.workshop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 12px;
+}
+@media (max-width: 1300px) {
+  .workshop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.workshop-side .card {
+  margin: 0 0 10px;
+}
+.workshop-side h4 {
+  margin: 0 0 4px;
+}
+.item-card {
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.item-card-icon {
+  font-size: 48px;
+  line-height: 1.1;
+}
+.item-card-name {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+.item-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.item-card-text {
+  font-size: 13px;
+  text-align: left;
+}
+.ai-lines li {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 2px 0;
+}
+.icon-picker {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  position: relative;
+  flex-wrap: wrap;
+}
+.icon-big {
+  font-size: 22px;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 32px);
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.icon-cell {
+  font-size: 18px;
+  padding: 2px;
+  border: none;
+  background: none;
+}
+.icon-cell:hover {
+  background: var(--bg);
+}
+.inv-slot .inv-text {
+  display: none;
+}
+.inv-slot .inv-actions select {
+  max-width: 74px;
+}

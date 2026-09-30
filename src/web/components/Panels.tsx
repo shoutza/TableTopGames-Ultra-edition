@@ -3,6 +3,7 @@ import type { GameDefinition } from '../../schema/definition.ts';
 import type { ContestantViewResponse, MindDto } from '../../shared/api.ts';
 import { api, type MatchData } from '../api.ts';
 import { activeId, entityColor, entityIcon, formatMs, formatUsd, resourceName, spaceName, statusLabel, transformationOf } from '../format.ts';
+import { InventoryPanel } from './Inventory.tsx';
 
 /** Standings, entity inspector and the AI panel. */
 
@@ -209,22 +210,7 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
           </tbody>
         </table>
       )}
-      {e.items.length > 0 && (
-        <div className="block">
-          <h4>Items</h4>
-          <ul className="plain">
-            {e.items.map((i) => {
-              const d = def.items.find((x) => x.id === data.state.items[i]?.defId);
-              return (
-                <li key={i}>
-                  {d?.icon ?? '•'} <b>{d?.name ?? i}</b>
-                  {d?.concealed ? ' 🔒 concealed' : ''} <span className="muted">— {d ? data.rulebook.items[d.id] : ''}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {e.kind === 'contestant' && <InventoryPanel data={data} entityId={e.id} />}
       {e.statuses.length > 0 && (
         <div className="block">
           <h4>Statuses</h4>

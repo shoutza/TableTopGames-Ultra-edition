@@ -1,4 +1,4 @@
-import type { ObjectiveDef, StatusDef } from '../schema/definition.ts';
+import type { ItemDef, ObjectiveDef, StatusDef } from '../schema/definition.ts';
 import type { Capability, Cond, ContinuousRule, Effect, EntityRef, ModifierRule, ModifyOp, Num, ReactionRule, RuleDef, RuleLimits, Selector, SpaceRef, Trigger } from '../schema/rules.ts';
 import type { GameEvent, GameState, PromiseTerm, TradeTermsView } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
@@ -826,4 +826,26 @@ export function describeTerms(terms: TradeTermsView, from: string, to: string, n
 
 function pct(a: number, b: number): string {
   return `${((a / (a + b)) * 100).toFixed(1)}%`;
+}
+
+/** An item's card text: slot, bonuses, use (target, uses, free action, cooldown), public attached rules. */
+export function describeItem(item: ItemDef, names: Names): string {
+  const use = item.use;
+  const useBits = use
+    ? [
+        use.target ? `on ${use.target.range === 'here' ? `a ${use.target.kind} here` : `any ${use.target.kind}`}` : '',
+        use.consumed ? (use.charges !== undefined && use.charges > 1 ? `${use.charges} uses` : 'once') : '',
+        use.free ? 'free action' : '',
+        use.cooldownRounds !== undefined ? `every ${use.cooldownRounds} rounds` : '',
+      ].filter(Boolean)
+    : [];
+  const parts = [
+    ...(item.slot !== undefined ? [`worn (${item.slot.replace(/^[a-z]+\./, '')})`] : []),
+    ...item.modifiers.map((m) => `${m.add >= 0 ? '+' : ''}${m.add} ${names.resource(m.resource)}${item.slot !== undefined ? ' while worn' : ''}`),
+    ...(use ? [`use${useBits.length ? ` (${useBits.join(', ')})` : ''}: ${summarizeEffects(use.effects, names)}`] : []),
+    ...item.rules.filter((r) => r.visibility === 'public').map((r) => attachedRuleText(r, names)),
+    ...(item.stackSize > 1 ? [`stacks ${item.stackSize} per space`] : []),
+    ...(item.concealed ? ['others cannot see it'] : []),
+  ];
+  return parts.join('; ') || (item.description ?? '');
 }

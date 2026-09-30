@@ -13,6 +13,53 @@ interface Props {
   idLocked: boolean;
 }
 
+interface Slot {
+  id: string;
+  name: string;
+  count: number;
+}
+
+function EquipmentSlots({ slots, onChange }: { slots: Slot[]; onChange: (v: Slot[]) => void }) {
+  const env = useEnv();
+  const set = (i: number, patch: Partial<Slot>) => onChange(slots.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  return (
+    <div>
+      <div className="ed-label">Equipment slots</div>
+      {slots.length === 0 && <p className="muted small">None: every item is carried in the bag.</p>}
+      {slots.map((s, i) => (
+        <div key={i} className="ed-inline-row">
+          <TextInput value={s.name} max={80} onChange={(v) => set(i, { name: v })} />
+          <span className="ed-label">id</span>
+          <TextInput value={s.id} max={80} onChange={(v) => set(i, { id: v.toLowerCase().replace(/[^a-z0-9_.-]/g, '') })} />
+          <span className="ed-label">holds</span>
+          <IntInput value={s.count} min={1} max={4} onChange={(v) => set(i, { count: Math.max(1, Math.min(4, v ?? 1)) })} />
+          {!env.readOnly && (
+            <button className="icon danger" title="Remove slot" onClick={() => onChange(slots.filter((_, j) => j !== i))}>
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {!env.readOnly && slots.length < 8 && (
+        <span className="ed-add">
+          {[
+            ['Weapon', 1],
+            ['Armor', 1],
+            ['Trinket', 2],
+          ]
+            .filter(([n]) => !slots.some((s) => s.name === n))
+            .map(([n, c]) => (
+              <button key={String(n)} onClick={() => onChange([...slots, { id: `slot.${String(n).toLowerCase()}`, name: String(n), count: Number(c) }])}>
+                + {String(n)}
+              </button>
+            ))}
+          <button onClick={() => onChange([...slots, { id: `slot.custom${slots.length + 1}`, name: `Slot ${slots.length + 1}`, count: 1 }])}>+ other slot</button>
+        </span>
+      )}
+    </div>
+  );
+}
+
 const BUDGET_DEFAULTS: Record<string, number> = { firings: 200, firingsPerRule: 20, events: 500, depth: 24, randomDraws: 256, expressionSteps: 20000, selectorSize: 64, spawns: 10, choices: 4, loopIterations: 256 };
 
 export function SettingsEditor({ def, edit, check, idLocked }: Props) {
@@ -80,9 +127,17 @@ export function SettingsEditor({ def, edit, check, idLocked }: Props) {
           <Row label="Movement bonus" help="A stat added to every roll (statuses can lower it).">
             <RefSelect optional section="resources" value={get(['movement', 'bonus']) as string | undefined} onChange={(v) => put(['movement', 'bonus'], v)} />
           </Row>
-          <Row label="Inventory slots">{num(['inventoryCapacity'], 3, 0, 20)}</Row>
           <Row label="Resting heals">{num(['rest', 'heal'], 20, 0)}</Row>
         </div>
+      </section>
+
+      <section className="card">
+        <h3>Inventory</h3>
+        <p className="muted small">Carried items take bag spaces (copies of a stackable item share one). Gear with an equipment slot is worn: it takes no bag space and gives its bonuses only while worn.</p>
+        <div className="ed-grid">
+          <Row label="Bag spaces">{num(['inventoryCapacity'], 3, 0, 20)}</Row>
+        </div>
+        <EquipmentSlots slots={(get(['equipment']) as Slot[] | undefined) ?? []} onChange={(v) => put(['equipment'], v)} />
       </section>
 
       <section className="card">
