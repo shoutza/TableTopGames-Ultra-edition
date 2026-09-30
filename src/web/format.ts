@@ -46,3 +46,18 @@ export function formatUsd(v: number | null): string {
   if (v === null) return 'n/a';
   return v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
 }
+
+export function phaseName(phase: string): string {
+  const names: Record<string, string> = {
+    setup: 'Ready to play',
+    roundStart: 'Starting the round',
+    turnStart: 'Starting a turn',
+    roll: 'Rolling the die',
+    move: 'Choosing a move',
+    main: 'Choosing an action',
+    turnEnd: 'Ending a turn',
+    roundEnd: 'Ending the round',
+    gameOver: 'Match complete',
+  };
+  return names[phase] ?? phase.replace(/([A-Z])/g, ' $1').toLowerCase();
+}

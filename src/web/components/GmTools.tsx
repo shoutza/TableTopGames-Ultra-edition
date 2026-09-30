@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react';
 import type { GmCommandInput } from '../../schema/commands.ts';
 import { api, type MatchData } from '../api.ts';
 import { resourceName } from '../format.ts';
+import { Icon } from './Ui.tsx';
 
 /**
  * GM interventions for the selected entity. Each one is an engine operation: rules react to it
  * unless "silent correction" is ticked, and a pending contestant decision is re-issued.
  */
-export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; entityId: string | null; teleportTarget: string | null }) {
+export function GmTools({
+  data,
+  entityId,
+  teleportTarget,
+  onSelectEntity,
+}: {
+  data: MatchData;
+  entityId: string | null;
+  teleportTarget: string | null;
+  onSelectEntity: (id: string) => void;
+}) {
   const def = data.definition;
   const entity = entityId ? data.state.entities[entityId] : undefined;
   const resources = entity ? Object.keys(entity.resources) : [];
@@ -19,6 +30,7 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
   const [asLanding, setAsLanding] = useState(false);
   const [silent, setSilent] = useState(false);
   const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -29,18 +41,68 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
   }, [entityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (cmd: GmCommandInput, label: string) => {
+    if (busy) return;
+    setBusy(true);
     setMessage(null);
     api
       .gm(data.matchId, cmd)
-      .then(() => setMessage({ ok: true, text: `Done: ${label}` }))
-      .catch((err: unknown) => setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) }));
+      .then(() => {
+        setMessage({ ok: true, text: `Done: ${label}` });
+        if (cmd.type === 'announce') setText('');
+      })
+      .catch((err: unknown) =>
+        setMessage({
+          ok: false,
+          text: err instanceof Error ? err.message : String(err),
+        }),
+      )
+      .finally(() => setBusy(false));
   };
 
+  const heading = (
+    <div className="panel-heading">
+      <div>
+        <p className="eyebrow">A LITTLE DIVINE INTERVENTION</p>
+        <h2>Game Master tools</h2>
+      </div>
+      <Icon name="sliders" />
+    </div>
+  );
+  const target = (
+    <label className="field gm-target">
+      Select an entity
+      <select
+        aria-label="GM target"
+        value={entityId ?? ''}
+        disabled={busy}
+        onChange={(e) => onSelectEntity(e.target.value)}
+      >
+        <option value="" disabled>
+          Choose a contestant or piece
+        </option>
+        {Object.values(data.state.entities).map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
   const announce = (
     <div className="tool">
       <h4>Announce</h4>
-      <input value={text} placeholder="The volcano rumbles…" onChange={(e) => setText(e.target.value)} />
-      <button disabled={!text.trim()} onClick={() => run({ type: 'announce', text: text.trim() }, 'announcement')}>
+      <input
+        aria-label="Announcement"
+        maxLength={280}
+        disabled={busy}
+        value={text}
+        placeholder="The volcano rumbles…"
+        onChange={(e) => setText(e.target.value)}
+      />
+      <button
+        disabled={busy || !text.trim()}
+        onClick={() => run({ type: 'announce', text: text.trim() }, 'announcement')}
+      >
         Announce
       </button>
     </div>
@@ -49,43 +111,88 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
   if (!entity || !entityId) {
     return (
       <div className="gm-tools">
-        <p className="muted">Select a contestant or enemy to intervene. Click a space on the board to pick a teleport destination.</p>
+        {heading}
+        {target}
+        <p className="muted">
+          Select a contestant or enemy to intervene. Click a space on the board to pick a teleport destination.
+        </p>
         {announce}
-        {message && <p className={message.ok ? 'ok' : 'error'}>{message.text}</p>}
+        {message && (
+          <p role={message.ok ? 'status' : 'alert'} className={`tool-message ${message.ok ? 'ok' : 'error'}`}>
+            {message.text}
+          </p>
+        )}
       </div>
     );
   }
 
-  const n = Number.parseInt(amount, 10);
-  const valid = Number.isFinite(n);
+  const n = Number(amount);
+  const valid = amount.trim() !== '' && Number.isSafeInteger(n);
   return (
     <div className="gm-tools">
+      {heading}
+      {target}
       <p>
         Acting on <b>{entity.name}</b>
       </p>
       <label className="check">
-        <input type="checkbox" checked={silent} onChange={(e) => setSilent(e.target.checked)} /> Silent correction (rules do not react)
+        <input type="checkbox" checked={silent} onChange={(e) => setSilent(e.target.checked)} /> Silent correction
+        (rules do not react)
       </label>
       <div className="tool">
         <h4>Resource</h4>
-        <select value={resource} onChange={(e) => setResource(e.target.value)}>
+        <select aria-label="Resource" value={resource} onChange={(e) => setResource(e.target.value)}>
           {resources.map((r) => (
             <option key={r} value={r}>
               {resourceName(def, r)}
             </option>
           ))}
         </select>
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <button disabled={!valid} onClick={() => run({ type: 'adjustResource', entity: entityId, resource, delta: n, silent }, `${n >= 0 ? '+' : ''}${n} ${resourceName(def, resource)}`)}>
+        <input
+          aria-label="Resource amount"
+          type="number"
+          step={1}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <button
+          disabled={busy || !valid || !resources.includes(resource)}
+          onClick={() =>
+            run(
+              {
+                type: 'adjustResource',
+                entity: entityId,
+                resource,
+                delta: n,
+                silent,
+              },
+              `${n >= 0 ? '+' : ''}${n} ${resourceName(def, resource)}`,
+            )
+          }
+        >
           Add
         </button>
-        <button disabled={!valid} onClick={() => run({ type: 'setResource', entity: entityId, resource, value: n, silent }, `set ${resourceName(def, resource)} to ${n}`)}>
+        <button
+          disabled={busy || !valid || !resources.includes(resource)}
+          onClick={() =>
+            run(
+              {
+                type: 'setResource',
+                entity: entityId,
+                resource,
+                value: n,
+                silent,
+              },
+              `set ${resourceName(def, resource)} to ${n}`,
+            )
+          }
+        >
           Set
         </button>
       </div>
       <div className="tool">
         <h4>Tag</h4>
-        <select value={tag} onChange={(e) => setTag(e.target.value)}>
+        <select aria-label="Tag" value={tag} onChange={(e) => setTag(e.target.value)}>
           {def.tags
             .filter((t) => t.appliesTo === 'entity')
             .map((t) => (
@@ -94,13 +201,23 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
               </option>
             ))}
         </select>
-        <button onClick={() => run({ type: 'addTag', entity: entityId, tag, silent }, `tag ${tag}`)}>Add tag</button>
-        <button onClick={() => run({ type: 'removeTag', entity: entityId, tag, silent }, `untag ${tag}`)}>Remove</button>
+        <button
+          disabled={busy || !tag}
+          onClick={() => run({ type: 'addTag', entity: entityId, tag, silent }, `tag ${tag}`)}
+        >
+          Add tag
+        </button>
+        <button
+          disabled={busy || !tag}
+          onClick={() => run({ type: 'removeTag', entity: entityId, tag, silent }, `untag ${tag}`)}
+        >
+          Remove
+        </button>
         <p className="hint">A tag alone changes nothing unless a rule refers to it (e.g. Fish → Fishy Blue Bonus).</p>
       </div>
       <div className="tool">
         <h4>Teleport</h4>
-        <select value={space} onChange={(e) => setSpace(e.target.value)}>
+        <select aria-label="Teleport destination" value={space} onChange={(e) => setSpace(e.target.value)}>
           {def.spaces.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -108,31 +225,56 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
           ))}
         </select>
         <label className="check">
-          <input type="checkbox" checked={asLanding} onChange={(e) => setAsLanding(e.target.checked)} /> Counts as landing
+          <input type="checkbox" checked={asLanding} onChange={(e) => setAsLanding(e.target.checked)} /> Counts as
+          landing
         </label>
-        <button onClick={() => run({ type: 'teleport', entity: entityId, space, asLanding, silent }, `teleport${asLanding ? ' (landing)' : ''}`)}>Teleport</button>
+        <button
+          disabled={busy || !space}
+          onClick={() =>
+            run(
+              { type: 'teleport', entity: entityId, space, asLanding, silent },
+              `teleport${asLanding ? ' (landing)' : ''}`,
+            )
+          }
+        >
+          Teleport
+        </button>
         <p className="hint">Landing rules (coins, ambushes, bananas) fire only if “counts as landing” is ticked.</p>
       </div>
       {entity.kind === 'contestant' && (
         <div className="tool">
           <h4>Items</h4>
-          <select value={item} onChange={(e) => setItem(e.target.value)}>
+          <select aria-label="Item" value={item} onChange={(e) => setItem(e.target.value)}>
             {def.items.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.icon} {i.name}
               </option>
             ))}
           </select>
-          <button onClick={() => run({ type: 'grantItem', entity: entityId, item, silent }, `give ${item}`)}>Give</button>
+          <button
+            disabled={busy || !item}
+            onClick={() => run({ type: 'grantItem', entity: entityId, item, silent }, `give ${item}`)}
+          >
+            Give
+          </button>
           {entity.items.map((i) => (
-            <button key={i} className="chip" onClick={() => run({ type: 'removeItem', entity: entityId, item: i, silent }, `remove ${i}`)}>
+            <button
+              key={i}
+              className="chip"
+              disabled={busy}
+              onClick={() => run({ type: 'removeItem', entity: entityId, item: i, silent }, `remove ${i}`)}
+            >
               ✕ {def.items.find((x) => x.id === data.state.items[i]?.defId)?.name ?? i}
             </button>
           ))}
         </div>
       )}
       {announce}
-      {message && <p className={message.ok ? 'ok' : 'error'}>{message.text}</p>}
+      {message && (
+        <p role={message.ok ? 'status' : 'alert'} className={`tool-message ${message.ok ? 'ok' : 'error'}`}>
+          {message.text}
+        </p>
+      )}
     </div>
   );
 }

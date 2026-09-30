@@ -171,9 +171,6 @@ export class GmApp {
 
   snapshot(h: Hosted): MatchSnapshotDto {
     const s = h.session;
-    h.sentEvents = s.history.length;
-    h.sentFirings = s.firings.length;
-    h.sentCalls = s.calls.length;
     return {
       matchId: s.matchId,
       definition: s.game.def,
@@ -357,6 +354,13 @@ export class GmApp {
   }
 
   private stream(h: Hosted, req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Existing viewers must receive pending deltas before a new viewer gets the
+    // complete snapshot. Reading a snapshot never consumes another viewer's feed.
+    if (h.pushTimer) {
+      clearTimeout(h.pushTimer);
+      h.pushTimer = null;
+    }
+    this.push(h);
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     res.write(`event: snapshot\ndata: ${JSON.stringify(this.snapshot(h))}\n\n`);
     h.clients.add(res);
