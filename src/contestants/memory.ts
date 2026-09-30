@@ -1,4 +1,5 @@
-import { describeTerms, type Names } from '../engine/explain.ts';
+import type { Names } from '../engine/explain.ts';
+import type { TradeTermsView } from '../schema/state.ts';
 import type { PublicGameInfo } from '../visibility/public-info.ts';
 import type { VisibleEvent } from '../visibility/redact.ts';
 import type { ContestantView } from '../visibility/view.ts';
@@ -87,7 +88,7 @@ export function observe(mind: ContestantMind, view: ContestantView, events: Visi
         if (ev.from === me || ev.to === me) {
           const other = ev.from === me ? ev.to : ev.from;
           adjust(mind, other, 0, 1);
-          remember(mind, e, 'trade', other, `You traded with ${names.entity(other)}: ${describeTerms(ev.terms, ev.from, ev.to, names)}`, 3);
+          remember(mind, e, 'trade', other, `You traded with ${names.entity(other)}: ${tradeFromMySide(ev.terms, ev.from === me, names.entity(other), names)}`, 3);
           moment(`You just closed a deal with ${names.entity(other)}`, 2);
         }
         break;
@@ -112,6 +113,23 @@ export function observe(mind: ContestantMind, view: ContestantView, events: Visi
   }
   const last = events.at(-1);
   if (last && last.seq > mind.lastSeenEventSeq) mind.lastSeenEventSeq = last.seq;
+}
+
+function goodsText(g: { resources: Record<string, number>; items: string[] }, names: Names): string {
+  const parts = [...Object.entries(g.resources).map(([r, a]) => `${a} ${names.resource(r)}`), ...g.items.map((i) => names.item(i))];
+  return parts.length > 0 ? parts.join(', ') : 'nothing';
+}
+
+/** "you gave 2 Gold and got nothing; Brine promised no attack" (terms are from the proposer's side). */
+function tradeFromMySide(t: TradeTermsView, iProposed: boolean, other: string, names: Names): string {
+  const gave = iProposed ? t.give : t.get;
+  const got = iProposed ? t.get : t.give;
+  const promises = t.promises.map((p) => {
+    const byMe = (p.by === 'from') === iProposed;
+    const who = byMe ? 'you' : other;
+    return p.kind === 'noAttack' ? `${who} promised no attack for ${p.rounds} rounds` : `${who} promised to pay ${p.amount} ${names.resource(p.resource)}`;
+  });
+  return [`you gave ${goodsText(gave, names)} and got ${goodsText(got, names)}`, ...promises].join('; ');
 }
 
 /** Entities that matter for the current decision: trade partner, attack targets, rivals on my space. */
@@ -147,7 +165,8 @@ export function selectMemories(mind: ContestantMind, view: ContestantView, limit
     const relevance = latest.other !== null && relevant.has(latest.other) ? 2 : 0;
     const repeat = Math.min(2, list.length - 1) * 0.5;
     const score = latest.importance + recency + relevance + repeat;
-    const text = list.length > 1 ? `${latest.text} ${list.length}× (rounds ${list.map((m) => m.round).join(', ')})` : `r${latest.round}: ${latest.text}`;
+    const rounds = list.map((m) => m.round);
+    const text = list.length > 1 ? `${latest.text} ${list.length}× (${rounds.length > 3 ? 'latest rounds' : 'rounds'} ${rounds.slice(-3).join(', ')})` : `r${latest.round}: ${latest.text}`;
     return { score, seq: latest.seq, text };
   });
   return scored

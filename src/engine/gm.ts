@@ -102,6 +102,7 @@ export function applyGmCommand(game: CompiledGame, state: GameState, cmd: GmComm
             const entity = getEntity(ctx.state, cmd.entity);
             if (entity.kind !== 'contestant' || entity.status === 'eliminated') throw new InvalidInput('only contestants in play take objectives');
             if (!game.objectives.has(cmd.objective)) throw new InvalidInput(`unknown objective "${cmd.objective}"`);
+            if (ctx.state.objectives.some((o) => o.owner === cmd.entity && o.defId === cmd.objective && !o.done)) throw new InvalidInput(`${entity.name} already has that objective`);
             summary(`give ${names.entity(cmd.entity)} a secret objective`);
             assignObjective(ctx, cmd.entity, cmd.objective, cause);
             return;

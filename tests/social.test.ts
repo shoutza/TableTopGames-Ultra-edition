@@ -58,11 +58,10 @@ const objectives = (list = OBJECTIVES, per = 1): Mutate => (d) => {
   d.settings.objectives = { perContestant: per };
 };
 
-/** Reassigns so a given contestant holds exactly the given objective (GM tool), dropping dealt ones. */
-function onlyObjective(g: CompiledGame, state: GameState, entity: string, objective: string): GameState {
-  const s = gm(g, state, { type: 'assignObjective', entity, objective }).state;
-  const mine = s.objectives.filter((o) => o.owner === entity);
-  s.objectives = s.objectives.filter((o) => o.owner !== entity || o === mine[mine.length - 1]);
+/** A copy of the state in which the contestant holds exactly the given objective (test setup). */
+function onlyObjective(_g: CompiledGame, state: GameState, entity: string, objective: string): GameState {
+  const s = structuredClone(state);
+  s.objectives = [...s.objectives.filter((o) => o.owner !== entity), { id: 'o99', defId: objective, owner: entity, progress: 0, done: false }];
   return s;
 }
 
@@ -142,6 +141,15 @@ describe('objectives', () => {
     state = gm(g, state, { type: 'adjustResource', entity: ann, resource: 'res.gold', delta: 25 }).state;
     const r = idle(g, state, (s) => s.phase === 'gameOver');
     expect(r.state.winners).toEqual([ann]);
+  });
+
+  it('the GM cannot deal a contestant an objective it is already working on', () => {
+    const g = game([], objectives());
+    const { state } = startMini(g);
+    const ann = entityByName(state, 'Ann');
+    const held = state.objectives.find((o) => o.owner === ann)?.defId as string;
+    const out = applyGmCommand(g, state, GmCommandSchema.parse({ type: 'assignObjective', entity: ann, objective: held }));
+    expect(out.ok === false && out.message).toBe('Ann already has that objective');
   });
 
   it('the compiler checks objectives', () => {

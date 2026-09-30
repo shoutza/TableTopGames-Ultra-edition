@@ -248,7 +248,7 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
         .filter((t) => threatWeight(t) >= 0.3 && t.reach * t.pKnockout >= 0.2)
         .sort((a, b) => b.reach * b.pKnockout - a.reach * a.pKnockout)
         .slice(0, 2)
-        .map((t) => `${t.name} ${Math.round(t.reach * 100)}% reach/${Math.round(t.pKnockout * 100)}% KO`);
+        .map((t) => `${shortName(view, t.rival, t.name)} ${Math.round(t.reach * 100)}/${Math.round(t.pKnockout * 100)}`);
       if (danger.length > 0) bits.push(`⚠ ${danger.join(', ')}`);
       const head = p.steps === 0 ? `Stay at ${p.spaceName}` : `${p.spaceName} (${p.steps} step${p.steps === 1 ? '' : 's'})`;
       return `[${p.optionId}] ${head}${bits.length ? ` — ${bits.join('; ')}` : ''}${dist.length ? ` | near: ${dist.join(', ')}` : ''}`;
@@ -289,6 +289,20 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
     case 'tradeAnswer':
       return `[${p.optionId}] ${p.answer === 'accept' ? 'Accept' : p.answer === 'reject' ? 'Reject' : 'Counteroffer (terms in "trade"; only one allowed)'}`;
   }
+}
+
+const TITLES = new Set(['captain', 'lady', 'lord', 'sir', 'dame', 'mr', 'mrs', 'ms', 'dr', 'king', 'queen', 'prince', 'princess', 'the']);
+
+function firstName(full: string): string {
+  const words = full.split(' ');
+  return words.find((w) => !TITLES.has(w.toLowerCase())) ?? full;
+}
+
+/** A rival's short name ("Gorp", "Vex") when that is unambiguous at this table. */
+function shortName(view: ContestantView, id: string, full: string): string {
+  const short = firstName(full);
+  const clash = view.entities.some((e) => e.id !== id && e.kind === 'contestant' && firstName(e.name) === short);
+  return clash ? full : short;
 }
 
 function goodsText(info: PublicGameInfo, names: Names, g: ViewGoods, ids = false): string {
@@ -341,7 +355,13 @@ export function buildInput(info: PublicGameInfo, view: ContestantView, mind: Con
   if (mine.length > 0) lines.push(`YOUR SECRET OBJECTIVE${mine.length > 1 ? 'S' : ''}: ${mine.map((o) => objectiveLine(info, o)).join(' | ')}`);
   const revealed = view.objectives.filter((o) => o.done && !o.mine);
   if (revealed.length > 0) lines.push(`Completed objectives: ${revealed.map((o) => `${o.ownerName} — ${o.name}`).join('; ')}`);
-  const promises = [...view.commitments].sort((a, b) => Number(b.by === view.viewer || b.to === view.viewer) - Number(a.by === view.viewer || a.to === view.viewer)).slice(0, 4);
+  // Promises that involve you first; of repeated truces between the same pair only the latest.
+  const latestTruce = new Map<string, number>();
+  for (const c of view.commitments) if (c.kind === 'noAttack') latestTruce.set(`${c.by}>${c.to}`, Math.max(latestTruce.get(`${c.by}>${c.to}`) ?? 0, c.dueRound));
+  const promises = view.commitments
+    .filter((c) => c.kind !== 'noAttack' || latestTruce.get(`${c.by}>${c.to}`) === c.dueRound)
+    .sort((a, b) => Number(b.by === view.viewer || b.to === view.viewer) - Number(a.by === view.viewer || a.to === view.viewer))
+    .slice(0, 4);
   if (promises.length > 0) lines.push(`OPEN PROMISES: ${promises.map((c) => c.text).join('; ')}`);
   const relations = relationshipLines(mind, view, names);
   if (relations.length > 0) lines.push(`HOW YOU FEEL: ${relations.join('; ')}`);
@@ -385,7 +405,7 @@ export function buildInput(info: PublicGameInfo, view: ContestantView, mind: Con
           ? `TRADE — ${negotiationText(info, names, view.negotiation)}.`
           : 'Choose your action for this turn.';
   lines.push(`DECISION ${decision.id}: ${what}`);
-  lines.push(decision.kind === 'move' ? 'Options (⚠ = rivals who could reach you there next turn: chance to reach / chance they knock you out; near = steps to key places):' : 'Options:');
+  lines.push(decision.kind === 'move' ? 'Options (⚠ rival a/b = a% chance they reach you there next turn, b% chance they knock you out if they attack; near = steps to key places):' : 'Options:');
   for (const p of decision.previews) lines.push(optionLine(info, view, names, p, me));
   const cardHints = decision.previews.some((p) => p.kind === 'move' && p.hints.some((h) => h.deck !== undefined && !h.fromCard));
   if (cardHints) lines.push('(Card draws are random: the deck list above shows what remains possible.)');

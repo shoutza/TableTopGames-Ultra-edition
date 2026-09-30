@@ -564,9 +564,10 @@ training, card draws, known rule effects and threats; choices, item uses and cus
 their effects with probabilities. Texts in the digest are generated tersely from the structured
 definitions ("landing on a Coin space: +3 Gold").
 
-Measured with the M5 starter (mock pipeline, 3 matches): the stable, cacheable instructions are
-≈ 1.74k estimated tokens; the per-decision input is p50 ≈ 560, p95 ≈ 1,060 (total p50 ≈ 2.3k,
-p95 ≈ 2.8k). The biggest inputs are six-step move decisions with many reachable spaces.
+Measured with the M5 starter (mock pipeline with scripted trades, 3 matches): the stable, cacheable
+instructions are ≈ 1.74k estimated tokens; the per-decision input is p50 ≈ 630, p95 ≈ 1,070 (total
+p50 ≈ 2.4k, p95 ≈ 2.8k). The biggest inputs are six-step move decisions with many reachable spaces;
+threat notes use short names ("⚠ Vex 83/64") with the legend given once.
 
 ### 11.4 Responses, validation, fallback
 

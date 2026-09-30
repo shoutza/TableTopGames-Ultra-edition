@@ -183,6 +183,19 @@ contestant's own turns after its key opportunity is removed.
       line always follows)
 - [x] Balance: contestants no longer lend a rival the gold for an immediate Star; the banker values
       some armour (it was every rival's favourite target)
+- [x] The scripted mock provider now proposes truces and counteroffers, so `--controllers mock` and
+      the GM app's mock mode exercise model-driven trading end to end (verified in headless Chromium:
+      offer → counteroffer → deal → promise, no console errors)
+- [x] The GM cannot deal a contestant an objective it is already working on
+- [x] Packets: short names in threat notes, trade memories from the contestant's side, capped round
+      lists, repeated truces shown once
+
+**Status:** `npm run sim -- --matches 1000 --seed accept` after the pass: 0 faults, 0 aborts, 127 ms
+per match, operation p99 0.29 ms, median 3 accepted trades, 2.0 objectives per match; wins by
+archetype with the offline player: power farmer 396, gear-up 280, star chaser 223, banker 109 (the
+cautious banker remains weakest; balance should be revisited with model-driven contestants).
+`npm run fuzz -- --runs 500 --gm 0.15`: 0 problems. Remaining known gaps: SSE updates still send
+full state (deltas are M8); separate non-blocking dialogue calls are deferred.
 
 ## M6 — GM authoring and live edits
 Board editor, definition editors (resources, items, enemies with stats and rewards, shops, cast,
