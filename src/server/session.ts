@@ -1,5 +1,7 @@
-import { applyToMind, chooseStrategy, decide, ProviderHealth, type ControllerConfig, type DecisionResult } from '../contestants/controller.ts';
+import { applyToMind, chooseStrategy, decide, ProviderHealth, withoutTrade, type ControllerConfig, type DecisionResult } from '../contestants/controller.ts';
+import { prepareMind } from '../contestants/memory.ts';
 import { newMind, type ContestantMind } from '../contestants/mind.ts';
+import { namesFromView } from '../contestants/packet.ts';
 import { castCandidates } from '../contestants/strategy.ts';
 import { advance, answerDecision, applyGmCommand, createMatch, nextStepKind, type CompiledGame, type FiringRecord, type OpOutcome } from '../engine/index.ts';
 import { estimateCost, type Price } from '../llm/prices.ts';
@@ -8,6 +10,7 @@ import type { GmCommand } from '../schema/commands.ts';
 import type { Persona } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
 import { publicInfo, type PublicGameInfo } from '../visibility/public-info.ts';
+import { visibleEventsAfter } from '../visibility/redact.ts';
 import { buildContestantView, type ContestantView } from '../visibility/view.ts';
 
 /**
@@ -263,18 +266,20 @@ export class MatchSession {
     const controller = new AbortController();
     this.inFlight = { decisionId: decision.id, controller };
     this.notifyStatus();
+    const view = this.view(decision.actor);
+    const persona = this.persona(decision.actor);
+    if (view.decision && view.decision.options.length > 1) {
+      prepareMind(mind, view, this.info, visibleEventsAfter(this.game, this.history, decision.actor, mind.lastSeenEventSeq), namesFromView(this.info, view));
+    }
+    // Lets the model repair answers the engine would refuse (e.g. trade terms it cannot deliver).
+    const validate = (optionId: string, trade: DecisionResult['trade']): string | null => {
+      if (this.state.pendingDecision?.id !== decision.id) return null;
+      const out = answerDecision(this.game, this.state, { decisionId: decision.id, optionId, trade: trade ?? undefined });
+      return !out.ok && out.kind === 'invalid' ? out.message : null;
+    };
     let result: DecisionResult;
     try {
-      result = await decide({
-        view: this.view(decision.actor),
-        info: this.info,
-        mind,
-        persona: this.persona(decision.actor),
-        provider: this.deps.provider,
-        config: this.deps.config,
-        health: this.health,
-        signal: controller.signal,
-      });
+      result = await decide({ view, info: this.info, mind, persona, provider: this.deps.provider, config: this.deps.config, health: this.health, signal: controller.signal, validate });
     } finally {
       this.inFlight = null;
     }
@@ -285,11 +290,18 @@ export class MatchSession {
       this.notifyStatus();
       return 'obsolete';
     }
-    const out = this.apply(answerDecision(this.game, this.state, { decisionId: decision.id, optionId: result.optionId, rev: revAtRequest, say: result.say ?? undefined }), 'decision', {
+    let attempt = answerDecision(this.game, this.state, { decisionId: decision.id, optionId: result.optionId, rev: revAtRequest, say: result.say ?? undefined, trade: result.trade ?? undefined });
+    if (!attempt.ok && attempt.kind === 'invalid') {
+      // Never stall on an answer the engine refuses: fall back to a safe choice.
+      result = withoutTrade({ view, info: this.info, mind, persona }, result);
+      attempt = answerDecision(this.game, this.state, { decisionId: decision.id, optionId: result.optionId, rev: revAtRequest, say: result.say ?? undefined });
+    }
+    const out = this.apply(attempt, 'decision', {
       decisionId: decision.id,
       optionId: result.optionId,
       source: result.source,
       say: result.say,
+      ...(result.trade ? { trade: result.trade } : {}),
     });
     if (out.ok) applyToMind(mind, result, this.state.round);
     return out.ok ? 'progress' : 'aborted';

@@ -25,6 +25,11 @@ function causeLabel(data: MatchData, e: EventDto): string {
     }
     case 'choice':
       return `choice made by ${c.entity ? (data.state.entities[c.entity]?.name ?? c.entity) : 'a contestant'}${c.rule ? ` (offered by rule “${ruleName(c.rule)}”${hidden(c.rule) ? ' 🔒 hidden' : ''})` : ''}`;
+    case 'objective': {
+      const inst = data.state.objectives.find((o) => o.owner === c.entity && o.done);
+      const def = data.definition.objectives.find((o) => o.id === inst?.defId);
+      return `secret objective${def ? ` “${def.name}”` : ''} completed by ${c.entity ? (data.state.entities[c.entity]?.name ?? c.entity) : 'a contestant'}`;
+    }
     case 'system':
       return 'game system';
   }

@@ -54,6 +54,8 @@ export function Standings({ data, onSelect, selected }: { data: MatchData; onSel
                 {e.koTurns > 0 ? ' 💫' : ''}
                 {e.status === 'eliminated' ? ' ☠️' : ''}
                 {state.winners?.includes(id) ? ' 🏆' : ''}
+                {state.objectives.some((o) => o.owner === id && o.done) ? <span title="completed a secret objective"> 🎯</span> : null}
+                {state.commitments.some((c) => c.status === 'open' && c.by === id) ? <span title="has open promises"> 🤝</span> : null}
               </td>
               <td>{v[victory] ?? 0}</td>
               <td>{v[core.gold] ?? 0}</td>
@@ -69,6 +71,66 @@ export function Standings({ data, onSelect, selected }: { data: MatchData; onSel
         })}
       </tbody>
     </table>
+  );
+}
+
+function SocialBlock({ data, entityId, mind }: { data: MatchData; entityId: string; mind: MindDto | undefined }) {
+  const { state, definition: def } = data;
+  const name = (id: string) => state.entities[id]?.name ?? id;
+  const objectives = state.objectives.filter((o) => o.owner === entityId);
+  const promises = state.commitments.filter((c) => c.by === entityId || c.to === entityId);
+  const feelings = Object.entries(mind?.relationships ?? {}).filter(([, r]) => r.trust !== 0 || r.affinity !== 0);
+  const signed = (v: number) => (v > 0 ? `+${v}` : `${v}`);
+  const promiseText = (c: (typeof promises)[number]) =>
+    c.kind === 'noAttack'
+      ? `${name(c.by)} will not attack ${name(c.to)} (to round ${c.dueRound})`
+      : `${name(c.by)} pays ${name(c.to)} ${c.amount} ${resourceName(def, c.resource ?? '')} (by round ${c.dueRound}${c.paid > 0 ? `, paid ${c.paid}` : ''})`;
+  const statusIcon = { open: '⏳', kept: '✅', broken: '💔', void: '—' } as const;
+  if (objectives.length === 0 && promises.length === 0 && feelings.length === 0 && (mind?.memories.length ?? 0) === 0) return null;
+  return (
+    <div className="block">
+      <h4>Social</h4>
+      {objectives.map((o) => {
+        const d = def.objectives.find((x) => x.id === o.defId);
+        const target = d ? (d.goal.kind === 'count' ? d.goal.times : d.goal.atLeast) : 0;
+        return (
+          <p key={o.id}>
+            {d?.icon ?? '🎯'} <b>{d?.name ?? o.defId}</b> {o.done ? '✓ done (revealed)' : `· secret · ${d?.goal.kind === 'count' ? `${o.progress}/${target}` : `needs ${target}`}`}
+            <span className="muted"> — {data.rulebook.objectives[o.defId]}</span>
+          </p>
+        );
+      })}
+      {promises.length > 0 && (
+        <ul className="plain">
+          {promises.map((c) => (
+            <li key={c.id}>
+              {statusIcon[c.status]} {promiseText(c)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {feelings.length > 0 && (
+        <p className="muted">
+          Feels about: {feelings.map(([id, r]) => `${name(id)} (trust ${signed(r.trust)}, affinity ${signed(r.affinity)})`).join(' · ')}
+        </p>
+      )}
+      {mind?.keyMoment && <p className="warn">Key moment: {mind.keyMoment}</p>}
+      {(mind?.memories.length ?? 0) > 0 && (
+        <details>
+          <summary>Memories ({mind?.memories.length})</summary>
+          <ul className="plain">
+            {mind?.memories
+              .slice()
+              .reverse()
+              .map((m, i) => (
+                <li key={i} className="muted">
+                  r{m.round}: {m.text}
+                </li>
+              ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -193,6 +255,7 @@ export function Inspector({ data, entityId }: { data: MatchData; entityId: strin
         </div>
       )}
       {mind && <StrategyBlock mind={mind} />}
+      {e.kind === 'contestant' && <SocialBlock data={data} entityId={entityId} mind={mind} />}
       {enemy && (
         <div className="block">
           <h4>{enemy.boss ? 'Boss 👑' : 'Enemy'}</h4>

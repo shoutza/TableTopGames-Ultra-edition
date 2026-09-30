@@ -1,4 +1,4 @@
-import type { ReactionRule } from '../schema/rules.ts';
+import type { ReactionRule, TriggerWhere } from '../schema/rules.ts';
 import type { EventCause, GameEvent, GameState } from '../schema/state.ts';
 import type { CompiledGame, CompiledRule } from './compile.ts';
 import { OpContext, type FaultRecord, type FiringRecord } from './context.ts';
@@ -6,6 +6,7 @@ import { issueNextDecision } from './decisions.ts';
 import { applyEffects, handleDefeat } from './effects.ts';
 import { evalCond, type Bindings } from './eval.ts';
 import { limitAllows, recordFiring } from './modifiers.ts';
+import { settleObjectives } from './objectives.ts';
 import { hasEffectiveTag, holdersOf } from './queries.ts';
 import { BudgetExceeded, InvalidInput, RuleFault, cloneJson } from './util.ts';
 
@@ -29,6 +30,7 @@ export function runOperation(game: CompiledGame, state: GameState, body: (ctx: O
   const ctx = new OpContext(game, cloneJson(state));
   try {
     body(ctx);
+    settleObjectives(ctx);
     issueNextDecision(ctx);
     ctx.state.rev += 1;
     return { ok: true, state: ctx.state, events: ctx.events, firings: ctx.firings, faults: ctx.faults };
@@ -47,7 +49,8 @@ export function runRoot(ctx: OpContext, fn: () => void, options: { reactions: bo
   stateChecks(ctx, options.reactions);
 }
 
-function bindingsFor(ctx: OpContext, ev: GameEvent): Bindings {
+/** Bindings a trigger event provides to rules (and to objective goals). */
+export function bindingsFor(ctx: { state: GameState }, ev: GameEvent): Bindings {
   switch (ev.type) {
     case 'landed':
     case 'left':
@@ -85,8 +88,8 @@ function bindingsFor(ctx: OpContext, ev: GameEvent): Bindings {
   }
 }
 
-function matchesWhere(ctx: OpContext, rule: ReactionRule, ev: GameEvent, b: Bindings): boolean {
-  const w = rule.trigger.where;
+/** Whether an event passes a trigger's static filter. */
+export function matchesWhere(ctx: { game: CompiledGame; state: GameState }, w: TriggerWhere | undefined, ev: GameEvent, b: Bindings): boolean {
   if (!w) return true;
   const space = 'space' in ev && typeof ev.space === 'string' ? ev.space : undefined;
   if (w.space !== undefined && space !== w.space) return false;
@@ -124,11 +127,11 @@ export function runReactions(ctx: OpContext, events: GameEvent[], depth: number)
         // Attached rules fire once per current holder, in stable holder order.
         for (const holder of holdersOf(ctx.state, rule.owner)) {
           const b: Bindings = { ...bindingsFor(ctx, ev), $holder: holder };
-          if (matchesWhere(ctx, def, ev, b)) fireRule(ctx, rule, ev, b, depth, holder);
+          if (matchesWhere(ctx, def.trigger.where, ev, b)) fireRule(ctx, rule, ev, b, depth, holder);
         }
       } else {
         const b = bindingsFor(ctx, ev);
-        if (matchesWhere(ctx, def, ev, b)) fireRule(ctx, rule, ev, b, depth, undefined);
+        if (matchesWhere(ctx, def.trigger.where, ev, b)) fireRule(ctx, rule, ev, b, depth, undefined);
       }
     }
   }

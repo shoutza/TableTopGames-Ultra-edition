@@ -141,12 +141,22 @@ describe('match session', () => {
       return answerWith(firstOption)(req);
     });
     const session = await MatchSession.create(starter, { matchId: 'full', seed: 'full' }, { provider, config: DEFAULT_CONTROLLER_CONFIG, price: { input: 0.1, cachedInput: 0.01, output: 0.5 } });
+    // The changing part of each packet (the situation and options), apart from the shared rulebook prefix.
+    const inputs: number[] = [];
+    session.subscribe({
+      onAiCall: (r) => {
+        const p = session.lastPackets.get(r.contestant);
+        if (p && r.purpose === 'decision' && r.attempts > 0) inputs.push(Math.ceil(p.input.length / 4));
+      },
+    });
     await session.runToEnd();
     expect(session.over).toBe(true);
     const m = session.metrics();
     expect(m.fallbackRate).toBe(0);
     expect(m.costUsd).toBeGreaterThan(0);
-    expect(m.packetTokens.p95).toBeLessThan(2600);
+    expect(m.packetTokens.p95).toBeLessThan(3000);
+    const sorted = [...inputs].sort((a, b) => a - b);
+    expect(sorted[Math.floor(sorted.length * 0.95)]).toBeLessThan(1200);
     for (const mind of session.minds.values()) expect(mind.strategy).not.toBeNull();
   });
 });

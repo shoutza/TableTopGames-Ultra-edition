@@ -1,3 +1,4 @@
+import type { TradeOfferInput } from '../schema/trade.ts';
 import type { LlmErrorKind, LlmProvider, LlmUsage } from '../llm/port.ts';
 import type { Persona, Strategy } from '../schema/persona.ts';
 import type { PublicGameInfo } from '../visibility/public-info.ts';
@@ -14,7 +15,7 @@ import {
   StrategyResponseSchema,
   parseStructured,
 } from './responses.ts';
-import { ARCHETYPE_INFO, defaultStrategy } from './strategy.ts';
+import { ARCHETYPE_INFO, defaultStrategy, reviseStrategy } from './strategy.ts';
 
 /**
  * Decision controller: builds a packet from the contestant's view, asks the model, validates the
@@ -46,6 +47,8 @@ export interface DecisionResult {
   say: string | null;
   plan: string | null;
   strategyUpdate: Strategy | null;
+  /** Terms when the option is "trade" or a counteroffer. */
+  trade: TradeOfferInput | null;
   reason: string;
   source: DecisionSource;
   attempts: AttemptRecord[];
@@ -81,36 +84,63 @@ export interface DecideInput {
   config: ControllerConfig;
   health: ProviderHealth;
   signal?: { readonly aborted: boolean } | undefined;
+  /**
+   * Checks an answer against the authoritative state without committing it; returns the engine's
+   * (view-safe) reason when it would be refused. Used to give the model one repair attempt.
+   */
+  validate?: ((optionId: string, trade: TradeOfferInput | null) => string | null) | undefined;
+}
+
+/** Options whose answers must carry trade terms. */
+export function needsTerms(optionId: string): boolean {
+  return optionId === 'trade' || optionId === 'tr:counter';
 }
 
 const RETRYABLE: ReadonlySet<LlmErrorKind> = new Set(['timeout', 'rate_limit', 'server', 'network', 'incomplete', 'unknown']);
 
-function heuristicResult(input: DecideInput, source: DecisionSource, attempts: AttemptRecord[], packetTokens: number, packet: DecisionResult['packet']): DecisionResult {
-  const choice = chooseHeuristic(input.view, input.info, input.persona, input.mind.strategy?.archetype ?? input.mind.candidates[0] ?? null);
-  return { optionId: choice.optionId, say: null, plan: null, strategyUpdate: null, reason: choice.reason, source, attempts, packetTokens, packet };
+type OfflineInput = Pick<DecideInput, 'view' | 'info' | 'mind' | 'persona'>;
+
+function heuristicResult(input: OfflineInput, source: DecisionSource, attempts: AttemptRecord[], packetTokens: number, packet: DecisionResult['packet']): DecisionResult {
+  const { mind } = input;
+  const choice = chooseHeuristic(input.view, input.info, input.persona, mind.strategy?.archetype ?? mind.candidates[0] ?? null, mind);
+  // The fallback player answers a reconsideration flag too: it switches strategy when its plan no longer works.
+  const strategyUpdate = mind.reconsider && mind.strategy ? reviseStrategy(input.info, input.view, input.persona, mind.strategy, mind.reconsider) : null;
+  return { optionId: choice.optionId, say: choice.say ?? null, plan: null, strategyUpdate, trade: choice.trade ?? null, reason: choice.reason, source, attempts, packetTokens, packet };
 }
 
-/** Sets or clears the reconsider flag from what the contestant has observed. */
-export function updateReconsider(mind: ContestantMind, view: ContestantView): void {
-  const fresh = view.recentEvents.filter((e) => e.seq > mind.lastSeenEventSeq);
-  const knockedOut = fresh.some((e) => e.event.type === 'knockedOut' && 'entity' in e.event && e.event.entity === view.viewer);
-  if (fresh.length > 0) mind.lastSeenEventSeq = Math.max(...fresh.map((e) => e.seq));
-  if (!mind.strategy || mind.reconsider) return;
-  const sinceLast = view.round - mind.lastReconsiderRound;
-  if (knockedOut) mind.reconsider = 'You were just knocked out';
-  else if (view.round - mind.strategy.adoptedAtRound >= 8 && sinceLast >= 8) mind.reconsider = `${view.round - mind.strategy.adoptedAtRound} rounds have passed since you chose this strategy; check whether it is working`;
+function forcedResult(input: OfflineInput): DecisionResult | null {
+  const options = input.view.decision?.options ?? [];
+  if (options.length !== 1) return null;
+  const only = options[0] as { id: string };
+  return { optionId: only.id, say: null, plan: null, strategyUpdate: null, trade: null, reason: 'only option', source: 'forced', attempts: [], packetTokens: 0, packet: null };
+}
+
+/** The offline player's decision (headless simulations, no provider, tripped circuit breaker). */
+export function decideOffline(input: OfflineInput): DecisionResult {
+  if (!input.view.decision) throw new Error('no decision for this contestant');
+  return forcedResult(input) ?? heuristicResult(input, 'heuristic', [], 0, null);
+}
+
+/**
+ * A safe replacement when an answer turns out to be refused by the engine (e.g. trade terms that
+ * no longer fit): the fallback player's choice without trading, or rejecting the offer.
+ */
+export function withoutTrade(input: OfflineInput, result: DecisionResult): DecisionResult {
+  const decision = input.view.decision;
+  if (!decision) throw new Error('no decision for this contestant');
+  if (decision.kind === 'trade') return { ...result, optionId: 'tr:reject', trade: null, reason: 'the terms did not work out' };
+  const view = { ...input.view, decision: { ...decision, options: decision.options.filter((o) => o.kind !== 'trade'), previews: decision.previews.filter((p) => p.kind !== 'trade') } };
+  const choice = chooseHeuristic(view, input.info, input.persona, input.mind.strategy?.archetype ?? input.mind.candidates[0] ?? null, input.mind);
+  return { ...result, optionId: choice.optionId, trade: null, reason: choice.reason, source: result.source === 'llm' || result.source === 'repaired' ? 'fallback' : result.source };
 }
 
 export async function decide(input: DecideInput): Promise<DecisionResult> {
   const decision = input.view.decision;
   if (!decision) throw new Error('no decision for this contestant');
-  if (decision.options.length === 1) {
-    const only = decision.options[0] as { id: string };
-    return { optionId: only.id, say: null, plan: null, strategyUpdate: null, reason: 'only option', source: 'forced', attempts: [], packetTokens: 0, packet: null };
-  }
+  const forced = forcedResult(input);
+  if (forced) return forced;
   if (!input.provider || input.mind.controller === 'heuristic' || input.health.tripped) return heuristicResult(input, 'heuristic', [], 0, null);
 
-  updateReconsider(input.mind, input.view);
   const packet = buildDecisionPacket(input.info, input.view, input.mind, input.persona);
   const attempts: AttemptRecord[] = [];
   let extra = '';
@@ -140,6 +170,8 @@ export async function decide(input: DecideInput): Promise<DecisionResult> {
     if (!parsed.ok) problem = parsed.error;
     else if (parsed.value.decisionId !== decision.id) problem = `decisionId must be "${decision.id}".`;
     else if (!decision.options.some((o) => o.id === parsed.value.optionId)) problem = `"${parsed.value.optionId}" is not one of the offered option ids.`;
+    else if (needsTerms(parsed.value.optionId) && !parsed.value.trade) problem = `"${parsed.value.optionId}" needs trade terms in "trade".`;
+    else problem = input.validate?.(parsed.value.optionId, needsTerms(parsed.value.optionId) ? parsed.value.trade : null) ?? null;
     if (problem !== null || !parsed.ok) {
       attempts.push({ ok: false, errorKind: 'invalid', error: problem, usage: res.usage, latencyMs: res.latencyMs });
       input.health.record(true); // the provider works; the answer was just unusable
@@ -160,7 +192,8 @@ export async function decide(input: DecideInput): Promise<DecisionResult> {
         reason: v.strategyUpdate.reason,
       };
     }
-    return { optionId: v.optionId, say: v.say, plan: v.plan, strategyUpdate, reason: v.reason, source: attempt === 0 ? 'llm' : 'repaired', attempts, packetTokens: packet.estimatedTokens, packet };
+    const trade = needsTerms(v.optionId) ? v.trade : null;
+    return { optionId: v.optionId, say: v.say, plan: v.plan, strategyUpdate, trade, reason: v.reason, source: attempt === 0 ? 'llm' : 'repaired', attempts, packetTokens: packet.estimatedTokens, packet };
   }
   return heuristicResult(input, 'fallback', attempts, packet.estimatedTokens, packet);
 }
@@ -175,9 +208,13 @@ export function applyToMind(mind: ContestantMind, result: DecisionResult, round:
     if (mind.strategy) mind.strategyHistory.push(mind.strategy);
     mind.strategy = result.strategyUpdate;
   }
-  if (mind.reconsider && (result.source === 'llm' || result.source === 'repaired')) {
-    mind.reconsider = null;
-    mind.lastReconsiderRound = round;
+  // A real decision (not a forced one) is the contestant's chance to react; the flags are answered.
+  if (result.source !== 'forced' && result.source !== 'aborted') {
+    if (mind.reconsider) {
+      mind.reconsider = null;
+      mind.lastReconsiderRound = round;
+    }
+    mind.keyMoment = null;
   }
 }
 

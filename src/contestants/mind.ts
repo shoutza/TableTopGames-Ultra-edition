@@ -1,9 +1,31 @@
 import { z } from 'zod';
 import { ARCHETYPES, StrategySchema, type Persona } from '../schema/persona.ts';
 
+/** How a contestant feels about another (−10..10), updated by fixed rules from observed events. */
+export const RelationshipSchema = z.strictObject({
+  trust: z.number().int().min(-10).max(10),
+  affinity: z.number().int().min(-10).max(10),
+});
+export type Relationship = z.infer<typeof RelationshipSchema>;
+
+export const MEMORY_KINDS = ['betrayal', 'promiseKept', 'attackedMe', 'knockedOut', 'knockedOutRival', 'trade', 'offerRejected', 'robbedMe', 'objective', 'reputation'] as const;
+export type MemoryKind = (typeof MEMORY_KINDS)[number];
+
+/** Something the contestant observed and may recall (built only from events it could see). */
+export const MemorySchema = z.strictObject({
+  seq: z.number().int(),
+  round: z.number().int(),
+  kind: z.enum(MEMORY_KINDS),
+  /** The other contestant involved, if any. */
+  other: z.string().nullable(),
+  text: z.string(),
+  importance: z.number().int().min(0).max(5),
+});
+export type Memory = z.infer<typeof MemorySchema>;
+
 /**
- * A contestant's persistent AI-side data: persona reference, strategy history and current plan.
- * Rules never read it; it is saved with the match.
+ * A contestant's persistent AI-side data: persona reference, strategy history, current plan,
+ * relationships and memories. Rules never read it; it is saved with the match.
  */
 export const ContestantMindSchema = z.strictObject({
   entityId: z.string(),
@@ -18,6 +40,11 @@ export const ContestantMindSchema = z.strictObject({
   reconsider: z.string().nullable(),
   lastReconsiderRound: z.number().int(),
   lastSeenEventSeq: z.number().int(),
+  relationships: z.record(z.string(), RelationshipSchema).default({}),
+  /** Most recent last; capped. */
+  memories: z.array(MemorySchema).default([]),
+  /** A moment worth reacting to in character at the next decision (set by code). */
+  keyMoment: z.string().nullable().default(null),
 });
 export type ContestantMind = z.infer<typeof ContestantMindSchema>;
 
@@ -34,6 +61,9 @@ export function newMind(entityId: string, castId: string, candidates: Contestant
     reconsider: null,
     lastReconsiderRound: 0,
     lastSeenEventSeq: 0,
+    relationships: {},
+    memories: [],
+    keyMoment: null,
   };
 }
 

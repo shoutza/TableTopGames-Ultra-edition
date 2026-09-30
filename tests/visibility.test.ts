@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { loadStarter } from '../src/cli/headless.ts';
 import { chooseHeuristic } from '../src/contestants/heuristic.ts';
-import { newMind } from '../src/contestants/mind.ts';
-import { buildDecisionPacket } from '../src/contestants/packet.ts';
+import { prepareMind, selectMemories } from '../src/contestants/memory.ts';
+import { newMind, type ContestantMind } from '../src/contestants/mind.ts';
+import { buildDecisionPacket, namesFromView } from '../src/contestants/packet.ts';
 import { advance, answerDecision, applyGmCommand, cloneJson, compileGame, createMatch, nextStepKind, type CompiledGame } from '../src/engine/index.ts';
 import { GmCommandSchema } from '../src/schema/commands.ts';
 import { GameDefinitionSchema } from '../src/schema/definition.ts';
 import type { GameEvent, GameState } from '../src/schema/state.ts';
 import { publicInfo } from '../src/visibility/public-info.ts';
+import { visibleEvents } from '../src/visibility/redact.ts';
 import { buildContestantView } from '../src/visibility/view.ts';
 
 /**
@@ -26,7 +28,7 @@ function playUntil(game: CompiledGame, seed: string, operations: number): { stat
     const out =
       nextStepKind(state) === 'auto'
         ? advance(game, state)
-        : answerDecision(game, state, { decisionId: state.pendingDecision?.id as string, optionId: state.pendingDecision?.options.at(-1)?.id as string });
+        : answerDecision(game, state, { decisionId: state.pendingDecision?.id as string, optionId: state.pendingDecision?.options.filter((o) => o.kind !== 'trade' && o.id !== 'tr:counter').at(-1)?.id as string });
     if (!out.ok) throw new Error(out.message);
     state = out.state;
     events.push(...out.events);
@@ -41,19 +43,28 @@ function playUntil(game: CompiledGame, seed: string, operations: number): { stat
   return { state, events };
 }
 
+/**
+ * Everything a contestant's decision depends on. The mind is built the way the coordinator builds
+ * it: from the events this contestant could see (memories, relationships, flags).
+ */
 function packetFor(game: CompiledGame, state: GameState, events: GameEvent[], viewer: string) {
   const info = publicInfo(game);
   const view = buildContestantView(game, state, viewer, events);
   const castId = state.entities[viewer]?.defId as string;
   const persona = game.cast.get(castId)?.persona;
   if (!persona) throw new Error('persona');
-  const mind = newMind(viewer, castId, ['opportunist'], 'llm');
+  const mind: ContestantMind = newMind(viewer, castId, ['opportunist'], 'llm');
+  prepareMind(mind, view, info, visibleEvents(game, events, viewer), namesFromView(info, view));
   const packet = buildDecisionPacket(info, view, mind, persona);
+  const choice = chooseHeuristic(view, info, persona, 'opportunist', mind);
   return {
     text: `${packet.instructions}\n---\n${packet.input}`,
     options: view.decision?.options.map((o) => o.id),
     previews: JSON.stringify(view.decision?.previews),
-    choice: chooseHeuristic(view, info, persona, 'opportunist').optionId,
+    choice: choice.optionId,
+    trade: JSON.stringify(choice.trade ?? null),
+    memories: selectMemories(mind, view),
+    relationships: JSON.stringify(mind.relationships),
   };
 }
 
@@ -173,7 +184,7 @@ describe('hidden-information pairs for M4 mechanics', () => {
   it('which concealed item another contestant holds does not change the packet', () => {
     // Two concealed items with different bonuses; only their holder may know which is which.
     const def = cloneJson(starter.def);
-    def.items.push({ id: 'item.cursed_coin', name: 'Cursed Coin', concealed: true, tags: [], modifiers: [{ resource: 'res.power', add: -30 }], rules: [] });
+    def.items.push({ id: 'item.cursed_coin', name: 'Cursed Coin', concealed: true, tradeable: true, tags: [], modifiers: [{ resource: 'res.power', add: -30 }], rules: [] });
     const g = compileGame(GameDefinitionSchema.parse(def));
     const a = packetFor(g, withItem(base.state, other, 'item.lucky_coin'), base.events, viewer);
     const b = packetFor(g, withItem(base.state, other, 'item.cursed_coin'), base.events, viewer);
@@ -198,6 +209,37 @@ describe('hidden-information pairs for M4 mechanics', () => {
       (hexed.entities[target] as { statuses: GameState['entities'][string]['statuses'] }).statuses.push({ id: 's99', defId: 'status.secret_hex', stacks: 1, remaining: null, fresh: false });
       expect(packetFor(g, hexed, base.events, viewer)).toEqual(packetFor(g, base.state, base.events, viewer));
     }
+  });
+
+  it('another contestant’s secret objective (which one, and its progress) does not change the packet', () => {
+    const theirs = base.state.objectives.find((o) => o.owner === other);
+    expect(theirs).toBeDefined();
+    const mine = base.state.objectives.find((o) => o.owner === viewer);
+    const variant = cloneJson(base.state);
+    const swapped = variant.objectives.find((o) => o.owner === other) as GameState['objectives'][number];
+    swapped.defId = starter.def.objectives.find((o) => o.id !== theirs?.defId && o.id !== mine?.defId)?.id as string;
+    swapped.progress = 2;
+    const a = packetFor(starter, base.state, base.events, viewer);
+    const b = packetFor(starter, variant, base.events, viewer);
+    expect(b).toEqual(a);
+    // The viewer's own objective is in its packet.
+    const own = starter.def.objectives.find((o) => o.id === mine?.defId);
+    expect(a.text).toContain(`YOUR SECRET OBJECTIVE: ${own?.name}`);
+  });
+
+  it('memories and relationships come only from what the contestant saw: private trades between others leave no trace', () => {
+    const third = base.state.turnOrder.find((id) => id !== viewer && id !== other) as string;
+    const at = { rev: base.state.rev, round: base.state.round };
+    const terms = { give: { resources: { 'res.gold': 3 }, items: [] }, get: { resources: {}, items: [] }, promises: [] };
+    const privateEvents = [
+      { type: 'tradeProposed', negotiation: 't99', from: other, to: third, terms, message: 'secret deal', seq: 99_990, ...at, cause: { kind: 'action', entity: other }, audience: [other, third] },
+      { type: 'tradeRejected', negotiation: 't99', from: other, to: third, by: third, automatic: false, seq: 99_991, ...at, cause: { kind: 'action', entity: third }, audience: [other, third] },
+      { type: 'objectiveAssigned', entity: other, objective: 'o99', def: 'obj.angler', seq: 99_992, ...at, cause: { kind: 'gm' }, audience: [other] },
+    ] as GameEvent[];
+    const a = packetFor(starter, base.state, base.events, viewer);
+    const b = packetFor(starter, base.state, [...base.events, ...privateEvents], viewer);
+    expect(b).toEqual(a);
+    expect(b.text).not.toContain('secret deal');
   });
 
   it('Fish Form is explained in the packet: −1 Move on the roll and no shopping', () => {

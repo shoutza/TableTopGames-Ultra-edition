@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { castCandidates, defaultStrategy } from '../contestants/strategy.ts';
-import { chooseHeuristic } from '../contestants/heuristic.ts';
+import { applyToMind, decideOffline, withoutTrade } from '../contestants/controller.ts';
+import { prepareMind } from '../contestants/memory.ts';
+import { newMind, type ContestantMind } from '../contestants/mind.ts';
+import { namesFromView } from '../contestants/packet.ts';
+import { ARCHETYPE_INFO, castCandidates, defaultStrategy } from '../contestants/strategy.ts';
 import { advance, answerDecision, createMatch, loadGame, nextStepKind, type CompiledGame } from '../engine/index.ts';
 import type { Archetype } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
 import { publicInfo } from '../visibility/public-info.ts';
+import { visibleEventsAfter } from '../visibility/redact.ts';
 import { buildContestantView } from '../visibility/view.ts';
 
 /** Headless, synchronous match runner with the offline heuristic player (tests and the sim CLI). */
@@ -33,7 +37,10 @@ export { stateHash } from '../server/hash.ts';
 export interface HeadlessResult {
   state: GameState;
   events: GameEvent[];
+  /** Strategy each contestant was cast with at match start. */
   archetypes: Map<string, Archetype>;
+  /** Contestant minds at the end (strategies, relationships, memories). */
+  minds: Map<string, ContestantMind>;
   decisions: number;
   forcedDecisions: number;
   faults: number;
@@ -56,9 +63,15 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
   });
   const candidates = castCandidates(info, [...contestants].sort((a, b) => a.id.localeCompare(b.id)));
   const archetypes = new Map<string, Archetype>();
+  const minds = new Map<string, ContestantMind>();
   for (const c of contestants) {
-    const first = candidates.get(c.id)?.[0] ?? 'opportunist';
-    archetypes.set(c.id, defaultStrategy(info, first, 0, 'casting').archetype);
+    const list = candidates.get(c.id) ?? ['opportunist'];
+    const first = list[0] ?? 'opportunist';
+    const mind = newMind(c.id, state.entities[c.id]?.defId ?? '', list, 'heuristic');
+    mind.strategy = defaultStrategy(info, first, 0, 'casting');
+    mind.plan = ARCHETYPE_INFO[first].priorities(info)[0] ?? '';
+    minds.set(c.id, mind);
+    archetypes.set(c.id, first);
   }
   let decisions = 0;
   let forced = 0;
@@ -77,27 +90,35 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
       const decision = state.pendingDecision;
       if (!decision) throw new Error('missing decision');
       decisions++;
-      let optionId: string;
       if (decision.options.length === 1) {
         forced++;
-        optionId = (decision.options[0] as { id: string }).id;
+        const t0 = performance.now();
+        out = answerDecision(game, state, { decisionId: decision.id, optionId: (decision.options[0] as { id: string }).id });
+        opMs.push(performance.now() - t0);
       } else {
         const view = buildContestantView(game, state, decision.actor, events);
         const persona = contestants.find((c) => c.id === decision.actor)?.persona;
-        if (!persona) throw new Error('persona missing');
-        optionId = chooseHeuristic(view, info, persona, archetypes.get(decision.actor) ?? null).optionId;
+        const mind = minds.get(decision.actor);
+        if (!persona || !mind) throw new Error('persona missing');
+        prepareMind(mind, view, info, visibleEventsAfter(game, events, decision.actor, mind.lastSeenEventSeq), namesFromView(info, view));
+        let result = decideOffline({ view, info, mind, persona });
+        const t0 = performance.now();
+        out = answerDecision(game, state, { decisionId: decision.id, optionId: result.optionId, say: result.say ?? undefined, trade: result.trade ?? undefined });
+        if (!out.ok && out.kind === 'invalid') {
+          result = withoutTrade({ view, info, mind, persona }, result);
+          out = answerDecision(game, state, { decisionId: decision.id, optionId: result.optionId });
+        }
+        opMs.push(performance.now() - t0);
+        if (out.ok) applyToMind(mind, result, state.round);
       }
-      const t0 = performance.now();
-      out = answerDecision(game, state, { decisionId: decision.id, optionId });
-      opMs.push(performance.now() - t0);
     }
     if (!out.ok) {
-      if (out.kind === 'aborted') return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: out.message, operations, opMs };
+      if (out.kind === 'aborted') return { state, events, archetypes, minds, decisions, forcedDecisions: forced, faults, aborted: out.message, operations, opMs };
       throw new Error(`operation rejected: ${out.message}`);
     }
     state = out.state;
     events.push(...out.events);
     faults += out.faults.length;
   }
-  return { state, events, archetypes, decisions, forcedDecisions: forced, faults, aborted: null, operations, opMs };
+  return { state, events, archetypes, minds, decisions, forcedDecisions: forced, faults, aborted: null, operations, opMs };
 }

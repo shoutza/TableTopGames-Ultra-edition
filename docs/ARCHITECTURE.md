@@ -97,13 +97,13 @@ restore them. History and memories store IDs; names are rendered at display time
 
 | Concept | Representation |
 |---|---|
-| **ResourceDef** | `id, name, role: pool \| stat, appliesTo[], default, min, max, maxFrom?, visibility: public \| owner \| gm`. Integers only (±10⁹); changes clamp to bounds and events record requested vs applied. |
+| **ResourceDef** | `id, name, role: pool \| stat, appliesTo[], default, min, max, maxFrom?, visibility: public \| owner \| gm, tradeable`. Integers only (±10⁹); changes clamp to bounds and events record requested vs applied. Tradeable resources must be public pools of contestants. |
 | **Effective value** | `stat` resources: base value + Σ modifiers from held items, statuses (× stacks) and continuous rules, then clamped. `pool` resources are plain stored amounts. |
 | **HP / Power** | Separate resources. `res.hp` is a pool bounded by `res.max_hp`; `res.power` is a stat whose effective value drives combat. |
 | **TagDef** | `id, name, appliesTo, color`. "Has tag" means **effective** tags: base tags + tags granted by statuses. |
 | **StatusDef / instance** | Def: `duration` (holder turns, or null = until removed), `stacking: refresh \| extend \| stack(maxStacks) \| ignore`, `grantsTags`, `modifiers` (per stack), `suppress` (capabilities), `visibility: public \| hidden`, `transformation` (offered to the GM as a template; one at a time — a new transformation ends the previous one), attached `rules`. Instance on the entity: `defId, stacks, remaining, fresh`. |
 | **Capabilities** | `takesTurns, moves, shops, attacks, attackable, usesItems, trades`. Contestants have all, enemies only `attackable`, fixtures none; statuses and continuous rules suppress them. |
-| **ItemDef / ItemInstance** | Def: `id, name, description, tags, modifiers[{resource, add}], concealed, use?{effects, consumed}, rules`. Instance: `id, defId, holder`. Inventory capacity is a setting. |
+| **ItemDef / ItemInstance** | Def: `id, name, description, tags, modifiers[{resource, add}], concealed, tradeable (default true; concealed items never trade), use?{effects, consumed}, rules`. Instance: `id, defId, holder`. Inventory capacity is a setting. |
 | **DeckDef** | `id, name, cards[{id, name, count, effects}]`. The deck list is public; the draw order lives in the state and is hidden. |
 | **ActionDef** | Custom main actions: `where` (space / space tag), `requires` (view-safe condition), `cost`, `cooldownRounds`, optional `target {kind, range}`, `effects`. |
 | **Space / Connection / Layout** | Space: `id, name, tags, description`. Connection: `{a, b, directed}`. Layout (`x, y`) is stored separately, so moving a space on screen never changes movement. |
@@ -112,9 +112,12 @@ restore them. History and memories store IDs; names are rendered at display time
 | **ShopDef** | Entries selling an item or a resource bundle for a price (`resource, amount`). |
 | **Rule** | See §5. |
 | **Event** | `seq, rev, round, type, data, cause {kind: action \| rule \| gm \| system, ruleId?, parentSeq?}, audience: all \| [ids] \| gm`. |
-| **Decision** | `id, actor, kind: move \| main \| choice, rev, options[{id, kind, label, params}]`. Options: move, buy (with its modified price), attack (enemy or contestant), use (item), act (custom action, optional target), rest, pass, choose. Stored in the state so saves include it. |
+| **Decision** | `id, actor, kind: move \| main \| choice \| trade, rev, options[{id, kind, label, params}]`. Options: move, buy (with its modified price), attack (enemy or contestant), use (item), act (custom action, optional target), rest, pass, choose, trade (propose; free action), pay (keep a payment promise; free action), tradeAnswer (accept / reject / counter). Stored in the state so saves include it. |
 | **Pending choice** | Queued by `offerChoice`: `chooser, prompt, options (label, requires, effects), default, saved bindings`. Answered in its own later operation. |
-| **Contestant mind** | Persona, strategy history, plan, memory (AI side, never readable by rules). |
+| **ObjectiveDef / instance** | Def: `id, name, text?, goal: count {trigger, times} \| reach {resource, atLeast}, reward: Effect[]`. Instance: `id, defId, owner, progress, done`. The pool is public; who holds which is secret until completed. |
+| **Negotiation** | At most one open: `from, to, terms {give, get, promises}, stage: response \| final, message, original`. Terms are from the proposer's side with item instances. |
+| **Commitment (promise)** | `by, to, kind: noAttack \| pay, resource, amount, paid, dueRound, status: open \| kept \| broken \| void, trade`. Public; tracked, never enforced. |
+| **Contestant mind** | Persona, strategy history, plan, reconsider flag, relationships `{trust, affinity}` per rival, memories, key moment (AI side, never readable by rules). |
 
 **Missing, deleted, renamed content.** Imported JSON with unknown fields or missing required fields is
 rejected; defaults exist only where the schema documents them. A rule reading a resource an entity does
@@ -338,11 +341,15 @@ Data in `content/starter/star-chase.json`, fully configurable.
   tagged Fish) and Harbor Sanctuary (nobody can be attacked at the start space); PvP with loot; the
   **Kraken** boss (900 Power, 600 HP, grabs anyone landing on its space, enraged +300 Power below half
   HP, 2 stars, never returns).
+- **Social (M5):** one secret objective each, dealt from eight (Island Hopper, Slime Slayer,
+  Treasure Hoard, Pilgrim, Angler, Dojo Devotee, Big Spender, Banana Baron; each +1 Star); Gold and
+  Bananas and every non-concealed item are tradeable; promises last up to 5 rounds.
 - **Contestants** start with 80 Power, 100/100 HP, 10 gold.
 
 This creates the intended strategic choices: buy stars early vs invest in gear, farm power vs chase
 the vendor, decide when you are strong enough to take the Demon — and now also when to gamble on a
-Mystery space, when to spend on protection, and whom to avoid.
+Mystery space, when to spend on protection, whom to avoid, whom to deal with, and whether to keep
+your word.
 
 ---
 
@@ -362,15 +369,20 @@ Mystery space, when to spend on protection, and whom to avoid.
       `landed` if ≥ 1 step. Intermediate spaces fire nothing in V1.
    5. **Main decision:** buy (one shop entry at a fixture on this space, at the modified price),
       attack an enemy or contestant here, use an item, a custom action, rest (+40 HP), or pass.
-      Skipped if the contestant was knocked out during its turn.
+      Skipped if the contestant was knocked out during its turn. Two **free actions** come back to
+      the main decision afterwards: propose a trade (once per turn) and pay a promised debt.
    6. **Turn end** (auto): `turnEnded` reactions, then the contestant's statuses count down (so a
       status's end-of-turn effect still fires on its last turn).
-3. **Round end** (auto): enemy regeneration, `roundEnded` reactions, statuses of enemies and fixtures
-   count down, victory checkpoint, round limit.
+3. **Round end** (auto): enemy regeneration, `roundEnded` reactions, promises due this round are
+   settled (no attack happened → kept; unpaid → broken), statuses of enemies and fixtures count
+   down, victory checkpoint, round limit.
 
 **Queued choices** are answered before the phase decision, in order, each in its own operation. A
 choice whose chooser can no longer answer (eliminated, nothing legal) resolves to its default in the
-next automatic step. Every operation ends by issuing the next decision with a fresh id.
+next automatic step. An open **negotiation** comes next: its offer or counteroffer is answered by the
+party whose turn it is to answer, each step its own operation; an offer nobody can answer any more
+lapses in the next automatic step. **Objectives** are settled at the end of every operation. Every
+operation ends by issuing the next decision with a fresh id.
 
 **Status durations** count the holder's own turns (enemies and fixtures: rounds) and skip the
 countdown at the end of the turn (or round) in which the status was applied.
@@ -431,7 +443,10 @@ its event (die values, wheel rolls).
 | Choices offered by hidden rules | labels only | ✗ |
 | Deck order | ✗ | ✗ (pile sizes, deck list and discards are public) |
 | RNG state, future rolls | ✗ | ✗ |
-| Others' numeric traits, strategy, plan, memory | own only | ✗ |
+| Secret objectives | own (with progress) | that one exists; revealed when completed (the pool is public) |
+| Negotiations: offers, counteroffers, messages, what was said while answering | the two parties | ✗ (a completed trade is public) |
+| Promises (made in completed trades), and whether they were kept or broken | ✓ | ✓ |
+| Others' numeric traits, strategy, plan, memories, relationships | own only | ✗ |
 
 - `ContestantView` is its own type; the packet builder and fallback player cannot reach `GameState`.
 - Views are computed with a contestant-facing copy of the game (`viewGame`) from which hidden rules
@@ -440,9 +455,12 @@ its event (die values, wheel rolls).
 - Every event type has a redactor producing the version an audience may see.
 - Previews and odds use only view data. Legality for contestants depends only on visible data; hidden
   effects happen during resolution (an attempt can fail) rather than hiding options.
-- Error messages returned to a model never reveal hidden values.
-- **Test:** state pairs differing only in hidden data must produce identical packets, options, previews
-  and fallback choices.
+- Error messages returned to a model never reveal hidden values. Trade validation only mentions what
+  both parties can see (tradeable resources are public; concealed items never trade).
+- Memories and relationships are derived only from events the contestant could see.
+- **Test:** state pairs differing only in hidden data (another contestant's Stash, concealed item or
+  secret objective, deck order, hidden statuses and rules, private negotiations between others) must
+  produce identical packets, options, previews, memories and fallback choices.
 
 ---
 
@@ -450,7 +468,7 @@ its event (die values, wheel rolls).
 
 | Edit class | Examples | When | Effect on waiting decisions |
 |---|---|---|---|
-| GM intervention | adjust/set resource, add/remove tag, teleport (as-landing checkbox), grant/remove item, apply/remove status, transform (template), spawn enemy or boss, remove entity, make a contestant draw a card, announce | Between operations, running or paused | Pending decision re-issued with a new ID; in-flight model request aborted. Reactions fire unless "silent". |
+| GM intervention | adjust/set resource, add/remove tag, teleport (as-landing checkbox), grant/remove item, apply/remove status, transform (template), spawn enemy or boss, remove entity, make a contestant draw a card, assign a secret objective, announce | Between operations, running or paused | Pending decision re-issued with a new ID; in-flight model request aborted. Reactions fire unless "silent". |
 | Definition change | rules, items, enemies, victory (M6) | Paused only, as a proposal | All decisions invalidated |
 
 **Saves** (`data/matches/<id>/`): `snapshot.json` (engine, rules-language and save-format versions,
@@ -460,8 +478,9 @@ a moment after every committed operation, so a crash loses at most a fraction of
 `ai-calls.jsonl` (packets, responses, usage, latency, outcome). Loading uses the snapshot.
 Re-simulating recorded inputs with the same engine version reproduces the same state hashes (used by
 tests and, later, rewind). Replaying recorded results (without re-running rules) serves display and audit.
-Older save formats are upgraded by explicit, step-by-step migrations (format 1 → 2 is covered by a
-committed fixture from the first playable version); newer formats are refused.
+Older save formats are upgraded by explicit, step-by-step migrations, each covered by a committed
+fixture: format 1 (first playable version) → 2 (M4) → 3 (M5: objectives, negotiations, promises,
+relationships and memories start empty). Newer formats are refused.
 
 ---
 
@@ -483,33 +502,83 @@ committed fixture from the first playable version); newer formats are refused.
   A deterministic "casting" step gives each contestant 2–3 candidates (personality fit, ≤ 2 per
   archetype); each contestant picks from its own view at match start.
 - **Current plan:** ≤ 30 words, optionally updated with any decision.
-- **Reconsideration** is flagged by code (rule change, lost opportunity, progress ≥ 30 % behind, 8 rounds
-  elapsed, knockout) and answered inside the next decision response — no extra call.
+- **Reconsideration** is flagged by code before each real decision and answered inside the next
+  decision response — no extra call. Triggers: the strategy's key opportunity is gone (e.g. the GM
+  removed the Demon or the Star Vendor; checked from the contestant's view — no cooldown), a
+  knockout, a broken promise, 2+ of the victory resource behind the leader, 8 rounds on the same
+  strategy. Otherwise at most one revision per 3 rounds. The fallback player answers the flag too:
+  it switches to the best-fitting archetype that still works (or, far behind, to a higher-reward
+  plan).
 
-### 11.2 Decision packets (target 800–1,800 tokens)
+### 11.2 Social layer
 
-Instructions: how to answer → rules digest (victory, loop, public rules, statuses, actions, shops,
-enemies, deck list) → persona. The shared rulebook comes before the persona so every contestant of a
+- **Secret objectives** (`objectives` in the definition, `settings.objectives.perContestant`): dealt
+  at match start with the match RNG, different per contestant. Goals count events in which the owner
+  is `$actor` (landing on Mystery spaces, defeating Slimes, using an action, buying) or ask for an
+  amount of a resource at once. Progress is settled at the end of every operation; a completed
+  objective is revealed to everyone and its reward (the starter: +1 Star) runs for the owner.
+- **Trading** (`settings.trading`): the active contestant may propose one trade per turn as a free
+  action to any contestant: up to 3 kinds of tradeable resources and 3 items per side, a message
+  (≤ 200 characters, private to the two parties) and at most one promise per side. The partner
+  accepts, rejects or makes one counteroffer; the proposer accepts or rejects it. Acceptance re-checks
+  that both sides can still deliver and fit the items, then swaps everything at once
+  (`tradeCompleted` is public). Offers are validated by the engine with messages that only mention
+  what both parties can see; a model gets one repair attempt, and a refused answer never stalls the
+  game (the fallback player's choice without the trade is used).
+- **Promises** (`noAttack` for N rounds, `pay` an amount within N rounds; N ≤
+  `trading.maxPromiseRounds`): public commitments tracked by the engine, never enforced. A voluntary
+  attack breaks a no-attack promise; paying (a free "pay" option) keeps a payment promise; at the
+  end of the due round the rest are settled (kept / broken). Promises involving an eliminated
+  contestant lapse.
+- **Relationships** (AI side) change by fixed rules from observed events: promise to me kept trust
+  +2, broken −3 (broken to someone else −1), attacked me affinity −2, knocked me out and took gold
+  −1 more, a completed trade +1, a hostile action on me −1. Range −10..10.
+- **Memory**: observed events become memories (betrayal 5, knockout 4, attacked me 4, trade 3,
+  kept promise 3, hostile action 3, objectives 2–3, rejected offer 1). The packet shows the top 4 by
+  importance, recency and relevance to the current decision (trade partner, attack targets, rivals
+  nearby), with repeats grouped by code ("Vex attacked you 3× (rounds 2, 5, 9)"). No model-written
+  summaries.
+- **Key-moment dialogue**: the most important moment since the contestant's last decision (a
+  betrayal, being attacked or knocked out, a deal, a completed objective) is put in the next packet
+  with a prompt to react in character through `say` — no extra call. The fallback player speaks
+  short lines from its traits when talkative. Separate, non-blocking reaction calls are deferred.
+- **Fallback player**: values trades from its own view (shop exchange rates for resources like
+  Bananas, crossing the price of a Star, item value, promise value × trust, the attack opportunity
+  a no-attack promise gives up), estimates the partner's side with neutral traits, proposes the best
+  deal a partner would plausibly accept (resource sales, loans at the Star Vendor, truces with a
+  threatening rival), counters once, pays debts if loyal (loyalty ≥ 4), keeps no-attack promises if
+  loyal, holds grudges if vindictive, and does not help the leader.
+
+### 11.3 Decision packets (target 800–1,800 tokens of situation per decision)
+
+Instructions: how to answer → rules digest (victory, loop, public rules, statuses, actions, trading
+and promises, the objective pool, shops, enemies, deck list) → persona. The shared rulebook comes before the persona so every contestant of a
 match sends the same long prefix (providers cache identical prefixes). Input: strategy, plan, own
-state (statuses, what you currently cannot do) → standings → recent visible events → options with
-engine-computed consequences. Combat options include per-spin chance, damage both ways, outcome
+state (statuses, what you currently cannot do, secret objective with progress, open promises, how
+you feel about rivals, up to 4 memories, the key moment) → standings → recent visible events →
+options with engine-computed consequences. Trade decisions show the offer from the contestant's own
+side ("you give …; you get …; promises; message"); the trade option lists partners with their ids
+and tradeable holdings. Combat options include per-spin chance, damage both ways, outcome
 probabilities and rewards; move options note shops, enemies (with odds if you would be ambushed),
 training, card draws, known rule effects and threats; choices, item uses and custom actions list
 their effects with probabilities. Texts in the digest are generated tersely from the structured
 definitions ("landing on a Coin space: +3 Gold").
 
-Measured with the M4 starter (mock pipeline, 3 matches): packet p50 ≈ 2.0k, p95 ≈ 2.5k estimated
-tokens, of which ≈ 1.4k is the stable, cacheable instructions.
+Measured with the M5 starter (mock pipeline, 3 matches): the stable, cacheable instructions are
+≈ 1.74k estimated tokens; the per-decision input is p50 ≈ 560, p95 ≈ 1,060 (total p50 ≈ 2.3k,
+p95 ≈ 2.8k). The biggest inputs are six-step move decisions with many reachable spaces.
 
-### 11.3 Responses, validation, fallback
+### 11.4 Responses, validation, fallback
 
-Fixed response schema for every decision (`decisionId, optionId, say, plan, strategyUpdate, reason`)
-validated by Zod, then checked for decision ID, revision, actor and option membership. One repair retry
+Fixed response schema for every decision (`decisionId, optionId, say, plan, strategyUpdate, trade,
+reason`; `trade` holds the terms for a proposal or counteroffer, from the answering side) validated
+by Zod, then checked for decision ID, revision, actor and option membership, and trade terms are
+checked against the engine without committing. One repair retry
 with a view-safe error; timeouts, refusals and repeated failures go to the heuristic fallback player.
 Three consecutive provider failures switch all contestants to the fallback and alert the GM. The game
 never stalls on the AI.
 
-### 11.4 Provider
+### 11.5 Provider
 
 - Port: `complete({model, instructions, input, schema, maxOutputTokens, timeoutMs, signal})` →
   parsed value or error kind, usage, latency.
@@ -530,8 +599,9 @@ never stalls on the AI.
 ## 12. Deferred (not in V1 unless noted)
 
 Arbitrary scripts, unrestricted conversations, minigames, interrupt stacks, arbitrary turn systems,
-multiplayer hosting, cross-game memory, sophisticated contracts, autonomous rule repair, image
-generation, vector databases, parallel model-driven match infrastructure.
+multiplayer hosting, cross-game memory, sophisticated or enforceable contracts (escrow), free-text
+promises, separate non-blocking dialogue calls, mechanical alliances that rules can read, autonomous
+rule repair, image generation, vector databases, parallel model-driven match infrastructure.
 
 ---
 

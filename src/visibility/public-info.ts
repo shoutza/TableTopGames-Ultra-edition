@@ -1,5 +1,5 @@
 import type { CompiledGame } from '../engine/compile.ts';
-import { attachedRuleText, describeStatus, makeNames, summarizeEffects, summarizeRule } from '../engine/explain.ts';
+import { attachedRuleText, describeObjectiveGoal, describeStatus, makeNames, summarizeEffects, summarizeRule } from '../engine/explain.ts';
 import type { Effect } from '../schema/rules.ts';
 import type { Settings } from '../schema/definition.ts';
 import { describeItem } from './view.ts';
@@ -12,11 +12,11 @@ import { describeItem } from './view.ts';
 export interface PublicGameInfo {
   name: string;
   description: string;
-  settings: Pick<Settings, 'core' | 'startSpace' | 'movement' | 'inventoryCapacity' | 'rest' | 'combat' | 'ko' | 'victory'>;
+  settings: Pick<Settings, 'core' | 'startSpace' | 'movement' | 'inventoryCapacity' | 'rest' | 'combat' | 'ko' | 'victory' | 'objectives' | 'trading'>;
   resources: Array<{ id: string; name: string; role: 'pool' | 'stat'; visibility: 'public' | 'owner' | 'gm'; icon: string | undefined; tradeable: boolean }>;
   tags: Array<{ id: string; name: string }>;
   spaces: Array<{ id: string; name: string; tags: string[]; description: string | undefined }>;
-  items: Array<{ id: string; name: string; modifiers: Array<{ resource: string; add: number }>; concealed: boolean; usable: boolean; text: string }>;
+  items: Array<{ id: string; name: string; modifiers: Array<{ resource: string; add: number }>; concealed: boolean; usable: boolean; tradeable: boolean; text: string }>;
   statuses: Array<{
     id: string;
     name: string;
@@ -47,6 +47,8 @@ export interface PublicGameInfo {
   }>;
   decks: Array<{ id: string; name: string; description: string | undefined; size: number; cards: Array<{ id: string; name: string; count: number; text: string }> }>;
   actions: Array<{ id: string; name: string; text: string }>;
+  /** The pool secret objectives are dealt from (public, like a deck list; who holds which is secret). */
+  objectives: Array<{ id: string; name: string; text: string; reward: string }>;
   rules: Array<{ id: string; name: string; kind: 'reaction' | 'modifier' | 'continuous'; text: string; trigger: string | null; spaceTag: string | undefined }>;
 }
 
@@ -80,11 +82,11 @@ export function publicInfo(game: CompiledGame): PublicGameInfo {
   return {
     name: game.def.name,
     description: game.def.description,
-    settings: { core: s.core, startSpace: s.startSpace, movement: s.movement, inventoryCapacity: s.inventoryCapacity, rest: s.rest, combat: s.combat, ko: s.ko, victory: s.victory },
+    settings: { core: s.core, startSpace: s.startSpace, movement: s.movement, inventoryCapacity: s.inventoryCapacity, rest: s.rest, combat: s.combat, ko: s.ko, victory: s.victory, objectives: s.objectives, trading: s.trading },
     resources: game.def.resources.filter((r) => r.visibility !== 'gm').map((r) => ({ id: r.id, name: r.name, role: r.role, visibility: r.visibility, icon: r.icon, tradeable: r.tradeable })),
     tags: game.def.tags.map((t) => ({ id: t.id, name: t.name })),
     spaces: game.def.spaces.map((sp) => ({ id: sp.id, name: sp.name, tags: sp.tags, description: sp.description })),
-    items: game.def.items.map((i) => ({ id: i.id, name: i.name, modifiers: i.modifiers, concealed: i.concealed, usable: i.use !== undefined, text: describeItem(i, names) })),
+    items: game.def.items.map((i) => ({ id: i.id, name: i.name, modifiers: i.modifiers, concealed: i.concealed, usable: i.use !== undefined, tradeable: i.tradeable && !i.concealed, text: describeItem(i, names) })),
     statuses: game.def.statuses
       .filter((st) => st.visibility === 'public')
       .map((st) => {
@@ -142,6 +144,7 @@ export function publicInfo(game: CompiledGame): PublicGameInfo {
       const cooldown = a.cooldownRounds !== undefined ? `, usable again after ${a.cooldownRounds} round${a.cooldownRounds === 1 ? '' : 's'}` : '';
       return { id: a.id, name: a.name, text: `main action${where}${cost}${target}${cooldown}: ${summarizeEffects(a.effects, names)}` };
     }),
+    objectives: game.def.objectives.map((o) => ({ id: o.id, name: o.name, text: describeObjectiveGoal(o, names), reward: summarizeEffects(o.reward, names) })),
     rules: [...game.rules.values()]
       .filter((r) => r.def.enabled && r.def.visibility === 'public' && r.owner === null)
       .map((r) => ({

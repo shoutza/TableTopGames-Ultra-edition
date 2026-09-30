@@ -129,8 +129,42 @@ Move and no shop access; a boss fight works end to end; 30-round sims on the sta
 rule faults; operations run at p99 < 10 ms.
 
 ## M5 — Social layer
-Private objectives (templates, rewards in stars), trading with one counteroffer, commitments and
-promises, relationships, memory selection, key-moment dialogue, strategy reconsideration triggers.
+- [x] Secret objectives from templates: dealt with the match RNG, private until completed, then
+      revealed with their reward (+1 Star in the starter); count and "have N at once" goals; GM tool
+      to assign one
+- [x] Trading: offer (free action, once per turn) → accept / reject / one counteroffer → final
+      answer; atomic swap with a re-check; view-safe validation; private messages
+- [x] Promises (no attack for N rounds, pay within N rounds): public, tracked, kept or broken,
+      never enforced; paying is a free action
+- [x] Relationships (trust, affinity) updated by fixed rules; memories with code-side selection and
+      grouping
+- [x] Key-moment dialogue: the most important moment since the last decision is put in the packet
+      (the model reacts through `say`; the fallback player speaks short lines from its traits)
+- [x] Reconsideration triggers: lost key opportunity (no cooldown), knockout, betrayal, 2+ behind
+      the leader, 8 rounds; the fallback player revises its strategy too
+- [x] Fallback player: trading (resource sales, loans at the Star Vendor, truces), counteroffers,
+      loyalty-based promise keeping, grudges, objective-aware scoring
+- [x] Save format 3 with a migration from format 2, tested on a real save from M4
+- [x] GM app: social section in the inspector (objectives, promises, feelings, memories, key moment),
+      🎯/🤝 markers in the standings, trade prompts in the top bar
+
+**Status:** done. `npm run sim -- --matches 1000 --seed accept`: 0 rule faults, 0 aborts; accepted
+trades per match mean 4.6, **median 4**; 5.9 offers and 0.2 counteroffers per match; 3.1 promises
+made, 2.5 kept, 0.3 broken; 2.0 objectives completed; 0.3 strategy revisions; operation p99 0.30 ms;
+130 ms per match; wins by archetype: star chaser 332, power farmer 323, gear-up 216, banker 137.
+30-round sims (200): 0 faults, median 8 accepted trades. `tests/minds.test.ts`: a broken promise
+lowers trust by 3 (and becomes the top memory and a reason to reconsider); removing the Demon makes
+a Demon-hunting strategy change within 2 of the contestant's own turns, both with the fallback
+player and through the model pipeline (scripted provider). Pair tests cover another contestant's
+secret objective, concealed items, Stash, deck order, hidden statuses and rules, and memories built
+from histories that differ only in private negotiations between others. Headless Chromium: trades,
+promises and objectives appear in the log and inspector; assigning an objective from the GM tools
+works; no console errors. Packets (mock pipeline): stable instructions ≈ 1.74k estimated tokens,
+per-decision input p50 ≈ 560 / p95 ≈ 1,060.
+
+**Done when:** the median sim has at least 1 accepted trade; broken promises lower trust; pair
+tests cover objectives, concealed items and memory; a strategy is revised within ≤ 2 of the
+contestant's own turns after its key opportunity is removed.
 
 ## M6 — GM authoring and live edits
 Board editor, definition editors (resources, items, enemies with stats and rewards, shops, cast,

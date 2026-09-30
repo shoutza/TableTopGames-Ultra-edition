@@ -47,6 +47,75 @@ export const ItemInstanceSchema = z.strictObject({
 });
 export type ItemInstance = z.infer<typeof ItemInstanceSchema>;
 
+export const ObjectiveInstanceSchema = z.strictObject({
+  id: z.string(),
+  defId: z.string(),
+  owner: z.string(),
+  /** Events counted so far (count goals). */
+  progress: z.number().int().min(0),
+  done: z.boolean(),
+});
+export type ObjectiveInstance = z.infer<typeof ObjectiveInstanceSchema>;
+
+/** Goods one side hands over: amounts of tradeable resources and item instances. */
+export const GoodsSchema = z.strictObject({
+  resources: z.record(z.string(), z.number().int().min(1)),
+  items: z.array(z.string()),
+});
+export type Goods = z.infer<typeof GoodsSchema>;
+
+/** A promise made as part of a trade, by the proposer (`from`) or the partner (`to`). */
+export const PromiseTermSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('noAttack'), by: z.enum(['from', 'to']), rounds: z.number().int().min(1) }),
+  z.strictObject({ kind: z.literal('pay'), by: z.enum(['from', 'to']), resource: z.string(), amount: z.number().int().min(1), rounds: z.number().int().min(1) }),
+]);
+export type PromiseTerm = z.infer<typeof PromiseTermSchema>;
+
+/** Trade terms from the proposer's side: `give` goes from → to, `get` goes to → from. */
+export const TradeTermsSchema = z.strictObject({
+  give: GoodsSchema,
+  get: GoodsSchema,
+  promises: z.array(PromiseTermSchema),
+});
+export type TradeTerms = z.infer<typeof TradeTermsSchema>;
+
+/**
+ * An open negotiation: offer → the partner accepts, rejects or makes one counteroffer → the
+ * proposer accepts or rejects the counteroffer. Each step is its own decision and operation.
+ */
+export const NegotiationSchema = z.strictObject({
+  id: z.string(),
+  from: z.string(),
+  to: z.string(),
+  terms: TradeTermsSchema,
+  stage: z.enum(['response', 'final']),
+  /** The latest message (the offer's, or the counteroffer's), seen only by the two parties. */
+  message: z.string().nullable(),
+  /** The first offer when a counteroffer replaced it. */
+  original: TradeTermsSchema.nullable(),
+  proposedSeq: z.number().int(),
+});
+export type Negotiation = z.infer<typeof NegotiationSchema>;
+
+/**
+ * A promise tracked by the engine. `noAttack`: `by` does not attack `to` through `dueRound`.
+ * `pay`: `by` pays `amount` of `resource` to `to` by the end of `dueRound`. Promises are not
+ * enforced: they are kept or broken, and everyone sees which.
+ */
+export const CommitmentSchema = z.strictObject({
+  id: z.string(),
+  by: z.string(),
+  to: z.string(),
+  kind: z.enum(['noAttack', 'pay']),
+  resource: z.string().nullable(),
+  amount: z.number().int().min(0),
+  paid: z.number().int().min(0),
+  dueRound: z.number().int(),
+  status: z.enum(['open', 'kept', 'broken', 'void']),
+  trade: z.string(),
+});
+export type Commitment = z.infer<typeof CommitmentSchema>;
+
 export const PHASES = ['roundStart', 'turnStart', 'roll', 'move', 'main', 'turnEnd', 'roundEnd', 'gameOver'] as const;
 export type Phase = (typeof PHASES)[number];
 
@@ -60,18 +129,26 @@ export const DecisionOptionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ id: z.string(), kind: z.literal('rest'), label: z.string() }),
   z.strictObject({ id: z.string(), kind: z.literal('pass'), label: z.string() }),
   z.strictObject({ id: z.string(), kind: z.literal('choose'), label: z.string(), option: z.string() }),
+  /** Propose a trade (a free action, once per turn); the answer carries the terms. */
+  z.strictObject({ id: z.string(), kind: z.literal('trade'), label: z.string() }),
+  /** Pay what a promise owes (a free action). */
+  z.strictObject({ id: z.string(), kind: z.literal('pay'), label: z.string(), commitment: z.string() }),
+  /** Answer to an offer or counteroffer; a counteroffer carries new terms. */
+  z.strictObject({ id: z.string(), kind: z.literal('tradeAnswer'), label: z.string(), answer: z.enum(['accept', 'reject', 'counter']) }),
 ]);
 export type DecisionOption = z.infer<typeof DecisionOptionSchema>;
 
 export const DecisionSchema = z.strictObject({
   id: z.string(),
   actor: z.string(),
-  kind: z.enum(['move', 'main', 'choice']),
+  kind: z.enum(['move', 'main', 'choice', 'trade']),
   issuedRev: z.number().int(),
   options: z.array(DecisionOptionSchema).min(1),
   /** For choices: the queued choice this decision answers, and its prompt. */
   choice: z.string().optional(),
   prompt: z.string().optional(),
+  /** For trade answers: the negotiation being answered. */
+  negotiation: z.string().optional(),
 });
 export type Decision = z.infer<typeof DecisionSchema>;
 
@@ -130,6 +207,9 @@ export const GameStateSchema = z.strictObject({
     fight: z.number().int(),
     status: z.number().int().default(0),
     choice: z.number().int().default(0),
+    objective: z.number().int().default(0),
+    trade: z.number().int().default(0),
+    commitment: z.number().int().default(0),
   }),
   round: z.number().int().min(0),
   phase: z.enum(PHASES),
@@ -138,6 +218,8 @@ export const GameStateSchema = z.strictObject({
     roll: z.number().int().nullable(),
     /** The active contestant was knocked out during its own turn: the turn ends. */
     over: z.boolean().default(false),
+    /** The active contestant has proposed its trade for this turn. */
+    traded: z.boolean().default(false),
   }),
   turnOrder: z.array(z.string()),
   entities: z.record(z.string(), EntitySchema),
@@ -150,6 +232,9 @@ export const GameStateSchema = z.strictObject({
   decks: z.record(z.string(), z.strictObject({ draw: z.array(z.string()), discard: z.array(z.string()) })).default({}),
   /** Choices waiting to be answered, in order. They are answered before the phase decision. */
   queue: z.array(PendingChoiceSchema).default([]),
+  objectives: z.array(ObjectiveInstanceSchema).default([]),
+  negotiation: NegotiationSchema.nullable().default(null),
+  commitments: z.array(CommitmentSchema).default([]),
   pendingDecision: DecisionSchema.nullable(),
   winners: z.array(z.string()).nullable(),
   endReason: z.string().nullable(),
@@ -163,8 +248,8 @@ export type GameState = z.infer<typeof GameStateSchema>;
 export type Audience = 'all' | 'gm' | string[];
 
 export interface EventCause {
-  kind: 'action' | 'rule' | 'system' | 'gm' | 'reward' | 'card' | 'choice';
-  /** The acting entity (actions, choices) or enemy granting a reward. */
+  kind: 'action' | 'rule' | 'system' | 'gm' | 'reward' | 'card' | 'choice' | 'objective';
+  /** The acting entity (actions, choices), enemy granting a reward, or objective owner. */
   entity?: string | undefined;
   /** Rule that produced this event. */
   rule?: string | undefined;
@@ -251,12 +336,29 @@ export type EventBody =
   | { type: 'cardDrawn'; entity: string; deck: string; card: string; name: string }
   | { type: 'choiceOffered'; entity: string; choice: string; prompt: string; options: string[] }
   | { type: 'choiceMade'; entity: string; choice: string; option: string; label: string; automatic: boolean }
+  | { type: 'objectiveAssigned'; entity: string; objective: string; def: string }
+  | { type: 'objectiveCompleted'; entity: string; objective: string; def: string }
+  | { type: 'tradeProposed'; negotiation: string; from: string; to: string; terms: TradeTermsView; message: string | null }
+  | { type: 'tradeCountered'; negotiation: string; from: string; to: string; terms: TradeTermsView; message: string | null }
+  | { type: 'tradeRejected'; negotiation: string; from: string; to: string; by: string; automatic: boolean }
+  | { type: 'tradeCompleted'; negotiation: string; from: string; to: string; terms: TradeTermsView }
+  | { type: 'tradeFailed'; negotiation: string; from: string; to: string; reason: string }
+  | { type: 'promiseMade'; commitment: string; by: string; to: string; kind: 'noAttack' | 'pay'; resource: string | null; amount: number; dueRound: number }
+  | { type: 'promiseKept'; commitment: string; by: string; to: string; kind: 'noAttack' | 'pay' }
+  | { type: 'promiseBroken'; commitment: string; by: string; to: string; kind: 'noAttack' | 'pay' }
   | { type: 'announced'; text: string }
   | { type: 'ruleFault'; rule: string; message: string }
   | { type: 'gmCommand'; summary: string }
   | { type: 'gameOver'; winners: string[]; reason: string };
 
 export type EventType = EventBody['type'];
+
+/** Trade terms as recorded in events: item definitions instead of instances. */
+export interface TradeTermsView {
+  give: { resources: Record<string, number>; items: string[] };
+  get: { resources: Record<string, number>; items: string[] };
+  promises: PromiseTerm[];
+}
 
 export type GameEvent = EventBody & {
   seq: number;
@@ -272,7 +374,7 @@ export const GameEventSchema = z.looseObject({
   rev: z.number().int(),
   round: z.number().int(),
   type: z.string(),
-  cause: z.looseObject({ kind: z.enum(['action', 'rule', 'system', 'gm', 'reward', 'card', 'choice']) }),
+  cause: z.looseObject({ kind: z.enum(['action', 'rule', 'system', 'gm', 'reward', 'card', 'choice', 'objective']) }),
 });
 
 export type { EntityKind };

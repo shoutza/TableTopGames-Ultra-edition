@@ -44,6 +44,13 @@
         "res.gold",
         "res.stash"
       ]
+    },
+    "objectives": {
+      "perContestant": 1
+    },
+    "trading": {
+      "enabled": true,
+      "maxPromiseRounds": 5
     }
   },
   "resources": [
@@ -2167,6 +2174,179 @@
       },
       "suppress": [
         "attackable"
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj.island_hopper",
+      "name": "Island Hopper",
+      "icon": "🧭",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "landed",
+          "where": {
+            "spaceTag": "tag.event"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.slime_slayer",
+      "name": "Slime Slayer",
+      "icon": "🟢",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "defeated",
+          "where": {
+            "enemy": "enemy.slime"
+          }
+        },
+        "times": 4
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.treasure_hoard",
+      "name": "Treasure Hoard",
+      "icon": "💰",
+      "goal": {
+        "kind": "reach",
+        "resource": "res.gold",
+        "atLeast": 35
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.pilgrim",
+      "name": "Pilgrim",
+      "icon": "🙏",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "actionUsed",
+          "where": {
+            "action": "action.pray"
+          }
+        },
+        "times": 2
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.angler",
+      "name": "Angler",
+      "icon": "🎣",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "actionUsed",
+          "where": {
+            "action": "action.fish"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.dojo_devotee",
+      "name": "Dojo Devotee",
+      "icon": "🥋",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "landed",
+          "where": {
+            "spaceTag": "tag.dojo"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.big_spender",
+      "name": "Big Spender",
+      "icon": "🛍️",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "purchased"
+        },
+        "times": 4
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.banana_baron",
+      "name": "Banana Baron",
+      "icon": "🍌",
+      "goal": {
+        "kind": "reach",
+        "resource": "res.bananas",
+        "atLeast": 6
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
       ]
     }
   ]

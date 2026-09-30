@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CapabilitySchema, CondSchema, EffectSchema, EntityKindSchema, RuleDefSchema } from './rules.ts';
+import { CapabilitySchema, CondSchema, EffectSchema, EntityKindSchema, RuleDefSchema, TriggerSchema } from './rules.ts';
 import { PersonaSchema } from './persona.ts';
 import { RULES_LANGUAGE_VERSION } from './versions.ts';
 
@@ -74,6 +74,8 @@ export const ItemDefSchema = z.strictObject({
   modifiers: z.array(StatModifierSchema).max(4).default([]),
   /** Other contestants see only "a concealed item" (and none of its modifiers). */
   concealed: z.boolean().default(false),
+  /** Contestants may hand it over in trades (concealed items never change hands in trades). */
+  tradeable: z.boolean().default(true),
   /** Optional use action (a main action); $actor and $holder are the user. */
   use: z
     .strictObject({
@@ -187,6 +189,26 @@ export const ActionDefSchema = z.strictObject({
 });
 export type ActionDef = z.infer<typeof ActionDefSchema>;
 
+/**
+ * Private objectives. Each contestant is dealt some at match start; an objective is secret until
+ * it is completed, then its reward runs for the owner ($actor) and everyone sees what it was.
+ */
+export const ObjectiveDefSchema = z.strictObject({
+  id: Id,
+  name: Name,
+  icon: Icon,
+  /** What the owner reads; generated from the goal when omitted. */
+  text: z.string().max(200).optional(),
+  goal: z.discriminatedUnion('kind', [
+    /** Do something N times: events of this trigger in which the owner is $actor. */
+    z.strictObject({ kind: z.literal('count'), trigger: TriggerSchema, times: z.number().int().min(1).max(20) }),
+    /** Have at least this much of a resource (effective value) at the end of any operation. */
+    z.strictObject({ kind: z.literal('reach'), resource: Id, atLeast: z.number().int().min(1) }),
+  ]),
+  reward: z.array(EffectSchema).min(1).max(8),
+});
+export type ObjectiveDef = z.infer<typeof ObjectiveDefSchema>;
+
 export const FixtureDefSchema = z.strictObject({
   id: Id,
   name: Name,
@@ -267,6 +289,16 @@ export const SettingsSchema = z.strictObject({
     /** Ranking keys (descending) used for ties and the round limit. */
     ranking: z.array(Id).min(1).max(4),
   }),
+  /** Secret objectives dealt to each contestant at match start (when the definition has any). */
+  objectives: z.strictObject({ perContestant: z.number().int().min(0).max(3).default(1) }).default({ perContestant: 1 }),
+  trading: z
+    .strictObject({
+      /** Contestants may propose one trade per turn (as a free action before their main action). */
+      enabled: z.boolean().default(true),
+      /** Longest promise, in rounds, a trade may include; 0 = no promises. */
+      maxPromiseRounds: z.number().int().min(0).max(10).default(5),
+    })
+    .default({ enabled: true, maxPromiseRounds: 5 }),
   budgets: BudgetSettingsSchema.default({
     firings: 200,
     firingsPerRule: 20,
@@ -301,6 +333,7 @@ export const GameDefinitionSchema = z.strictObject({
   fixtures: z.array(FixtureDefSchema).max(32).default([]),
   decks: z.array(DeckDefSchema).max(16).default([]),
   actions: z.array(ActionDefSchema).max(32).default([]),
+  objectives: z.array(ObjectiveDefSchema).max(64).default([]),
   cast: z.array(CastMemberSchema).min(1).max(8),
   rules: z.array(RuleDefSchema).max(256).default([]),
 });

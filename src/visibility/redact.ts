@@ -55,7 +55,7 @@ export function redactStateFor(game: CompiledGame, state: GameState, viewer: str
   copy.seed = '';
   copy.rng = [0, 0, 0, 0];
   // Counters would reveal how many hidden events happened.
-  copy.counters = { entity: 0, item: 0, event: 0, decision: 0, fight: 0, status: 0, choice: 0 };
+  copy.counters = { entity: 0, item: 0, event: 0, decision: 0, fight: 0, status: 0, choice: 0, objective: 0, trade: 0, commitment: 0 };
   copy.rev = 0;
   if (copy.pendingDecision && copy.pendingDecision.actor !== viewer) copy.pendingDecision = null;
   if (copy.pendingDecision) copy.pendingDecision.issuedRev = 0;
@@ -79,6 +79,10 @@ export function redactStateFor(game: CompiledGame, state: GameState, viewer: str
       if (!isHiddenRule(game, c.rule)) return c;
       return { ...c, rule: HIDDEN_RULE, options: c.options.map((o) => ({ id: o.id, label: o.label, effects: [] })) };
     });
+  // Objectives are secret until completed: others only know that one exists.
+  copy.objectives = copy.objectives.map((o) => (o.owner === viewer || o.done ? o : { ...o, defId: 'hidden', progress: 0 }));
+  // A negotiation is private to its two parties (promises become public once a trade is done).
+  if (copy.negotiation && copy.negotiation.from !== viewer && copy.negotiation.to !== viewer) copy.negotiation = null;
   for (const key of Object.keys(copy.ruleCounters)) {
     const ruleId = key.split('@')[0] as string;
     if (game.rules.get(ruleId)?.def.visibility !== 'public') delete copy.ruleCounters[key];
@@ -131,4 +135,27 @@ export function visibleEvents(game: CompiledGame, events: GameEvent[], viewer: s
     out.push({ seq: e.seq, round: e.round, type: e.type, unknownCause: hiddenRule, event });
   }
   return out;
+}
+
+/** Visible events with a sequence number above `afterSeq` (history must be in sequence order). */
+export function visibleEventsAfter(game: CompiledGame, history: GameEvent[], viewer: string, afterSeq: number): VisibleEvent[] {
+  let lo = 0;
+  let hi = history.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((history[mid] as GameEvent).seq <= afterSeq) lo = mid + 1;
+    else hi = mid;
+  }
+  return visibleEvents(game, history.slice(lo), viewer);
+}
+
+/** The last `limit` events the viewer could see, found by scanning back from the end. */
+export function recentVisibleEvents(game: CompiledGame, history: GameEvent[], viewer: string, limit: number): VisibleEvent[] {
+  const picked: GameEvent[] = [];
+  for (let i = history.length - 1; i >= 0 && picked.length < limit; i--) {
+    const e = history[i] as GameEvent;
+    if (canSee(e, viewer)) picked.push(e);
+  }
+  // Redaction may drop a few more (faults of hidden rules); that only shortens the window.
+  return visibleEvents(game, picked.reverse(), viewer);
 }

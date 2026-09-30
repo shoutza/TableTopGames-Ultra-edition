@@ -41,8 +41,10 @@ npm run sim -- --controllers llm             # one match with gpt-6-luna (needs 
 3. **GM tools** act on the selected entity: adjust or set resources, add/remove tags, teleport
    (tick *counts as landing* to trigger landing rules), give items, apply or remove statuses,
    transform (e.g. into Fish Form), make it draw a card (the GM sees the next card first), remove
-   it from the board, spawn an enemy or boss (the Kraken) on its space, announce. Tick *silent
-   correction* to change state without triggering rules.
+   it from the board, spawn an enemy or boss (the Kraken) on its space, deal it another secret
+   objective, announce. Tick *silent correction* to change state without triggering rules.
+   The inspector's *Social* section shows a contestant's secret objective, promises, how it feels
+   about the others and what it remembers; trades and promises appear in the log (🤝, ✅, 💔).
 4. Fights play on the combat wheel, replaying the engine's recorded spins. Click any log line to
    see why it happened (rule, triggering event, conditions checked).
 5. **Save** writes a snapshot; matches also autosave a moment after every operation, on pause and on

@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import { z } from 'zod';
-import { describeEvent, describeRule, describeStatus, effectiveTags, effectiveValue, loadGame, namesFor, suppressedCapabilities, type CompiledGame, type FiringRecord } from '../engine/index.ts';
+import { describeEvent, describeObjective, describeRule, describeStatus, effectiveTags, effectiveValue, loadGame, namesFor, suppressedCapabilities, type CompiledGame, type FiringRecord } from '../engine/index.ts';
 import { summarizeEffects } from '../engine/explain.ts';
 import { describeItem } from '../visibility/view.ts';
 import { GmCommandSchema } from '../schema/commands.ts';
@@ -169,6 +169,7 @@ export class GmApp {
       items: Object.fromEntries(game.def.items.map((i) => [i.id, describeItem(i, names)])),
       actions: Object.fromEntries(game.def.actions.map((a) => [a.id, summarizeEffects(a.effects, names)])),
       cards: Object.fromEntries(game.def.decks.flatMap((d) => d.cards.map((c) => [c.id, summarizeEffects(c.effects, names)] as const))),
+      objectives: Object.fromEntries(game.def.objectives.map((o) => [o.id, describeObjective(o, names)])),
     };
   }
 
@@ -199,6 +200,9 @@ export class GmApp {
       plan: m.plan,
       planRound: m.planRound,
       reconsider: m.reconsider,
+      relationships: m.relationships,
+      memories: m.memories.slice(-20).map((x) => ({ round: x.round, kind: x.kind, other: x.other, text: x.text, importance: x.importance })),
+      keyMoment: m.keyMoment,
     }));
   }
 

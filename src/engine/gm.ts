@@ -3,6 +3,7 @@ import type { EventCause, GameState } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
 import { addTag, applyStatus, changeResource, drawCard, grantItem, removeEntity, removeItem, removeStatus, removeTag, setResource, spawnEnemy, teleport } from './effects.ts';
 import { namesFor } from './explain.ts';
+import { assignObjective } from './objectives.ts';
 import { getEntity } from './queries.ts';
 import { runOperation, runRoot, type OpOutcome } from './resolve.ts';
 import { InvalidInput } from './util.ts';
@@ -95,6 +96,14 @@ export function applyGmCommand(game: CompiledGame, state: GameState, cmd: GmComm
             if (!game.decks.has(cmd.deck)) throw new InvalidInput(`unknown deck "${cmd.deck}"`);
             summary(`${names.entity(cmd.entity)} draws from ${game.decks.get(cmd.deck)?.name ?? cmd.deck}`);
             drawCard(ctx, cmd.deck, cmd.entity, cause);
+            return;
+          }
+          case 'assignObjective': {
+            const entity = getEntity(ctx.state, cmd.entity);
+            if (entity.kind !== 'contestant' || entity.status === 'eliminated') throw new InvalidInput('only contestants in play take objectives');
+            if (!game.objectives.has(cmd.objective)) throw new InvalidInput(`unknown objective "${cmd.objective}"`);
+            summary(`give ${names.entity(cmd.entity)} a secret objective`);
+            assignObjective(ctx, cmd.entity, cmd.objective, cause);
             return;
           }
           case 'announce':

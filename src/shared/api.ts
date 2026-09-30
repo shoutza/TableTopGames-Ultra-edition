@@ -35,6 +35,10 @@ export interface MindDto {
   plan: string;
   planRound: number;
   reconsider: string | null;
+  relationships: Record<string, { trust: number; affinity: number }>;
+  /** Most recent last (the last 20). */
+  memories: Array<{ round: number; kind: string; other: string | null; text: string; importance: number }>;
+  keyMoment: string | null;
 }
 
 export interface AiCallDto {
@@ -104,6 +108,8 @@ export interface RulebookDto {
   items: Record<string, string>;
   actions: Record<string, string>;
   cards: Record<string, string>;
+  /** "Island Hopper: Land on a Mystery space 3 times (reward: +1 Star)". */
+  objectives: Record<string, string>;
 }
 
 export interface MatchSnapshotDto {

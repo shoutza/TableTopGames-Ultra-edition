@@ -1,5 +1,6 @@
 import type { Archetype, Persona, Strategy } from '../schema/persona.ts';
 import type { PublicGameInfo } from '../visibility/public-info.ts';
+import type { ContestantView } from '../visibility/view.ts';
 
 /**
  * Match strategies. The engine only offers archetypes the scenario actually supports; a
@@ -119,6 +120,61 @@ export function castCandidates(info: PublicGameInfo, personas: Array<{ id: strin
     out.set(id, [first, ...ranked.filter((a) => a !== first)].slice(0, 3));
   }
   return out;
+}
+
+function vendorOnBoard(view: ContestantView, info: PublicGameInfo): boolean {
+  const entry = starEntry(info);
+  return entry !== undefined && view.entities.some((e) => e.kind === 'fixture' && e.status === 'active' && e.shopEntries.some((x) => x.entry === entry.id));
+}
+
+function gearShopOnBoard(view: ContestantView, info: PublicGameInfo): boolean {
+  const power = info.settings.core.power;
+  const gear = new Set(
+    info.shops.flatMap((sh) => sh.entries).filter((e) => e.grantsItem !== null && info.items.some((i) => i.id === e.grantsItem && i.modifiers.some((m) => m.resource === power && m.add > 0))).map((e) => e.id),
+  );
+  return view.entities.some((e) => e.kind === 'fixture' && e.status === 'active' && e.shopEntries.some((x) => gear.has(x.entry)));
+}
+
+/** The enemy worth victory points is on the board or will come back. */
+function victoryEnemyAround(view: ContestantView, info: PublicGameInfo): boolean {
+  const def = victoryEnemy(info);
+  return def !== undefined && view.entities.some((e) => e.kind === 'enemy' && e.defId === def.id && (e.status === 'active' || (e.status === 'defeated' && e.respawnRound !== null)));
+}
+
+/**
+ * Why an archetype's key opportunity is gone right now (e.g. the GM removed the Demon or the Star
+ * Vendor), or null while it is still there. Checked from the contestant's own view.
+ */
+export function opportunityLost(archetype: Archetype, view: ContestantView, info: PublicGameInfo): string | null {
+  const victoryName = nameOf(info, info.settings.victory.resource);
+  switch (archetype) {
+    case 'banker':
+    case 'starChaser':
+      return vendorOnBoard(view, info) ? null : `Nobody sells ${victoryName} any more: your strategy depends on buying them`;
+    case 'gearUp':
+      if (!victoryEnemyAround(view, info)) return `${victoryEnemy(info)?.name ?? 'The boss'} is gone for good: your strategy depends on defeating it`;
+      if (!gearShopOnBoard(view, info)) return 'No shop sells equipment any more: your strategy depends on buying it';
+      return null;
+    case 'powerFarmer':
+      return victoryEnemyAround(view, info) ? null : `${victoryEnemy(info)?.name ?? 'The boss'} is gone for good: your strategy depends on defeating it`;
+    case 'opportunist':
+      return null;
+  }
+}
+
+/**
+ * The fallback player's answer to a reconsideration flag: switch to the best-fitting archetype that
+ * still works when the current one's key opportunity is gone (or, when far behind, to a
+ * higher-reward plan that still works); otherwise keep the strategy.
+ */
+export function reviseStrategy(info: PublicGameInfo, view: ContestantView, persona: Persona, current: Strategy, reason: string): Strategy | null {
+  const viable = supportedArchetypes(info).filter((a) => opportunityLost(a, view, info) === null);
+  const ranked = [...viable].sort((a, b) => ARCHETYPE_INFO[b].fits(persona) - ARCHETYPE_INFO[a].fits(persona) || a.localeCompare(b));
+  let next: Archetype = current.archetype;
+  if (!viable.includes(current.archetype)) next = ranked[0] ?? 'opportunist';
+  else if (reason.includes(' behind ') && (current.archetype === 'banker' || current.archetype === 'starChaser') && viable.includes('powerFarmer') && persona.traits.risk >= 5) next = 'powerFarmer';
+  if (next === current.archetype) return null;
+  return defaultStrategy(info, next, view.round, reason);
 }
 
 export function defaultStrategy(info: PublicGameInfo, archetype: Archetype, round: number, reason: string): Strategy {

@@ -7,6 +7,7 @@ import type {
   FixtureDef,
   GameDefinition,
   ItemDef,
+  ObjectiveDef,
   ResourceDef,
   ShopDef,
   ShopEntry,
@@ -14,7 +15,7 @@ import type {
   StatusDef,
   TagDef,
 } from '../schema/definition.ts';
-import type { ChoiceOption, Cond, Effect, EntityRef, ModifierEvent, Num, RuleDef, Selector, SpaceRef, TriggerEvent } from '../schema/rules.ts';
+import type { ChoiceOption, Cond, Effect, EntityRef, ModifierEvent, Num, RuleDef, Selector, SpaceRef, TriggerEvent, TriggerWhere } from '../schema/rules.ts';
 
 /**
  * Compiles a validated GameDefinition into indexed lookup tables and checks everything a JSON
@@ -57,6 +58,7 @@ export interface CompiledGame {
   decks: Map<string, DeckDef>;
   cards: Map<string, { deck: DeckDef; card: CardDef }>;
   actions: Map<string, ActionDef>;
+  objectives: Map<string, ObjectiveDef>;
   cast: Map<string, CastMember>;
   /** Every rule, including rules attached to items, statuses and enemies. */
   rules: Map<string, CompiledRule>;
@@ -156,6 +158,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
   const fixtures = indexById(def.fixtures, 'fixture', diags);
   const decks = indexById(def.decks, 'deck', diags);
   const actions = indexById(def.actions, 'action', diags);
+  const objectives = indexById(def.objectives, 'objective', diags);
   const cast = indexById(def.cast, 'cast member', diags);
 
   const err = (code: string, message: string, ref?: string) => diags.push({ severity: 'error', code, message, ref });
@@ -201,6 +204,10 @@ export function compileGame(def: GameDefinition): CompiledGame {
       const other = resources.get(r.maxFrom);
       if (!other) err('unknown-resource', `Resource "${r.id}" maxFrom unknown "${r.maxFrom}"`, r.id);
       else if (other.maxFrom !== undefined) err('maxfrom-chain', `Resource "${r.id}" maxFrom must not chain`, r.id);
+    }
+    // Both sides of a trade must be able to see what changes hands.
+    if (r.tradeable && (r.role !== 'pool' || r.visibility !== 'public' || !r.appliesTo.includes('contestant'))) {
+      err('bad-tradeable', `Resource "${r.id}" is tradeable, so it must be a public pool resource of contestants`, r.id);
     }
   }
 
@@ -500,6 +507,38 @@ export function compileGame(def: GameDefinition): CompiledGame {
     checkEffects(action.effects, scope, where);
   }
 
+  function checkTriggerWhere(w: TriggerWhere | undefined, where: string): void {
+    if (w?.spaceTag !== undefined) needTag(w.spaceTag, where);
+    if (w?.space !== undefined) needSpace(w.space, where);
+    if (w?.resource !== undefined) needResource(w.resource, where);
+    if (w?.targetTag !== undefined) needTag(w.targetTag, where);
+    if (w?.item !== undefined) needItem(w.item, where);
+    if (w?.status !== undefined) needStatus(w.status, where);
+    if (w?.deck !== undefined && !decks.has(w.deck)) err('unknown-deck', `${where}: unknown deck "${w.deck}"`);
+    if (w?.card !== undefined && !cards.has(w.card)) err('unknown-card', `${where}: unknown card "${w.card}"`);
+    if (w?.action !== undefined && !actions.has(w.action)) err('unknown-action', `${where}: unknown action "${w.action}"`);
+    if (w?.enemy !== undefined && !enemies.has(w.enemy)) err('unknown-enemy', `${where}: unknown enemy "${w.enemy}"`);
+    if (w?.shopEntry !== undefined && !shopEntries.has(w.shopEntry)) err('unknown-entry', `${where}: unknown shop entry "${w.shopEntry}"`);
+  }
+
+  // --- objectives ---------------------------------------------------------------------------
+  for (const o of def.objectives) {
+    const where = `objective "${o.name}"`;
+    if (o.goal.kind === 'count') {
+      if (!TRIGGER_BINDINGS[o.goal.trigger.event].entities.includes('$actor')) {
+        err('bad-objective', `${where}: "${o.goal.trigger.event}" events have no acting contestant to count`, o.id);
+      }
+      checkTriggerWhere(o.goal.trigger.where, where);
+    } else {
+      needResource(o.goal.resource, where);
+      const r = resources.get(o.goal.resource);
+      if (r && !r.appliesTo.includes('contestant')) err('bad-objective', `${where}: contestants have no ${r.name}`, o.id);
+      if (r && r.visibility !== 'public' && r.visibility !== 'owner') err('bad-objective', `${where}: the owner cannot see ${r.name}`, o.id);
+      if (r && r.default >= o.goal.atLeast) diags.push({ severity: 'warning', code: 'objective-trivial', message: `${where} is complete from the start`, ref: o.id });
+    }
+    checkEffects(o.reward, { entities: new Set(['$actor']), space: false, amount: false, it: false }, `${where} reward`);
+  }
+
   // --- rules --------------------------------------------------------------------------------
   const rules = new Map<string, CompiledRule>();
   const ruleIndex = new Map<TriggerEvent, CompiledRule[]>();
@@ -515,18 +554,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
       case 'reaction': {
         const bindings = TRIGGER_BINDINGS[rule.trigger.event];
         const scope: Scope = { entities: new Set([...bindings.entities, ...holder]), space: bindings.space, amount: bindings.amount, it: false };
-        const w = rule.trigger.where;
-        if (w?.spaceTag !== undefined) needTag(w.spaceTag, where);
-        if (w?.space !== undefined) needSpace(w.space, where);
-        if (w?.resource !== undefined) needResource(w.resource, where);
-        if (w?.targetTag !== undefined) needTag(w.targetTag, where);
-        if (w?.item !== undefined) needItem(w.item, where);
-        if (w?.status !== undefined) needStatus(w.status, where);
-        if (w?.deck !== undefined && !decks.has(w.deck)) err('unknown-deck', `${where}: unknown deck "${w.deck}"`);
-        if (w?.card !== undefined && !cards.has(w.card)) err('unknown-card', `${where}: unknown card "${w.card}"`);
-        if (w?.action !== undefined && !actions.has(w.action)) err('unknown-action', `${where}: unknown action "${w.action}"`);
-        if (w?.enemy !== undefined && !enemies.has(w.enemy)) err('unknown-enemy', `${where}: unknown enemy "${w.enemy}"`);
-        if (w?.shopEntry !== undefined && !shopEntries.has(w.shopEntry)) err('unknown-entry', `${where}: unknown shop entry "${w.shopEntry}"`);
+        checkTriggerWhere(rule.trigger.where, where);
         if (rule.conditions) checkCond(rule.conditions, scope, where);
         checkEffects(rule.effects, scope, where);
         break;
@@ -611,6 +639,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
     decks,
     cards,
     actions,
+    objectives,
     cast,
     rules,
     ruleIndex,

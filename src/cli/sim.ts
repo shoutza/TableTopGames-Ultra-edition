@@ -80,6 +80,16 @@ interface Totals {
   choices: number;
   pvpFights: number;
   bossSpawns: number;
+  /** Per match: accepted trades. */
+  tradesDone: number[];
+  offers: number;
+  counters: number;
+  promisesMade: number;
+  promisesKept: number;
+  promisesBroken: number;
+  objectivesDone: number;
+  starsFromObjectives: number;
+  revisions: number;
 }
 
 const t: Totals = {
@@ -108,6 +118,15 @@ const t: Totals = {
   choices: 0,
   pvpFights: 0,
   bossSpawns: 0,
+  tradesDone: [],
+  offers: 0,
+  counters: 0,
+  promisesMade: 0,
+  promisesKept: 0,
+  promisesBroken: 0,
+  objectivesDone: 0,
+  starsFromObjectives: 0,
+  revisions: 0,
 };
 
 for (let i = 0; i < n; i++) {
@@ -119,7 +138,16 @@ for (let i = 0; i < n; i++) {
   const isDemon = (id: string) => s.entities[id]?.defId === 'enemy.demon';
   t.rounds += s.round;
   if (s.endReason?.startsWith('reached')) t.byThreshold++;
+  t.tradesDone.push(r.events.filter((e) => e.type === 'tradeCompleted').length);
+  for (const mind of r.minds.values()) t.revisions += mind.strategyHistory.length;
   for (const e of r.events) {
+    if (e.type === 'tradeProposed') t.offers++;
+    if (e.type === 'tradeCountered') t.counters++;
+    if (e.type === 'promiseMade') t.promisesMade++;
+    if (e.type === 'promiseKept') t.promisesKept++;
+    if (e.type === 'promiseBroken') t.promisesBroken++;
+    if (e.type === 'objectiveCompleted') t.objectivesDone++;
+    if (e.type === 'resourceChanged' && e.resource === victory && e.cause.kind === 'objective') t.starsFromObjectives += e.to - e.from;
     if (e.type === 'fightStarted') {
       t.fights++;
       if (isDemon(e.attacker) || isDemon(e.defender)) t.demonFights++;
@@ -183,5 +211,10 @@ console.log(`cards ${avg(t.cards)} · statuses applied ${avg(t.statuses)} · act
 const ops = [...t.opMs].sort((a, b) => a - b);
 const q = (p: number) => (ops[Math.min(ops.length - 1, Math.floor(ops.length * p))] ?? 0).toFixed(2);
 console.log(`engine operations ${ops.length}: p50 ${q(0.5)} ms · p99 ${q(0.99)} ms · max ${(ops[ops.length - 1] ?? 0).toFixed(2)} ms`);
+const trades = [...t.tradesDone].sort((a, b) => a - b);
+console.log(
+  `trades: offers ${avg(t.offers)} · counteroffers ${avg(t.counters)} · accepted ${avg(trades.reduce((a, b) => a + b, 0))} (median ${trades[Math.floor(trades.length / 2)] ?? 0}) · promises made ${avg(t.promisesMade)}, kept ${avg(t.promisesKept)}, broken ${avg(t.promisesBroken)}`,
+);
+console.log(`objectives completed ${avg(t.objectivesDone)} (stars from objectives ${avg(t.starsFromObjectives)}) · strategy revisions ${avg(t.revisions)}`);
 console.log(`rule faults ${t.faults} · aborted operations ${t.aborted}`);
 console.log(`wins by archetype ${JSON.stringify(t.winsByArchetype)}`);

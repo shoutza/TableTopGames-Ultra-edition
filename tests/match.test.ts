@@ -47,7 +47,7 @@ describe('starter scenario', () => {
       const out =
         nextStepKind(state) === 'auto'
           ? advance(starter, state)
-          : answerDecision(starter, state, { decisionId: state.pendingDecision?.id as string, optionId: state.pendingDecision?.options.at(-1)?.id as string });
+          : answerDecision(starter, state, { decisionId: state.pendingDecision?.id as string, optionId: state.pendingDecision?.options.filter((o) => o.kind !== 'trade' && o.id !== 'tr:counter').at(-1)?.id as string });
       state = deepFreeze(expectOk(out).state);
     }
     expect(state.phase).toBe('gameOver');

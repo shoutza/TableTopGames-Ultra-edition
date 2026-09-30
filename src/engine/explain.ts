@@ -1,6 +1,6 @@
-import type { StatusDef } from '../schema/definition.ts';
+import type { ObjectiveDef, StatusDef } from '../schema/definition.ts';
 import type { Capability, Cond, ContinuousRule, Effect, EntityRef, ModifierRule, ModifyOp, Num, ReactionRule, RuleDef, RuleLimits, Selector, SpaceRef, Trigger } from '../schema/rules.ts';
-import type { GameEvent, GameState } from '../schema/state.ts';
+import type { GameEvent, GameState, PromiseTerm, TradeTermsView } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
 
 /**
@@ -21,6 +21,7 @@ export interface Names {
   card(id: string): string;
   action(id: string): string;
   enemy(id: string): string;
+  objective(id: string): string;
 }
 
 export interface NameSource {
@@ -35,6 +36,7 @@ export interface NameSource {
   cards?: Map<string, { card: { name: string } }> | undefined;
   actions?: Map<string, { name: string }> | undefined;
   enemies?: Map<string, { name: string }> | undefined;
+  objectives?: Map<string, { name: string }> | undefined;
 }
 
 export function makeNames(source: NameSource, entityNames: (id: string) => string | undefined): Names {
@@ -56,6 +58,7 @@ export function makeNames(source: NameSource, entityNames: (id: string) => strin
     card: (id) => source.cards?.get(id)?.card.name ?? id,
     action: (id) => source.actions?.get(id)?.name ?? id,
     enemy: (id) => source.enemies?.get(id)?.name ?? id,
+    objective: (id) => (id === 'hidden' ? 'a secret objective' : (source.objectives?.get(id)?.name ?? id)),
   };
   return names;
 }
@@ -363,13 +366,19 @@ function terseSubject(sel: Selector | EntityRef, n: Names): string {
  * Compact effect text for rulebook digests ("+1d6+2 Gold", "become Blessed", "50%: …"). Generated
  * from the same structured data as the full descriptions; falls back to them for anything unusual.
  */
+/** "Stars" → "Star" for a single unit (names are plural nouns like Stars, Bananas, Gold). */
+function singular(name: string): string {
+  return /[^s]s$/.test(name) ? name.slice(0, -1) : name;
+}
+
 export function summarizeEffects(effects: Effect[], n: Names): string {
   const parts: string[] = [];
   for (const e of effects) {
     switch (e.op) {
       case 'changeResource': {
         const loss = asLoss(e.amount);
-        parts.push(`${terseSubject(e.target, n)}${loss !== null ? `−${terseNum(loss, n)}` : `+${terseNum(e.amount, n)}`} ${n.resource(e.resource)}`);
+        const one = e.amount === 1 || e.amount === -1;
+        parts.push(`${terseSubject(e.target, n)}${loss !== null ? `−${terseNum(loss, n)}` : `+${terseNum(e.amount, n)}`} ${one ? singular(n.resource(e.resource)) : n.resource(e.resource)}`);
         break;
       }
       case 'damage':
@@ -692,7 +701,7 @@ export function describeEvent(e: GameEvent, n: Names): string {
     case 'fightPrevented':
       return `No fight: ${e.reason}`;
     case 'damaged':
-      return `${n.entity(e.entity)} takes ${e.amount} damage${e.by !== null ? ` from ${n.entity(e.by)}` : ''}${e.amount !== e.base ? ` (${e.base} before ${e.mods?.map((m) => n.rule(m.rule)).join(', ') ?? 'modifiers'})` : ''}`;
+      return `${n.entity(e.entity)} takes ${e.amount} damage${e.by !== null && e.by !== e.entity ? ` from ${n.entity(e.by)}` : ''}${e.amount !== e.base ? ` (${e.base} before ${e.mods?.map((m) => n.rule(m.rule)).join(', ') ?? 'modifiers'})` : ''}`;
     case 'defeated':
       return `${n.entity(e.entity)} was defeated${e.by ? ` by ${n.entity(e.by)}` : ''}`;
     case 'knockedOut':
@@ -713,6 +722,26 @@ export function describeEvent(e: GameEvent, n: Names): string {
       return `${n.entity(e.entity)} must choose: ${e.prompt} (${e.options.join(' / ')})`;
     case 'choiceMade':
       return `${n.entity(e.entity)} ${e.automatic ? 'gets the default' : 'chooses'}: ${e.label}`;
+    case 'objectiveAssigned':
+      return `🎯 ${n.entity(e.entity)} receives ${e.def === 'hidden' ? 'a secret objective' : `the secret objective “${n.objective(e.def)}”`}`;
+    case 'objectiveCompleted':
+      return `🎯 ${n.entity(e.entity)} completes the secret objective “${n.objective(e.def)}”`;
+    case 'tradeProposed':
+      return `🤝 ${n.entity(e.from)} offers ${n.entity(e.to)} a trade: ${describeTerms(e.terms, e.from, e.to, n)}${e.message ? ` — “${e.message}”` : ''}`;
+    case 'tradeCountered':
+      return `🤝 ${n.entity(e.to)} counters: ${describeTerms(e.terms, e.from, e.to, n)}${e.message ? ` — “${e.message}”` : ''}`;
+    case 'tradeRejected':
+      return `${n.entity(e.by)} ${e.automatic ? 'could not answer; the trade is off' : 'rejects the trade'}`;
+    case 'tradeCompleted':
+      return `🤝 Trade done: ${describeTerms(e.terms, e.from, e.to, n)}`;
+    case 'tradeFailed':
+      return `The trade between ${n.entity(e.from)} and ${n.entity(e.to)} falls through (${e.reason})`;
+    case 'promiseMade':
+      return `${e.kind === 'noAttack' ? `${n.entity(e.by)} promises not to attack ${n.entity(e.to)} until the end of round ${e.dueRound}` : `${n.entity(e.by)} promises to pay ${n.entity(e.to)} ${e.amount} ${n.resource(e.resource ?? '')} by the end of round ${e.dueRound}`}`;
+    case 'promiseKept':
+      return `✅ ${n.entity(e.by)} kept a promise to ${n.entity(e.to)} (${e.kind === 'noAttack' ? 'no attack' : 'paid in full'})`;
+    case 'promiseBroken':
+      return `💔 ${n.entity(e.by)} broke a promise to ${n.entity(e.to)} (${e.kind === 'noAttack' ? 'attacked anyway' : 'never paid'})`;
     case 'announced':
       return `📣 ${e.text}`;
     case 'ruleFault':
@@ -722,6 +751,60 @@ export function describeEvent(e: GameEvent, n: Names): string {
     case 'gameOver':
       return `🏆 Game over — ${e.winners.map((id) => n.entity(id)).join(' & ')} win${e.winners.length === 1 ? 's' : ''} (${e.reason})`;
   }
+}
+
+function times(n: number): string {
+  return n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`;
+}
+
+/** What an objective asks for, generated from its goal unless the author wrote a text. */
+export function describeObjectiveGoal(def: ObjectiveDef, n: Names): string {
+  if (def.text) return def.text;
+  const g = def.goal;
+  if (g.kind === 'reach') return `Have ${g.atLeast} ${n.resource(g.resource)} at once`;
+  const w = g.trigger.where ?? {};
+  switch (g.trigger.event) {
+    case 'landed':
+      return `Land on ${w.space !== undefined ? n.space(w.space) : w.spaceTag !== undefined ? article(`${n.tag(w.spaceTag)} space`) : 'a space'} ${times(g.times)}`;
+    case 'defeated': {
+      const foe = w.enemy !== undefined ? n.enemy(w.enemy) : w.targetTag !== undefined ? `a foe tagged ${n.tag(w.targetTag)}` : w.targetKind === 'contestant' ? 'a rival contestant' : 'a foe';
+      return `Defeat ${foe} ${times(g.times)}`;
+    }
+    case 'purchased':
+      return `Buy ${w.shopEntry !== undefined ? n.entry(w.shopEntry) : 'something at a shop'} ${times(g.times)}`;
+    case 'actionUsed':
+      return `Use ${w.action !== undefined ? n.action(w.action) : 'a special action'} ${times(g.times)}`;
+    case 'itemUsed':
+      return `Use ${w.item !== undefined ? n.item(w.item) : 'an item'} ${times(g.times)}`;
+    case 'cardDrawn':
+      return `Draw ${w.card !== undefined ? `“${n.card(w.card)}”` : `a card${w.deck !== undefined ? ` from ${n.deck(w.deck)}` : ''}`} ${times(g.times)}`;
+    default:
+      return `${describeTrigger(g.trigger, n)} — ${times(g.times)}`;
+  }
+}
+
+/** "Island Hopper: land on a Mystery space 3 times (reward: +1 Star)". */
+export function describeObjective(def: ObjectiveDef, n: Names): string {
+  return `${def.name}: ${describeObjectiveGoal(def, n)} (reward: ${summarizeEffects(def.reward, n)})`;
+}
+
+function describeGoods(g: { resources: Record<string, number>; items: string[] }, n: Names): string {
+  const parts = [...Object.entries(g.resources).map(([r, a]) => `${a} ${n.resource(r)}`), ...g.items.map((i) => n.item(i))];
+  return parts.length > 0 ? parts.join(', ') : 'nothing';
+}
+
+export function describePromise(p: PromiseTerm, byName: string, toName: string, n: Names, dueRound?: number): string {
+  const until = dueRound !== undefined ? `until the end of round ${dueRound}` : `for ${p.rounds} round${p.rounds === 1 ? '' : 's'}`;
+  if (p.kind === 'noAttack') return `${byName} will not attack ${toName} ${until}`;
+  return `${byName} will pay ${toName} ${p.amount} ${n.resource(p.resource)} ${dueRound !== undefined ? `by the end of round ${dueRound}` : `within ${p.rounds} round${p.rounds === 1 ? '' : 's'}`}`;
+}
+
+/** Trade terms from the proposer's side in plain words. */
+export function describeTerms(terms: TradeTermsView, from: string, to: string, n: Names): string {
+  const a = n.entity(from);
+  const b = n.entity(to);
+  const promises = terms.promises.map((p) => describePromise(p, p.by === 'from' ? a : b, p.by === 'from' ? b : a, n));
+  return [`${a} gives ${describeGoods(terms.give, n)}`, `${b} gives ${describeGoods(terms.get, n)}`, ...promises].join('; ');
 }
 
 function pct(a: number, b: number): string {

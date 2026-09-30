@@ -40,32 +40,45 @@ const HistoryLineSchema = z.object({
 type Json = Record<string, unknown>;
 
 /**
- * Explicit, step-by-step save migrations. Version 1 (first playable version) → 2 (M4): rule
- * counters gained per-round/per-game/cooldown fields, attack options name their `target`, buy
- * options carry their price; new state fields (statuses, decks, choice queue, cooldowns) get
- * their schema defaults.
+ * Explicit, step-by-step save migrations.
+ * 1 (first playable version) → 2 (M4): rule counters gained per-round/per-game/cooldown fields,
+ *   attack options name their `target`, buy options carry their price; new state fields
+ *   (statuses, decks, choice queue, cooldowns) get their schema defaults.
+ * 2 → 3 (M5): objectives, negotiations, commitments and minds' relationships and memories start
+ *   empty (schema defaults); only the version numbers change.
  */
-export function migrateSnapshot(raw: Json): Json {
-  const version = raw['saveFormatVersion'];
-  if (version === SAVE_FORMAT_VERSION) return raw;
-  if (version !== 1) throw new Error(`save format ${String(version)} cannot be migrated`);
-  const state = (raw['state'] ?? {}) as Json;
-  const counters = (state['ruleCounters'] ?? {}) as Record<string, Json>;
-  for (const [key, c] of Object.entries(counters)) {
-    if ('count' in c) counters[key] = { turnKey: c['turnKey'], turnCount: c['count'], round: -1, roundCount: 0, total: c['count'], lastRound: -1000 };
-  }
-  const definition = (raw['definition'] ?? {}) as { shops?: Array<{ entries: Array<{ id: string; price: { amount: number } }> }> };
-  const prices = new Map((definition.shops ?? []).flatMap((shop) => shop.entries.map((e) => [e.id, e.price.amount] as const)));
-  const pending = state['pendingDecision'] as { options?: Json[] } | null | undefined;
-  for (const option of pending?.options ?? []) {
-    if (option['kind'] === 'attack' && 'enemy' in option) {
-      option['target'] = option['enemy'];
-      delete option['enemy'];
+const MIGRATIONS: Record<number, (raw: Json) => Json> = {
+  1: (raw) => {
+    const state = (raw['state'] ?? {}) as Json;
+    const counters = (state['ruleCounters'] ?? {}) as Record<string, Json>;
+    for (const [key, c] of Object.entries(counters)) {
+      if ('count' in c) counters[key] = { turnKey: c['turnKey'], turnCount: c['count'], round: -1, roundCount: 0, total: c['count'], lastRound: -1000 };
     }
-    if (option['kind'] === 'buy' && !('price' in option)) option['price'] = prices.get(String(option['entry'])) ?? 0;
+    const definition = (raw['definition'] ?? {}) as { shops?: Array<{ entries: Array<{ id: string; price: { amount: number } }> }> };
+    const prices = new Map((definition.shops ?? []).flatMap((shop) => shop.entries.map((e) => [e.id, e.price.amount] as const)));
+    const pending = state['pendingDecision'] as { options?: Json[] } | null | undefined;
+    for (const option of pending?.options ?? []) {
+      if (option['kind'] === 'attack' && 'enemy' in option) {
+        option['target'] = option['enemy'];
+        delete option['enemy'];
+      }
+      if (option['kind'] === 'buy' && !('price' in option)) option['price'] = prices.get(String(option['entry'])) ?? 0;
+    }
+    return { ...raw, state: { ...state, formatVersion: 2 }, saveFormatVersion: 2 };
+  },
+  2: (raw) => ({ ...raw, state: { ...((raw['state'] ?? {}) as Json), formatVersion: 3 }, saveFormatVersion: 3 }),
+};
+
+export function migrateSnapshot(raw: Json): Json {
+  let current = raw;
+  for (let guard = 0; guard < 10; guard++) {
+    const version = current['saveFormatVersion'];
+    if (version === SAVE_FORMAT_VERSION) return current;
+    const step = typeof version === 'number' ? MIGRATIONS[version] : undefined;
+    if (!step) throw new Error(`save format ${String(version)} cannot be migrated`);
+    current = step(current);
   }
-  state['formatVersion'] = SAVE_FORMAT_VERSION;
-  return { ...raw, state, saveFormatVersion: SAVE_FORMAT_VERSION };
+  throw new Error('save migration did not finish');
 }
 
 export interface LoadedMatch {

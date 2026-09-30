@@ -138,12 +138,19 @@ function signedRange(min: number, max: number): string {
 /** Damage of each successful hit after public damage modifiers (shields consumed as they go). */
 function damageSequence(scope: HintScope, winner: string, loser: string, base: number, n: number): number[] | undefined {
   if (!scope.game.modifierIndex.has('damage')) return undefined;
-  const sim = cloneJson(scope.state);
-  const env = new PreviewEnv(scope.game, sim);
+  // The state is copied only once a modifier actually applies (shields are used up as hits land).
+  let sim = scope.state;
+  let env = new PreviewEnv(scope.game, sim);
+  let copied = false;
   const seq: number[] = [];
   for (let k = 0; k < n; k++) {
     const out = computeModifiers(env, 'damage', { $actor: winner, $target: loser, amount: base }, base, { entity: loser });
     seq.push(Math.max(0, out.value));
+    if (out.steps.length > 0 && !copied) {
+      sim = cloneJson(sim);
+      env = new PreviewEnv(scope.game, sim);
+      copied = true;
+    }
     for (const step of out.steps) {
       recordFiring(sim, step.rule, step.holder);
       const consume = step.rule.def.kind === 'modifier' ? step.rule.def.consume : undefined;
@@ -326,7 +333,7 @@ export function effectHints(scope: HintScope, effects: Effect[], b: Bindings, su
       }
       case 'drawCard': {
         if (refIsViewer(scope, env, e.for, b) === false) continue;
-        out.push({ text: tag(`you draw a card from ${names.deck(e.deck)}`), certain: false, p, deck: e.deck });
+        out.push({ text: tag(`${names.deck(e.deck)} card`), certain: false, p, deck: e.deck });
         if (depth < 1) deckHints(scope, e.deck, b, p, depth + 1, out);
         break;
       }

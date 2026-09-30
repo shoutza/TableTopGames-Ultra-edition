@@ -2,8 +2,19 @@ import { formatPercent } from '../engine/combat.ts';
 import { describeCapabilityLoss, describeEvent, makeNames, type Names } from '../engine/explain.ts';
 import type { Persona } from '../schema/persona.ts';
 import type { PublicGameInfo } from '../visibility/public-info.ts';
-import { threatWeight, type ContestantView, type FightHint, type Hint, type OptionPreview, type ViewEntity } from '../visibility/view.ts';
+import {
+  threatWeight,
+  type ContestantView,
+  type FightHint,
+  type Hint,
+  type OptionPreview,
+  type ViewEntity,
+  type ViewGoods,
+  type ViewNegotiation,
+  type ViewObjective,
+} from '../visibility/view.ts';
 import { ARCHETYPE_INFO } from './strategy.ts';
+import { relationshipLines, selectMemories } from './memory.ts';
 import { traitGuidance, type ContestantMind } from './mind.ts';
 
 /**
@@ -30,7 +41,20 @@ export function namesFromView(info: PublicGameInfo, view: ContestantView): Names
   const cards = new Map(info.decks.flatMap((d) => d.cards.map((c) => [c.id, { card: { name: c.name } }] as const)));
   const entityNames = new Map(view.entities.map((e) => [e.id, e.name]));
   return makeNames(
-    { resources: map(info.resources), tags: map(info.tags), spaces: map(info.spaces), items: map(info.items), rules, shopEntries: entries, statuses: map(info.statuses), decks: map(info.decks), cards, actions: map(info.actions), enemies: map(info.enemies) },
+    {
+      resources: map(info.resources),
+      tags: map(info.tags),
+      spaces: map(info.spaces),
+      items: map(info.items),
+      rules,
+      shopEntries: entries,
+      statuses: map(info.statuses),
+      decks: map(info.decks),
+      cards,
+      actions: map(info.actions),
+      enemies: map(info.enemies),
+      objectives: map(info.objectives),
+    },
     (id) => entityNames.get(id),
   );
 }
@@ -84,6 +108,24 @@ function rulesDigest(info: PublicGameInfo, names: Names): string {
       ? 'Reaching 0 HP eliminates you from the match; the last contestant standing wins.'
       : `Knocked out (0 HP): lose ${s.ko.goldLossPercent}% of your ${resName(info, s.core.gold)}${s.ko.lootToVictor ? ' (to the contestant who beat you, if any)' : ''}, return to ${names.space(s.startSpace)}, HP restored${s.ko.clearStatuses && info.statuses.length > 0 ? ', all statuses end' : ''}, skip ${s.ko.skipTurns} turn${s.ko.skipTurns === 1 ? '' : 's'}.`;
   const actionsLine = info.actions.length > 0 ? ['Special actions (as your main action):', ...info.actions.map((a) => `- ${a.name}: ${a.text}`)] : [];
+  const tradeRes = info.resources.filter((r) => r.tradeable);
+  const tradeItems = info.items.filter((i) => i.tradeable);
+  const trading =
+    s.trading.enabled && (tradeRes.length > 0 || tradeItems.length > 0)
+      ? [
+          `Trading: once per turn, before your action, you may propose a trade to any contestant (free action). Tradeable: ${tradeRes.map((r) => `${r.name} (${r.id})`).join(', ')}${tradeItems.length > 0 ? `${tradeRes.length > 0 ? ' and ' : ''}items that are not concealed` : ''}.${s.trading.maxPromiseRounds > 0 ? ` Trades may include promises (no attack for N rounds; pay an amount within N rounds; N ≤ ${s.trading.maxPromiseRounds}): public, not enforced, and everyone sees if they are kept or broken.` : ''} The partner accepts, rejects or counters once; the proposer then accepts or rejects.`,
+        ]
+      : [];
+  const objectives =
+    info.objectives.length > 0 && s.objectives.perContestant > 0
+      ? [
+          (() => {
+            const same = info.objectives.every((o) => o.reward === info.objectives[0]?.reward);
+            const list = info.objectives.map((o) => `${o.name} (${o.text}${same ? '' : `; ${o.reward}`})`).join('; ');
+            return `Secret objectives: everyone holds ${s.objectives.perContestant}; completing one ${same ? `gives ${info.objectives[0]?.reward}` : 'gives its reward'} and reveals it. Possible: ${list}.`;
+          })(),
+        ]
+      : [];
   const lines = [
     `GAME: ${info.name}. ${info.description}`,
     `Goal: first to ${v.threshold} ${resName(info, v.resource)} at the end of a round wins; otherwise most ${resName(info, v.resource)} after round ${v.roundLimit} (ties: ${v.ranking.slice(1).map((r) => resName(info, r)).join(', ')}).`,
@@ -94,6 +136,8 @@ function rulesDigest(info: PublicGameInfo, names: Names): string {
     ...info.rules.map((r) => `- ${r.name}: ${r.text}`),
     ...(info.statuses.length > 0 ? ['Statuses (durations count your own turns):', ...info.statuses.map((st) => `- ${st.text}`)] : []),
     ...actionsLine,
+    ...trading,
+    ...objectives,
     'Shops:',
     ...info.shops.map((shop) => `- ${shop.name}: ${shop.entries.map((e) => `${e.label} for ${e.price} ${resName(info, e.priceResource)}${e.grantsItem ? ` (${info.items.find((i) => i.id === e.grantsItem)?.text ?? ''})` : ''}`).join('; ')}`),
     'Enemies:',
@@ -122,6 +166,7 @@ export function buildInstructions(info: PublicGameInfo, name: string, persona: P
     '- "say" is an optional short in-character line spoken BEFORE the outcome is known: state intent, never claim results. Use null to stay quiet.',
     '- "plan" is one short sentence about your next steps; null keeps your current plan.',
     '- "strategyUpdate" is null unless you decide to change your strategy (you will be prompted when it is worth reconsidering).',
+    '- "trade" is null unless you pick "trade" or "tr:counter"; then terms from YOUR side: with (partner id, proposals only), give/get (resources [{resource, amount}], item ids), promises [{by: "me"|"them", kind, rounds, resource, amount}] (null resource/amount for noAttack), message.',
     '',
     rulesDigest(info, names),
     '',
@@ -197,7 +242,7 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
       // The Star Vendor plus the two nearest other points of interest (entities only).
       const vendorId = view.entities.find((e) => e.kind === 'fixture' && e.status === 'active' && vendorEntry !== undefined && e.shopEntries.some((x) => x.entry === vendorEntry.id))?.id;
       const byDistance = p.distances.filter((d) => view.entities.some((e) => e.id === d.key) && d.key !== vendorId).sort((a, b) => a.steps - b.steps);
-      const dist = [...p.distances.filter((d) => d.key === vendorId), ...byDistance.slice(0, 2)].map((d) => `${d.label} ${d.steps}`);
+      const dist = [...p.distances.filter((d) => d.key === vendorId), ...byDistance.slice(0, 1)].map((d) => `${d.label} ${d.steps}`);
       // Only serious threats: a rival that likely reaches this space and would probably knock you out.
       const danger = p.threats
         .filter((t) => threatWeight(t) >= 0.3 && t.reach * t.pKnockout >= 0.2)
@@ -234,7 +279,31 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
       return `[${p.optionId}] Rest: HP ${me.stats[info.settings.core.hp]}→${p.hpAfter}`;
     case 'pass':
       return `[${p.optionId}] Pass`;
+    case 'trade': {
+      const holdings = (g: ViewGoods) => goodsText(info, names, g, true) || 'nothing tradeable';
+      const partners = p.partners.map((x) => `${x.name} [${x.id}]: ${holdings(x.holds)}`).join('; ');
+      return `[${p.optionId}] Propose a trade (free action; you still act afterwards). You hold ${holdings(p.youHold)}. Partners: ${partners}`;
+    }
+    case 'pay':
+      return `[${p.optionId}] Pay ${p.toName} ${p.amount} ${resName(info, p.resource)} as you promised (free action)`;
+    case 'tradeAnswer':
+      return `[${p.optionId}] ${p.answer === 'accept' ? 'Accept' : p.answer === 'reject' ? 'Reject' : 'Counteroffer (terms in "trade"; only one allowed)'}`;
   }
+}
+
+function goodsText(info: PublicGameInfo, names: Names, g: ViewGoods, ids = false): string {
+  return [...Object.entries(g.resources).map(([r, a]) => `${a} ${resName(info, r)}`), ...g.items.map((i) => (ids ? `${names.item(i)} (${i})` : names.item(i)))].join(', ');
+}
+
+function negotiationText(info: PublicGameInfo, names: Names, n: ViewNegotiation): string {
+  const who = n.proposedByYou ? 'Your offer' : `${n.partnerName}${n.stage === 'final' ? ' counters your offer' : ' offers you a trade'}`;
+  const parts = [`you give ${goodsText(info, names, n.youGive) || 'nothing'}`, `you get ${goodsText(info, names, n.youGet) || 'nothing'}`, ...n.promises.map((x) => x.text)];
+  return `${who}: ${parts.join('; ')}${n.message ? `. Message: “${n.message}”` : ''}`;
+}
+
+function objectiveLine(info: PublicGameInfo, o: ViewObjective): string {
+  const progress = o.done ? 'done' : o.current !== null ? `you have ${o.current}/${o.target}` : `${o.progress}/${o.target}`;
+  return `${o.name} — ${o.goal} (${progress}); reward: ${o.reward}`;
 }
 
 /** "You rolled 4; −1 Move (Fish Form) → up to 3 steps." */
@@ -268,6 +337,17 @@ export function buildInput(info: PublicGameInfo, view: ContestantView, mind: Con
   const place = me.spaceId ? names.space(me.spaceId) : 'nowhere';
   lines.push(`YOU (${me.name}) at ${place}: ${statLine(info, me)} · Items: ${itemsText(me)} (${me.items.length}/${info.settings.inventoryCapacity})`);
   if (me.suppressed.length > 0) lines.push(`Right now you ${me.suppressed.map((x) => `${describeCapabilityLoss(x.capability)} (${x.by})`).join('; ')}.`);
+  const mine = view.objectives.filter((o) => o.mine && !o.done);
+  if (mine.length > 0) lines.push(`YOUR SECRET OBJECTIVE${mine.length > 1 ? 'S' : ''}: ${mine.map((o) => objectiveLine(info, o)).join(' | ')}`);
+  const revealed = view.objectives.filter((o) => o.done && !o.mine);
+  if (revealed.length > 0) lines.push(`Completed objectives: ${revealed.map((o) => `${o.ownerName} — ${o.name}`).join('; ')}`);
+  const promises = [...view.commitments].sort((a, b) => Number(b.by === view.viewer || b.to === view.viewer) - Number(a.by === view.viewer || a.to === view.viewer)).slice(0, 4);
+  if (promises.length > 0) lines.push(`OPEN PROMISES: ${promises.map((c) => c.text).join('; ')}`);
+  const relations = relationshipLines(mind, view, names);
+  if (relations.length > 0) lines.push(`HOW YOU FEEL: ${relations.join('; ')}`);
+  const memories = selectMemories(mind, view, 4);
+  if (memories.length > 0) lines.push(`YOU REMEMBER: ${memories.join('; ')}`);
+  if (mind.keyMoment) lines.push(`KEY MOMENT: ${mind.keyMoment}. React in character with "say" if you like.`);
   lines.push('');
   lines.push(`STANDINGS — round ${view.round} of ${view.roundLimit}`);
   for (const id of view.turnOrder) {
@@ -297,7 +377,13 @@ export function buildInput(info: PublicGameInfo, view: ContestantView, mind: Con
   }
   lines.push('');
   const what =
-    decision.kind === 'move' ? `${rollText(info, view, names)} Choose where to move.` : decision.kind === 'choice' ? `CHOICE: ${decision.prompt ?? 'choose one'}` : 'Choose your action for this turn.';
+    decision.kind === 'move'
+      ? `${rollText(info, view, names)} Choose where to move.`
+      : decision.kind === 'choice'
+        ? `CHOICE: ${decision.prompt ?? 'choose one'}`
+        : decision.kind === 'trade' && view.negotiation
+          ? `TRADE — ${negotiationText(info, names, view.negotiation)}.`
+          : 'Choose your action for this turn.';
   lines.push(`DECISION ${decision.id}: ${what}`);
   lines.push(decision.kind === 'move' ? 'Options (⚠ = rivals who could reach you there next turn: chance to reach / chance they knock you out; near = steps to key places):' : 'Options:');
   for (const p of decision.previews) lines.push(optionLine(info, view, names, p, me));

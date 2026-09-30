@@ -11,6 +11,19 @@ export { createMatch, advance, answerDecision, nextStepKind, checkVictory, rankC
 export type { DecisionAnswer, MatchSetup, StepKind } from './turn.ts';
 export { moveOptions, mainOptions, choiceOptions, buyPrice, actionAvailable, actionTargets, attackTargets, CheckEnv } from './decisions.ts';
 export { applyGmCommand } from './gm.ts';
+export { dealObjectives, assignObjective } from './objectives.ts';
+export {
+  canProposeTrade,
+  tradePartners,
+  termsFromOffer,
+  deliveryProblem,
+  termsView,
+  isTradeableResource,
+  isTradeableItem,
+  openCommitments,
+  TRADE_LIMITS,
+} from './trade.ts';
+export type { TradeOfferInput, GoodsInput, PromiseInput } from './trade.ts';
 export {
   effectiveValue,
   effectiveTags,
@@ -25,7 +38,22 @@ export {
 } from './queries.ts';
 export { computeModifiers } from './modifiers.ts';
 export type { ModifierSubject, ModStep } from './modifiers.ts';
-export { describeEvent, describeRule, describeEffects, describeEffect, describeCond, describeTrigger, describeStatus, describeCapabilityLoss, makeNames, namesFor } from './explain.ts';
+export {
+  describeEvent,
+  describeRule,
+  describeEffects,
+  describeEffect,
+  describeCond,
+  describeTrigger,
+  describeStatus,
+  describeCapabilityLoss,
+  describeObjective,
+  describeObjectiveGoal,
+  describePromise,
+  describeTerms,
+  makeNames,
+  namesFor,
+} from './explain.ts';
 export type { Names, NameSource } from './explain.ts';
 export { damageFor, fightOdds, spinChance, formatPercent } from './combat.ts';
 export type { FightOdds, FightInput, DamageSettings } from './combat.ts';

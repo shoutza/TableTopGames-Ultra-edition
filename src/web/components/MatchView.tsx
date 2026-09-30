@@ -86,7 +86,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
           {thinkingName
             ? ` · 🤔 ${thinkingName} is thinking…`
             : pending
-              ? ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind === 'choice' ? `choice: ${pending.prompt ?? ''}` : pending.kind})`
+              ? ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind === 'choice' ? `choice: ${pending.prompt ?? ''}` : pending.kind === 'trade' ? (pending.prompt ?? 'trade') : pending.kind})`
               : ''}
         </div>
         <div className="controls">

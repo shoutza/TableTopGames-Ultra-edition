@@ -15,8 +15,10 @@ import {
   walk,
 } from './effects.ts';
 import { activeContestantId, effectiveValue, getEntity, hasCapability, requireValue, suppressedCapabilities } from './queries.ts';
+import { dealObjectives } from './objectives.ts';
 import { runOperation, runRoot, type OpOutcome } from './resolve.ts';
 import { seedRng } from './rng.ts';
+import { answerTrade, breakNoAttackPromises, lapseNegotiation, payCommitment, proposeTrade, settleCommitments, type TradeOfferInput } from './trade.ts';
 import { InvalidInput, RuleFault } from './util.ts';
 
 /**
@@ -32,6 +34,8 @@ export interface DecisionAnswer {
   rev?: number | undefined;
   /** Short in-character line spoken before the outcome is known. */
   say?: string | undefined;
+  /** Terms for "Propose a trade" and for a counteroffer, from the answering contestant's side. */
+  trade?: TradeOfferInput | undefined;
 }
 
 export interface MatchSetup {
@@ -58,10 +62,10 @@ export function createMatch(game: CompiledGame, setup: MatchSetup): OpOutcome {
     rev: 0,
     seed: setup.seed,
     rng: seedRng(setup.seed),
-    counters: { entity: 0, item: 0, event: 0, decision: 0, fight: 0, status: 0, choice: 0 },
+    counters: { entity: 0, item: 0, event: 0, decision: 0, fight: 0, status: 0, choice: 0, objective: 0, trade: 0, commitment: 0 },
     round: 0,
     phase: 'roundStart',
-    turn: { index: 0, roll: null, over: false },
+    turn: { index: 0, roll: null, over: false, traded: false },
     turnOrder: [],
     entities: {},
     items: {},
@@ -69,6 +73,9 @@ export function createMatch(game: CompiledGame, setup: MatchSetup): OpOutcome {
     cooldowns: {},
     decks: {},
     queue: [],
+    objectives: [],
+    negotiation: null,
+    commitments: [],
     pendingDecision: null,
     winners: null,
     endReason: null,
@@ -120,6 +127,7 @@ export function createMatch(game: CompiledGame, setup: MatchSetup): OpOutcome {
     ctx.state.turnOrder = order;
     setUpDecks(ctx);
     ctx.emit({ type: 'matchStarted', seed: setup.seed, turnOrder: order }, { kind: 'system' });
+    dealObjectives(ctx);
   });
 }
 
@@ -167,7 +175,7 @@ function skipReason(game: CompiledGame, state: GameState, actor: Entity): string
 /** Hands the turn to the next contestant in the order, or ends the round after the last one. */
 function passTurn(state: GameState): void {
   if (state.turn.index + 1 < state.turnOrder.length) {
-    state.turn = { index: state.turn.index + 1, roll: null, over: false };
+    state.turn = { index: state.turn.index + 1, roll: null, over: false, traded: false };
     state.phase = 'turnStart';
   } else {
     state.turn.roll = null;
@@ -179,11 +187,12 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
   if (state.pendingDecision) return { ok: false, kind: 'invalid', message: 'a decision is pending' };
   const queued = state.queue[0];
   if (queued) return runOperation(game, state, (ctx) => resolveChoice(ctx, queued, queued.default, true));
+  if (state.negotiation) return runOperation(game, state, (ctx) => runRoot(ctx, () => lapseNegotiation(ctx)));
   switch (state.phase) {
     case 'roundStart':
       return runOperation(game, state, (ctx) => {
         ctx.state.round += 1;
-        ctx.state.turn = { index: 0, roll: null, over: false };
+        ctx.state.turn = { index: 0, roll: null, over: false, traded: false };
         runRoot(ctx, () => {
           for (const e of Object.values(ctx.state.entities)) {
             if (e.kind === 'enemy' && e.status === 'defeated' && e.respawnRound !== null && e.respawnRound <= ctx.state.round) {
@@ -204,7 +213,7 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
         const actor = getEntity(ctx.state, actorId);
         // Eliminated contestants take no further part: no turn, no turn events, no countdowns.
         if (actor.status === 'eliminated') return passTurn(ctx.state);
-        ctx.state.turn = { index: ctx.state.turn.index, roll: null, over: false };
+        ctx.state.turn = { index: ctx.state.turn.index, roll: null, over: false, traded: false };
         const skip = skipReason(game, ctx.state, actor);
         if (skip !== null) {
           if (actor.koTurns > 0) actor.koTurns -= 1;
@@ -252,6 +261,7 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
           }
           ctx.emit({ type: 'roundEnded', round: ctx.state.round }, { kind: 'system' });
         });
+        runRoot(ctx, () => settleCommitments(ctx));
         runRoot(ctx, () => {
           for (const e of Object.values(ctx.state.entities)) if (e.kind !== 'contestant' && e.status === 'active' && e.statuses.length > 0) countDownStatuses(ctx, e.id, { kind: 'system' });
         });
@@ -286,6 +296,16 @@ export function answerDecision(game: CompiledGame, state: GameState, answer: Dec
   return runOperation(game, state, (ctx) => {
     const actorId = pending.actor;
     const cause = { kind: 'action' as const, entity: actorId };
+    if (pending.kind === 'trade') {
+      const n = ctx.state.negotiation;
+      if (!n || n.id !== pending.negotiation || option.kind !== 'tradeAnswer') throw new InvalidInput('that negotiation is over');
+      runRoot(ctx, () => {
+        // Negotiations are private to the two parties, including what they say.
+        ctx.emit({ type: 'decided', entity: actorId, decision: pending.id, option: option.id, label: option.label, say: answer.say }, cause, [n.from, n.to]);
+        answerTrade(ctx, actorId, option.answer, answer.trade, cause);
+      });
+      return;
+    }
     if (pending.kind === 'choice') {
       const choice = ctx.state.queue.find((c) => c.id === pending.choice);
       if (!choice || option.kind !== 'choose') throw new InvalidInput('that choice is no longer open');
@@ -293,15 +313,18 @@ export function answerDecision(game: CompiledGame, state: GameState, answer: Dec
       resolveChoice(ctx, choice, option.option, false);
       return;
     }
+    const partner = option.kind === 'trade' ? answer.trade?.with : undefined;
     runRoot(ctx, () => {
-      ctx.emit({ type: 'decided', entity: actorId, decision: pending.id, option: option.id, label: option.label, say: answer.say }, cause);
-      performOption(ctx, actorId, option, cause);
+      ctx.emit({ type: 'decided', entity: actorId, decision: pending.id, option: option.id, label: option.label, say: answer.say }, cause, partner !== undefined ? [actorId, partner] : undefined);
+      performOption(ctx, actorId, option, cause, answer);
     });
-    ctx.state.phase = pending.kind === 'move' ? 'main' : 'turnEnd';
+    // Trading and paying debts are free actions: the main decision comes back afterwards.
+    const free = option.kind === 'trade' || option.kind === 'pay';
+    ctx.state.phase = pending.kind === 'move' || free ? 'main' : 'turnEnd';
   });
 }
 
-function performOption(ctx: OpContext, actorId: string, option: DecisionOption, cause: { kind: 'action'; entity: string }): void {
+function performOption(ctx: OpContext, actorId: string, option: DecisionOption, cause: { kind: 'action'; entity: string }, answer: DecisionAnswer): void {
   const { core, rest } = ctx.game.def.settings;
   const actor = getEntity(ctx.state, actorId);
   switch (option.kind) {
@@ -327,6 +350,7 @@ function performOption(ctx: OpContext, actorId: string, option: DecisionOption, 
     }
     case 'attack':
       if (!attackTargets(ctx.game, ctx.state, actor).includes(option.target)) throw new InvalidInput('that target cannot be attacked now');
+      breakNoAttackPromises(ctx, actorId, option.target, cause);
       fight(ctx, actorId, option.target, cause);
       return;
     case 'use': {
@@ -357,8 +381,16 @@ function performOption(ctx: OpContext, actorId: string, option: DecisionOption, 
     case 'pass':
       ctx.emit({ type: 'passed', entity: actorId }, cause);
       return;
+    case 'trade':
+      proposeTrade(ctx, actorId, answer.trade, cause);
+      return;
+    case 'pay':
+      payCommitment(ctx, actorId, option.commitment, cause);
+      return;
     case 'choose':
       throw new InvalidInput('choices are answered through their own decision');
+    case 'tradeAnswer':
+      throw new InvalidInput('trade answers belong to a trade decision');
   }
 }
 

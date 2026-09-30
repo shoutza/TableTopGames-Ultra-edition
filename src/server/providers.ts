@@ -30,11 +30,14 @@ export function scriptedProvider(): MockProvider {
       return mockOk({ archetype, summary: `Scripted ${archetype} strategy.`, priorities: ['win'], avoid: [], plan: 'Follow the strategy.', reason: 'scripted' });
     }
     const decisionId = /DECISION (d\d+)/.exec(req.input)?.[1] ?? '';
-    const ids = [...req.input.matchAll(/^\[([^\]]+)\]/gm)].map((m) => m[1] as string);
+    // Trade proposals and counteroffers need terms; the script only answers plain options.
+    const ids = [...req.input.matchAll(/^\[([^\]]+)\]/gm)].map((m) => m[1] as string).filter((id) => id !== 'trade' && id !== 'tr:counter');
+    const reconsider = /^RECONSIDER: (.*)$/m.exec(req.input)?.[1];
+    const strategyUpdate = reconsider ? { archetype: 'opportunist', summary: 'Scripted revision: stay flexible and take the best value each turn.', priorities: ['best value each turn'], reason: reconsider.slice(0, 200) } : null;
     if (i % 17 === 5 && !req.input.includes('previous answer was rejected')) return mockOk({ decisionId, optionId: 'not-an-option', say: null, plan: null, strategyUpdate: null, reason: 'bad' });
     let h = 0;
     for (const ch of decisionId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     const optionId = ids[h % Math.max(1, ids.length)] ?? 'pass';
-    return mockOk({ decisionId, optionId, say: i % 5 === 0 ? 'Watch this.' : null, plan: 'Keep going.', strategyUpdate: null, reason: 'scripted choice' });
+    return mockOk({ decisionId, optionId, say: i % 5 === 0 ? 'Watch this.' : null, plan: 'Keep going.', strategyUpdate, trade: null, reason: 'scripted choice' });
   });
 }

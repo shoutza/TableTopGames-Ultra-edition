@@ -5,6 +5,7 @@ import type { OpContext } from './context.ts';
 import { evalCond, type Bindings, type EvalEnv } from './eval.ts';
 import { computeModifiers, type ModStep } from './modifiers.ts';
 import { activeContestantId, effectiveValue, hasCapability, orderedEntityIds, reachableSpaces } from './queries.ts';
+import { awaitingParty, canProposeTrade, negotiationOptions, payOptions } from './trade.ts';
 import { RuleFault, UnknownValue } from './util.ts';
 
 /**
@@ -159,6 +160,9 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
   const maxHp = effectiveValue(game, state, actor, core.maxHp);
   if (hp !== undefined && maxHp !== undefined && hp < maxHp && rest.heal > 0) options.push({ id: 'rest', kind: 'rest', label: `Rest (+${rest.heal} HP)` });
   options.push({ id: 'pass', kind: 'pass', label: 'Pass' });
+  // Free actions (listed last): they do not use up the main action.
+  if (canProposeTrade(game, state, actor.id)) options.push({ id: 'trade', kind: 'trade', label: 'Propose a trade' });
+  options.push(...payOptions(game, state, actor.id));
   return options;
 }
 
@@ -173,7 +177,7 @@ export function choiceOptions(game: CompiledGame, state: GameState, choice: Pend
   return legal.map((o) => ({ id: `ch:${o.id}`, kind: 'choose' as const, label: o.label, option: o.id }));
 }
 
-function newDecision(ctx: OpContext, actor: string, kind: Decision['kind'], options: DecisionOption[], extra: { choice?: string; prompt?: string } = {}): Decision {
+function newDecision(ctx: OpContext, actor: string, kind: Decision['kind'], options: DecisionOption[], extra: { choice?: string; prompt?: string; negotiation?: string } = {}): Decision {
   ctx.state.counters.decision += 1;
   return { id: `d${ctx.state.counters.decision}`, actor, kind, issuedRev: ctx.state.rev + 1, options, ...extra };
 }
@@ -192,6 +196,15 @@ export function issueNextDecision(ctx: OpContext): void {
     const options = choiceOptions(ctx.game, s, head);
     // An unanswerable choice (chooser gone, nothing legal) resolves to its default in the next automatic step.
     if (options) s.pendingDecision = newDecision(ctx, head.chooser, 'choice', options, { choice: head.id, prompt: head.prompt });
+    return;
+  }
+  const n = s.negotiation;
+  if (n) {
+    // An offer nobody can answer any more lapses in the next automatic step.
+    const options = negotiationOptions(ctx.game, s, n);
+    const other = n.stage === 'response' ? n.from : n.to;
+    const prompt = `${n.stage === 'response' ? 'Trade offer' : 'Counteroffer'} from ${s.entities[other]?.name ?? other}`;
+    if (options) s.pendingDecision = newDecision(ctx, awaitingParty(n), 'trade', options, { negotiation: n.id, prompt });
     return;
   }
   if (s.phase !== 'move' && s.phase !== 'main') return;

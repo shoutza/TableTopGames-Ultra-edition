@@ -19,6 +19,8 @@ export const GmCommandSchema = z.discriminatedUnion('type', [
   /** Takes an enemy or fixture off the board for good (it stays in history as a tombstone). */
   z.strictObject({ type: z.literal('removeEntity'), entity: Id, silent: Silent }),
   z.strictObject({ type: z.literal('drawCard'), entity: Id, deck: Id, silent: Silent }),
+  /** Deals an extra secret objective to a contestant. */
+  z.strictObject({ type: z.literal('assignObjective'), entity: Id, objective: Id, silent: Silent }),
   z.strictObject({ type: z.literal('announce'), text: z.string().min(1).max(280) }),
 ]);
 export type GmCommand = z.infer<typeof GmCommandSchema>;

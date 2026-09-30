@@ -9,6 +9,7 @@ import { loadGame } from '../src/engine/index.ts';
 import { stateHash } from '../src/server/hash.ts';
 import { MatchSession } from '../src/server/session.ts';
 import { MatchStore, migrateSnapshot } from '../src/server/store.ts';
+import { SAVE_FORMAT_VERSION } from '../src/schema/versions.ts';
 
 const starter = loadStarter();
 const deps = { provider: null, config: DEFAULT_CONTROLLER_CONFIG, price: null };
@@ -79,7 +80,7 @@ describe('save migrations', () => {
     mkdirSync(path.join(dir, 'matches/v1fixture'), { recursive: true });
     copyFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/save-v1/snapshot.json'), path.join(dir, 'matches/v1fixture/snapshot.json'));
     const loaded = new MatchStore(dir).load('v1fixture');
-    expect(loaded.snapshot.saveFormatVersion).toBe(2);
+    expect(loaded.snapshot.saveFormatVersion).toBe(SAVE_FORMAT_VERSION);
     const attack = loaded.snapshot.state.pendingDecision?.options.find((o) => o.kind === 'attack');
     expect(attack && attack.kind === 'attack' ? attack.target : null).toBe('e6');
     expect(Object.values(loaded.snapshot.state.ruleCounters).every((c) => typeof c.turnCount === 'number')).toBe(true);
@@ -89,6 +90,25 @@ describe('save migrations', () => {
     await session.runToEnd();
     expect(session.over).toBe(true);
     expect(session.state.winners?.length).toBeGreaterThan(0);
+  });
+
+  it('loads a format-2 save (M4, with statuses), migrates it and plays on to the end', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ttg-'));
+    mkdirSync(path.join(dir, 'matches/v2fixture'), { recursive: true });
+    copyFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/save-v2/snapshot.json'), path.join(dir, 'matches/v2fixture/snapshot.json'));
+    const loaded = new MatchStore(dir).load('v2fixture');
+    expect(loaded.snapshot.saveFormatVersion).toBe(SAVE_FORMAT_VERSION);
+    const state = loaded.snapshot.state;
+    expect(Object.values(state.entities).flatMap((e) => e.statuses.map((st) => st.defId)).sort()).toEqual(['status.fish_form', 'status.shielded']);
+    expect(state.objectives).toEqual([]);
+    expect(state.negotiation).toBeNull();
+    expect(state.commitments).toEqual([]);
+    expect(loaded.snapshot.minds.every((m) => m.memories.length === 0 && Object.keys(m.relationships).length === 0)).toBe(true);
+    const compiled = loadGame(loaded.definition);
+    if (!compiled.ok) throw new Error(compiled.errors.join('; '));
+    const session = MatchSession.restore(compiled.game, state, loaded.events, loaded.firings, loaded.snapshot.minds, deps);
+    await session.runToEnd();
+    expect(session.over).toBe(true);
   });
 
   it('migrates buy options by adding the price from the saved definition', () => {

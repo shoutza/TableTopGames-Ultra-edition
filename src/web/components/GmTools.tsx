@@ -26,6 +26,7 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
   const [transformation, setTransformation] = useState(transformations[0]?.id ?? '');
   const [enemy, setEnemy] = useState(def.enemies.find((x) => x.boss)?.id ?? def.enemies[0]?.id ?? '');
   const [deck, setDeck] = useState(def.decks[0]?.id ?? '');
+  const [objective, setObjective] = useState(def.objectives[0]?.id ?? '');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -187,6 +188,20 @@ export function GmTools({ data, entityId, teleportTarget }: { data: MatchData; e
           </select>
           <button onClick={() => run({ type: 'drawCard', entity: entityId, deck, silent }, `draw from ${deck}`)}>Draw</button>
           <p className="hint">Next card: {def.decks.flatMap((d) => d.cards).find((c) => c.id === data.state.decks[deck]?.draw[0])?.name ?? '— (reshuffles)'} (only the GM can see this)</p>
+        </div>
+      )}
+      {entity.kind === 'contestant' && entity.status !== 'eliminated' && def.objectives.length > 0 && (
+        <div className="tool">
+          <h4>Secret objective</h4>
+          <select value={objective} onChange={(e) => setObjective(e.target.value)}>
+            {def.objectives.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.icon ?? '🎯'} {o.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => run({ type: 'assignObjective', entity: entityId, objective, silent }, `give ${entity.name} a secret objective`)}>Assign</button>
+          <p className="hint">{data.rulebook.objectives[objective]} — only {entity.name} learns which one.</p>
         </div>
       )}
       {entity.kind !== 'contestant' && entity.status !== 'removed' && (
