@@ -9,12 +9,13 @@
   },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server/main.ts",
-    "start": "node --env-file-if-exists=.env src/server/main.ts",
+    "start": "node scripts/launch.mjs",
     "sim": "node --env-file-if-exists=.env src/cli/sim.ts",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.server.json && tsc -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run test"
+    "test:launcher": "node --test scripts/launcher.test.mjs",
+    "check": "npm run typecheck && npm run test && npm run test:launcher"
   },
   "dependencies": {
     "openai": "^7.25.0",
