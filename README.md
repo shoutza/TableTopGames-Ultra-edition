@@ -7,6 +7,17 @@ engine code owns all game state, dice and combat; AI models only propose decisio
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Milestone checklist: [docs/MILESTONES.md](docs/MILESTONES.md)
 
+## Launch the studio
+
+**Windows:** double-click **Start-TableTopGames.bat**. **Mac:** double-click **Start-TableTopGames.command**.
+
+Install [Node.js LTS](https://nodejs.org/en/download) once if needed (22.18 or newer). The launcher
+sets up dependencies and optional settings, then opens your browser automatically. No API key is
+needed for offline play. Keep its window open; press **Ctrl+C** there to save and stop.
+
+See [START-HERE.md](START-HERE.md) for setup, optional AI contestants and keeping saves when updating.
+Terminal users can run `npm start`; use `npm start -- --no-browser` to leave the browser closed.
+
 ## Development
 
 Requires Node.js 22.18 or newer (the server runs TypeScript sources directly).

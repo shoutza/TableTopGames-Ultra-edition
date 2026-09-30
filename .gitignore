@@ -148,3 +148,5 @@ vite.config.ts.timestamp-*
 # Generated web bundle and simulation reports
 /dist-web/
 /reports/
+# Temporary first-run launcher lock (contains only a process ID)
+/.ttg-launch.lock
