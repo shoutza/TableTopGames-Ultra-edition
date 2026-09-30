@@ -4,6 +4,7 @@ import { damageFor } from './combat.ts';
 import type { OpContext } from './context.ts';
 import { evalCond, evalEntityRef, evalNum, evalSelector, evalSpaceRef, type Bindings } from './eval.ts';
 import { namesFor } from './explain.ts';
+import { canUnequip, equipPlan, initialCharges, receivePlan } from './inventory.ts';
 import { computeModifiers, recordFiring, type ModifierSubject } from './modifiers.ts';
 import { activeContestantId, effectiveValue, getEntity, hasCapability, requireValue, resourceBounds, shortestPath, statusOf } from './queries.ts';
 import { RuleFault, clamp, cloneJson } from './util.ts';
@@ -90,7 +91,7 @@ export function clampDependents(ctx: OpContext, entityId: string, changed: strin
 }
 
 /** Re-clamps every bounded resource of an entity (after its modifiers changed, e.g. a status expired). */
-function clampAllDependents(ctx: OpContext, entityId: string, cause: EventCause): void {
+export function clampAllDependents(ctx: OpContext, entityId: string, cause: EventCause): void {
   for (const def of ctx.game.resources.values()) if (def.maxFrom !== undefined) clampDependents(ctx, entityId, def.maxFrom, cause);
 }
 
@@ -148,19 +149,47 @@ export function grantItem(ctx: OpContext, entityId: string, itemDefId: string, c
   const entity = getEntity(ctx.state, entityId);
   if (!ctx.game.items.has(itemDefId)) throw new RuleFault(`unknown item "${itemDefId}"`);
   if (entity.kind !== 'contestant') throw new RuleFault(`${entity.name} cannot hold items`);
-  if (entity.items.length >= ctx.game.def.settings.inventoryCapacity) {
+  const plan = receivePlan(ctx.game, ctx.state, entity, itemDefId);
+  if (plan === null) {
     ctx.emit({ type: 'announced', text: `${entity.name}'s inventory is full; ${ctx.game.items.get(itemDefId)?.name ?? itemDefId} was not received.` }, cause);
     return false;
   }
   ctx.state.counters.item += 1;
   const id = `i${ctx.state.counters.item}`;
-  ctx.state.items[id] = { id, defId: itemDefId, holder: entityId };
+  ctx.state.items[id] = { id, defId: itemDefId, holder: entityId, equipped: false, charges: initialCharges(ctx.game, itemDefId) };
   entity.items.push(id);
   ctx.emit({ type: 'itemGained', entity: entityId, item: id, itemDef: itemDefId }, cause);
+  // Received into a free equipment slot: worn at once.
+  if (plan === 'equip') setEquipped(ctx, entityId, id, true, cause);
   return true;
 }
 
-export function removeItem(ctx: OpContext, entityId: string, itemId: string, cause: EventCause, reason: 'removed' | 'used' | 'given' | 'lost' | 'consumed' = 'removed'): void {
+/**
+ * Puts an item on (into its slot; a full slot's first item goes back into the bag) or takes it off
+ * (into the bag). Refused when the slot or the bag has no room.
+ */
+export function setEquipped(ctx: OpContext, entityId: string, itemId: string, equipped: boolean, cause: EventCause): void {
+  const entity = getEntity(ctx.state, entityId);
+  const item = ctx.state.items[itemId];
+  if (!item || item.holder !== entityId) throw new RuleFault(`${entity.name} does not hold item ${itemId}`);
+  if (item.equipped === equipped) return;
+  if (equipped) {
+    const plan = equipPlan(ctx.game, ctx.state, entity, itemId);
+    if (!plan) throw new RuleFault(`${ctx.game.items.get(item.defId)?.name ?? item.defId} cannot be equipped now`);
+    if (plan.replaces !== null) {
+      const old = ctx.state.items[plan.replaces];
+      if (old) {
+        old.equipped = false;
+        ctx.emit({ type: 'itemEquipped', entity: entityId, item: old.id, itemDef: old.defId, equipped: false }, cause);
+      }
+    }
+  } else if (!canUnequip(ctx.game, ctx.state, entity, itemId)) throw new RuleFault(`no room in ${entity.name}'s bag`);
+  item.equipped = equipped;
+  ctx.emit({ type: 'itemEquipped', entity: entityId, item: itemId, itemDef: item.defId, equipped }, cause);
+  clampAllDependents(ctx, entityId, cause);
+}
+
+export function removeItem(ctx: OpContext, entityId: string, itemId: string, cause: EventCause, reason: 'removed' | 'used' | 'given' | 'lost' | 'consumed' | 'discarded' = 'removed'): void {
   const entity = getEntity(ctx.state, entityId);
   const i = entity.items.indexOf(itemId);
   const item = ctx.state.items[itemId];
@@ -186,17 +215,20 @@ export function transferItem(ctx: OpContext, fromId: string, toId: string, spec:
   if (fromId === toId) return;
   const itemId = pickItem(ctx, fromId, spec);
   if (itemId === undefined) return;
-  if (to.items.length >= ctx.game.def.settings.inventoryCapacity) {
-    ctx.emit({ type: 'announced', text: `${to.name}'s inventory is full; nothing changed hands.` }, cause);
-    return;
-  }
   const item = ctx.state.items[itemId];
   if (!item) return;
   const defId = item.defId;
+  const plan = receivePlan(ctx.game, ctx.state, to, defId);
+  if (plan === null) {
+    ctx.emit({ type: 'announced', text: `${to.name}'s inventory is full; nothing changed hands.` }, cause);
+    return;
+  }
+  const charges = item.charges;
   removeItem(ctx, fromId, itemId, cause, 'given');
-  ctx.state.items[itemId] = { id: itemId, defId, holder: toId };
+  ctx.state.items[itemId] = { id: itemId, defId, holder: toId, equipped: false, charges };
   to.items.push(itemId);
   ctx.emit({ type: 'itemGained', entity: toId, item: itemId, itemDef: defId }, cause);
+  if (plan === 'equip') setEquipped(ctx, toId, itemId, true, cause);
 }
 
 // ---------------------------------------------------------------------------------------------

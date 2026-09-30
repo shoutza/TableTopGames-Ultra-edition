@@ -1,7 +1,8 @@
 import type { GmCommand } from '../schema/commands.ts';
 import type { EventCause, GameState } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
-import { addTag, applyStatus, changeResource, drawCard, grantItem, removeEntity, removeItem, removeStatus, removeTag, setResource, spawnEnemy, teleport } from './effects.ts';
+import { addTag, applyStatus, changeResource, drawCard, grantItem, removeEntity, removeItem, removeStatus, removeTag, setEquipped, setResource, spawnEnemy, teleport } from './effects.ts';
+import { canUnequip, equipPlan } from './inventory.ts';
 import { namesFor } from './explain.ts';
 import { assignObjective } from './objectives.ts';
 import { getEntity } from './queries.ts';
@@ -60,6 +61,18 @@ export function applyGmCommand(game: CompiledGame, state: GameState, cmd: GmComm
             summary(`take ${names.item(ctx.state.items[cmd.item]?.defId ?? cmd.item)} from ${names.entity(cmd.entity)}`);
             removeItem(ctx, cmd.entity, cmd.item, cause);
             return;
+          case 'equipItem': {
+            const entity = getEntity(ctx.state, cmd.entity);
+            const item = ctx.state.items[cmd.item];
+            if (!item || item.holder !== cmd.entity) throw new InvalidInput(`${entity.name} does not hold that item`);
+            const def = game.items.get(item.defId);
+            if (cmd.equipped && def?.slot === undefined) throw new InvalidInput(`${def?.name ?? 'that item'} is not worn (it has no equipment slot)`);
+            if (cmd.equipped && !equipPlan(game, ctx.state, entity, cmd.item)) throw new InvalidInput(`there is no room to swap ${def?.name ?? 'it'} in (the bag is full)`);
+            if (!cmd.equipped && item.equipped && !canUnequip(game, ctx.state, entity, cmd.item)) throw new InvalidInput(`no room in ${entity.name}'s bag to take it off`);
+            summary(`${cmd.equipped ? 'equip' : 'take off'} ${names.item(item.defId)} (${names.entity(cmd.entity)})`);
+            setEquipped(ctx, cmd.entity, cmd.item, cmd.equipped, cause);
+            return;
+          }
           case 'applyStatus': {
             const entity = getEntity(ctx.state, cmd.entity);
             const def = game.statuses.get(cmd.status);

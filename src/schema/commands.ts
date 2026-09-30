@@ -12,6 +12,8 @@ export const GmCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('teleport'), entity: Id, space: Id, asLanding: z.boolean(), silent: Silent }),
   z.strictObject({ type: z.literal('grantItem'), entity: Id, item: Id, silent: Silent }),
   z.strictObject({ type: z.literal('removeItem'), entity: Id, item: Id, silent: Silent }),
+  /** Put an item on (in its equipment slot) or take it off. */
+  z.strictObject({ type: z.literal('equipItem'), entity: Id, item: Id, equipped: z.boolean(), silent: Silent }),
   /** Also used for transformation templates ("turn into a fish"). */
   z.strictObject({ type: z.literal('applyStatus'), entity: Id, status: Id, stacks: z.number().int().min(1).max(10).default(1), silent: Silent }),
   z.strictObject({ type: z.literal('removeStatus'), entity: Id, status: Id, silent: Silent }),

@@ -176,7 +176,7 @@ describe('hidden-information pairs for M4 mechanics', () => {
     const s = cloneJson(state);
     s.counters.item += 1;
     const id = `i${s.counters.item}`;
-    s.items[id] = { id, defId, holder };
+    s.items[id] = { id, defId, holder, equipped: false, charges: null };
     (s.entities[holder] as { items: string[] }).items.push(id);
     return s;
   }
@@ -184,7 +184,7 @@ describe('hidden-information pairs for M4 mechanics', () => {
   it('which concealed item another contestant holds does not change the packet', () => {
     // Two concealed items with different bonuses; only their holder may know which is which.
     const def = cloneJson(starter.def);
-    def.items.push({ id: 'item.cursed_coin', name: 'Cursed Coin', concealed: true, tradeable: true, tags: [], modifiers: [{ resource: 'res.power', add: -30 }], rules: [] });
+    def.items.push({ id: 'item.cursed_coin', name: 'Cursed Coin', concealed: true, tradeable: true, tags: [], modifiers: [{ resource: 'res.power', add: -30 }], stackSize: 1, rules: [] });
     const g = compileGame(GameDefinitionSchema.parse(def));
     const a = packetFor(g, withItem(base.state, other, 'item.lucky_coin'), base.events, viewer);
     const b = packetFor(g, withItem(base.state, other, 'item.cursed_coin'), base.events, viewer);

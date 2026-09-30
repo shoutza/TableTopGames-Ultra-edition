@@ -73,7 +73,7 @@ export type Cond =
   | { op: 'hasTag'; entity: EntityRef; tag: string }
   | { op: 'spaceHasTag'; space: SpaceRef; tag: string }
   | { op: 'isKind'; entity: EntityRef; kind: EntityKind }
-  | { op: 'holds'; entity: EntityRef; item: string }
+  | { op: 'holds'; entity: EntityRef; item: string; equipped?: boolean | undefined }
   | { op: 'compare'; left: Num; cmp: Comparator; right: Num }
   | { op: 'exists'; of: Selector }
   | { op: 'hasStatus'; entity: EntityRef; status: string; minStacks?: number | undefined }
@@ -334,7 +334,7 @@ export const CondSchema: z.ZodType<Cond> = z.lazy(() =>
     z.strictObject({ op: z.literal('hasTag'), entity: EntityRefSchema, tag: Id }),
     z.strictObject({ op: z.literal('spaceHasTag'), space: SpaceRefSchema, tag: Id }),
     z.strictObject({ op: z.literal('isKind'), entity: EntityRefSchema, kind: EntityKindSchema }),
-    z.strictObject({ op: z.literal('holds'), entity: EntityRefSchema, item: Id }),
+    z.strictObject({ op: z.literal('holds'), entity: EntityRefSchema, item: Id, equipped: z.boolean().optional() }),
     z.strictObject({ op: z.literal('compare'), left: NumSchema, cmp: z.enum(COMPARATORS), right: NumSchema }),
     z.strictObject({ op: z.literal('exists'), of: SelectorSchema }),
     z.strictObject({ op: z.literal('hasStatus'), entity: EntityRefSchema, status: Id, minStacks: z.number().int().min(1).max(99).optional() }),

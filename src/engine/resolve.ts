@@ -147,7 +147,7 @@ export function runReactions(ctx: OpContext, events: GameEvent[], depth: number)
       const def = rule.def as ReactionRule;
       if (rule.owner) {
         // Attached rules fire once per current holder, in stable holder order.
-        for (const holder of holdersOf(ctx.state, rule.owner)) {
+        for (const holder of holdersOf(ctx.game, ctx.state, rule.owner)) {
           const b: Bindings = { ...bindingsFor(ctx, ev), $holder: holder };
           if (matchesWhere(ctx, def.trigger.where, ev, b)) fireRule(ctx, rule, ev, b, depth, holder);
         }

@@ -119,6 +119,17 @@ export interface Hint {
   /** Part of a card-draw estimate: used for scoring, summarized rather than listed in packets. */
   fromCard?: boolean | undefined;
   deck?: string | undefined;
+  /** The change happens to this other entity (targeted items and actions), not to the viewer. */
+  other?: string | undefined;
+  otherName?: string | undefined;
+}
+
+/** What effects would do to someone else (the target of an item or action), from the viewer's knowledge. */
+export function targetHints(scope: HintScope, effects: Effect[], b: Bindings, target: string, source: string): Hint[] {
+  const out: Hint[] = [];
+  effectHints({ ...scope, viewer: target }, effects, b, true, 1, source, out);
+  const name = scope.names.entity(target);
+  return out.filter((h) => !h.fight).map((h) => ({ ...h, other: target, otherName: name, text: `${name}: ${h.text}` }));
 }
 
 export interface HintScope {
@@ -408,7 +419,7 @@ export function landingHints(scope: HintScope, space: string): { hints: Hint[]; 
     if (w?.space !== undefined && w.space !== space) continue;
     if (w?.spaceTag !== undefined && !spaceDef?.tags.includes(w.spaceTag)) continue;
     if (w?.actorKind !== undefined && w.actorKind !== 'contestant') continue;
-    const holders: Array<string | undefined> = rule.owner ? holdersOf(scope.state, rule.owner) : [undefined];
+    const holders: Array<string | undefined> = rule.owner ? holdersOf(scope.game, scope.state, rule.owner) : [undefined];
     for (const holder of holders) {
       const b: Bindings = { $actor: scope.viewer, $space: space, ...(holder !== undefined ? { $holder: holder } : {}) };
       const cond = def.conditions ? tryEval(() => evalCond(env, def.conditions as NonNullable<typeof def.conditions>, b)) : true;

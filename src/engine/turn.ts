@@ -2,7 +2,8 @@ import type { DecisionOption, Entity, EventCause, GameState, PendingChoice } fro
 import { SAVE_FORMAT_VERSION } from '../schema/versions.ts';
 import type { CompiledGame } from './compile.ts';
 import type { OpContext } from './context.ts';
-import { actionAvailable, actionTargets, attackTargets, buyPrice, canAttemptFreeform } from './decisions.ts';
+import { actionAvailable, actionTargets, attackTargets, buyPrice, canAttemptFreeform, itemTargets, itemUsable } from './decisions.ts';
+import { equipPlan, MAX_FREE_ITEM_ACTIONS } from './inventory.ts';
 import {
   applyEffects,
   changeResource,
@@ -13,6 +14,7 @@ import {
   modify,
   queueGmRuling,
   removeItem,
+  setEquipped,
   setUpDecks,
   walk,
 } from './effects.ts';
@@ -69,7 +71,7 @@ export function createMatch(game: CompiledGame, setup: MatchSetup): OpOutcome {
     counters: { entity: 0, item: 0, event: 0, decision: 0, fight: 0, status: 0, choice: 0, objective: 0, trade: 0, commitment: 0 },
     round: 0,
     phase: 'roundStart',
-    turn: { index: 0, roll: null, over: false, traded: false },
+    turn: { index: 0, roll: null, over: false, traded: false, itemActions: 0 },
     turnOrder: [],
     entities: {},
     items: {},
@@ -182,7 +184,7 @@ function skipReason(game: CompiledGame, state: GameState, actor: Entity): string
 /** Hands the turn to the next contestant in the order, or ends the round after the last one. */
 function passTurn(state: GameState): void {
   if (state.turn.index + 1 < state.turnOrder.length) {
-    state.turn = { index: state.turn.index + 1, roll: null, over: false, traded: false };
+    state.turn = { index: state.turn.index + 1, roll: null, over: false, traded: false, itemActions: 0 };
     state.phase = 'turnStart';
   } else {
     state.turn.roll = null;
@@ -199,7 +201,7 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
     case 'roundStart':
       return runOperation(game, state, (ctx) => {
         ctx.state.round += 1;
-        ctx.state.turn = { index: 0, roll: null, over: false, traded: false };
+        ctx.state.turn = { index: 0, roll: null, over: false, traded: false, itemActions: 0 };
         runRoot(ctx, () => {
           for (const e of Object.values(ctx.state.entities)) {
             if (e.kind === 'enemy' && e.status === 'defeated' && e.respawnRound !== null && e.respawnRound <= ctx.state.round) {
@@ -221,7 +223,7 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
         const actor = getEntity(ctx.state, actorId);
         // Eliminated contestants take no further part: no turn, no turn events, no countdowns.
         if (actor.status === 'eliminated') return passTurn(ctx.state);
-        ctx.state.turn = { index: ctx.state.turn.index, roll: null, over: false, traded: false };
+        ctx.state.turn = { index: ctx.state.turn.index, roll: null, over: false, traded: false, itemActions: 0 };
         const skip = skipReason(game, ctx.state, actor);
         if (skip !== null) {
           if (actor.koTurns > 0) actor.koTurns -= 1;
@@ -326,8 +328,8 @@ export function answerDecision(game: CompiledGame, state: GameState, answer: Dec
       ctx.emit({ type: 'decided', entity: actorId, decision: pending.id, option: option.id, label: option.label, say: answer.say }, cause, partner !== undefined ? [actorId, partner] : undefined);
       performOption(ctx, actorId, option, cause, answer);
     });
-    // Trading and paying debts are free actions: the main decision comes back afterwards.
-    const free = option.kind === 'trade' || option.kind === 'pay';
+    // Trading, paying debts and free item actions do not use up the main action: it comes back afterwards.
+    const free = option.kind === 'trade' || option.kind === 'pay' || option.kind === 'equip' || option.kind === 'drop' || (option.kind === 'use' && option.free);
     ctx.state.phase = pending.kind === 'move' || free ? 'main' : 'turnEnd';
   });
 }
@@ -365,10 +367,33 @@ function performOption(ctx: OpContext, actorId: string, option: DecisionOption, 
       const item = ctx.state.items[option.item];
       const def = item ? ctx.game.items.get(item.defId) : undefined;
       if (!item || item.holder !== actorId || !def?.use) throw new InvalidInput('that item cannot be used');
-      if (!hasCapability(ctx.game, ctx.state, actor, 'usesItems')) throw new InvalidInput('cannot use items right now');
+      if (!itemUsable(ctx.game, ctx.state, actor, option.item)) throw new InvalidInput('that item cannot be used now');
+      const use = def.use;
+      if (use.target && (option.target === null || !itemTargets(ctx.game, ctx.state, actor, use.target).includes(option.target))) throw new InvalidInput('choose a valid target for that item');
+      if (use.free) ctx.state.turn.itemActions += 1;
       ctx.emit({ type: 'itemUsed', entity: actorId, item: option.item, itemDef: def.id }, cause);
-      if (def.use.consumed) removeItem(ctx, actorId, option.item, cause, 'used');
-      runGuarded(ctx, def.use.effects, { $actor: actorId, $holder: actorId, ...(actor.spaceId !== null ? { $space: actor.spaceId } : {}) }, cause, `item ${def.name}`);
+      if (use.cooldownRounds !== undefined) ctx.state.cooldowns[`item:${option.item}`] = ctx.state.round + use.cooldownRounds;
+      if (use.consumed) {
+        // Items with charges lose one per use; the last use (or a single-use item) is used up.
+        if (item.charges !== null && item.charges > 1) item.charges -= 1;
+        else removeItem(ctx, actorId, option.item, cause, 'used');
+      }
+      const target = use.target && option.target !== null ? { $target: option.target } : {};
+      runGuarded(ctx, use.effects, { $actor: actorId, $holder: actorId, ...target, ...(actor.spaceId !== null ? { $space: actor.spaceId } : {}) }, cause, `item ${def.name}`);
+      return;
+    }
+    case 'equip': {
+      if (ctx.state.turn.itemActions >= MAX_FREE_ITEM_ACTIONS) throw new InvalidInput('no more item actions this turn');
+      if (!equipPlan(ctx.game, ctx.state, actor, option.item)) throw new InvalidInput('that item cannot be equipped now');
+      ctx.state.turn.itemActions += 1;
+      setEquipped(ctx, actorId, option.item, true, cause);
+      return;
+    }
+    case 'drop': {
+      if (ctx.state.turn.itemActions >= MAX_FREE_ITEM_ACTIONS) throw new InvalidInput('no more item actions this turn');
+      if (ctx.state.items[option.item]?.holder !== actorId) throw new InvalidInput('you do not hold that item');
+      ctx.state.turn.itemActions += 1;
+      removeItem(ctx, actorId, option.item, cause, 'discarded');
       return;
     }
     case 'act': {

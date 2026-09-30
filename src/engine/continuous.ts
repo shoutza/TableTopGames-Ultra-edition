@@ -46,7 +46,7 @@ export function continuousEffects(game: CompiledGame, state: GameState, entity: 
     const result: ContinuousResult = { modifiers: new Map(), suppress: new Map() };
     for (const rule of game.continuous) {
       const def = rule.def as ContinuousRule;
-      const holders: Array<string | undefined> = rule.owner ? holdersOf(state, rule.owner) : [undefined];
+      const holders: Array<string | undefined> = rule.owner ? holdersOf(game, state, rule.owner) : [undefined];
       for (const holder of holders) {
         const env = new PureEnv(game, state);
         const b: Bindings = holder !== undefined ? { $holder: holder } : {};

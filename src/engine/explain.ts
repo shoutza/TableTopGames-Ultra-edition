@@ -205,7 +205,8 @@ export function describeCond(c: Cond, n: Names, b?: BoundNames): string {
     }
     case 'holds': {
       const who = ref(c.entity, n, b);
-      return `${who} ${verb(who, 'holds', 'hold')} ${n.item(c.item)}`;
+      if (c.equipped === true) return `${who} ${verb(who, 'wears', 'wear')} ${n.item(c.item)}`;
+      return `${who} ${verb(who, 'holds', 'hold')} ${n.item(c.item)}${c.equipped === false ? ' (not worn)' : ''}`;
     }
     case 'compare':
       return `${describeNum(c.left, n, b)} ${c.cmp === '==' ? '=' : c.cmp === '!=' ? '≠' : c.cmp === '<=' ? '≤' : c.cmp === '>=' ? '≥' : c.cmp} ${describeNum(c.right, n, b)}`;
@@ -238,7 +239,8 @@ function negate(c: Cond, n: Names, b?: BoundNames): string {
     }
     case 'holds': {
       const who = ref(c.entity, n, b);
-      return `${who} ${verb(who, 'does', 'do')} not hold ${n.item(c.item)}`;
+      if (c.equipped === true) return `${who} ${verb(who, 'does', 'do')} not wear ${n.item(c.item)}`;
+      return `${who} ${verb(who, 'does', 'do')} not hold ${n.item(c.item)}${c.equipped === false ? ' in the bag' : ''}`;
     }
     case 'hasStatus': {
       const who = ref(c.entity, n, b);
@@ -681,9 +683,11 @@ export function describeEvent(e: GameEvent, n: Names): string {
     case 'itemGained':
       return `${n.entity(e.entity)} gained ${n.item(e.itemDef)}`;
     case 'itemLost':
-      return `${n.entity(e.entity)} ${e.reason === 'used' ? 'used up' : e.reason === 'consumed' ? 'spent' : e.reason === 'given' ? 'handed over' : 'lost'} ${n.item(e.itemDef)}`;
+      return `${n.entity(e.entity)} ${e.reason === 'used' ? 'used up' : e.reason === 'consumed' ? 'spent' : e.reason === 'given' ? 'handed over' : e.reason === 'discarded' ? 'threw away' : 'lost'} ${n.item(e.itemDef)}`;
     case 'itemUsed':
       return `${n.entity(e.entity)} used ${n.item(e.itemDef)}`;
+    case 'itemEquipped':
+      return `${n.entity(e.entity)} ${e.equipped ? 'equipped' : 'took off'} ${n.item(e.itemDef)}`;
     case 'purchased':
       return `${n.entity(e.entity)} bought ${n.entry(e.entry)} for ${e.price} ${n.resource(e.priceResource)}`;
     case 'rested':

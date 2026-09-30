@@ -443,11 +443,28 @@ export function compileGame(def: GameDefinition): CompiledGame {
   }
 
   // --- items, statuses, shops, enemies, fixtures, decks, actions ----------------------------
+  at = undefined;
+  const slotIds = new Set<string>();
+  for (const slot of s.equipment) {
+    if (slotIds.has(slot.id)) err('duplicate-id', `Duplicate equipment slot id "${slot.id}"`, slot.id);
+    slotIds.add(slot.id);
+  }
   for (const item of def.items) {
     at = item.id;
     for (const t of item.tags) needTag(t, `item ${item.id}`);
     for (const m of item.modifiers) needStat(m.resource, `item ${item.id}`);
-    if (item.use) checkEffects(item.use.effects, { entities: new Set(['$actor', '$holder']), space: true, amount: false, it: false }, `item ${item.id} use`);
+    if (item.slot !== undefined && !slotIds.has(item.slot)) err('unknown-slot', `item "${item.name}": unknown equipment slot "${item.slot}" (add it under settings → equipment)`, item.slot);
+    const use = item.use;
+    if (use) {
+      const where = `item "${item.name}" use`;
+      const scope: Scope = { entities: new Set(use.target ? ['$actor', '$holder', '$target'] : ['$actor', '$holder']), space: true, amount: false, it: false };
+      checkEffects(use.effects, scope, where);
+      if (use.requires) {
+        checkCond(use.requires, { entities: new Set(['$actor', '$holder']), space: true, amount: false, it: false }, `${where} requirement`);
+        checkViewSafe(use.requires, `${where} requirement`);
+      }
+      if (use.charges !== undefined && !use.consumed) diags.push({ severity: 'warning', code: 'charges-unused', message: `${where}: charges only count for items that are used up`, ref: item.id, at: item.id });
+    }
   }
   for (const st of def.statuses) {
     at = st.id;

@@ -1,4 +1,5 @@
 import { advance, answerDecision, applyGmCommand, cloneJson, createMatch, effectiveValue, GM, loadGame, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
+import { bagSpacesUsed, equippedIn } from '../engine/inventory.ts';
 import { applyDefinitionChange, planMigration } from '../engine/migrate.ts';
 import type { GameDefinition } from '../schema/definition.ts';
 import { resourceBounds } from '../engine/queries.ts';
@@ -44,7 +45,14 @@ export function checkInvariants(game: CompiledGame, state: GameState): string[] 
   for (const e of Object.values(state.entities)) {
     for (const id of e.items) if (state.items[id]?.holder !== e.id) out.push(`${e.id} lists item ${id} it does not hold`);
     if (new Set(e.items).size !== e.items.length) out.push(`${e.id} lists an item twice`);
-    if (e.kind === 'contestant' && e.items.length > game.def.settings.inventoryCapacity) out.push(`${e.id} carries too many items`);
+    if (e.kind === 'contestant' && bagSpacesUsed(game, state, e) > game.def.settings.inventoryCapacity) out.push(`${e.id} carries more than its bag holds`);
+    for (const slot of game.def.settings.equipment) if (equippedIn(game, state, e, slot.id).length > slot.count) out.push(`${e.id} wears too many ${slot.name}`);
+    for (const id of e.items) {
+      const item = state.items[id];
+      const def = item ? game.items.get(item.defId) : undefined;
+      if (item?.equipped && def?.slot === undefined) out.push(`${e.id} wears ${id}, which has no slot`);
+      if (item && item.charges !== null && item.charges < 1) out.push(`${id} has ${item.charges} charges`);
+    }
     for (const [r, v] of Object.entries(e.resources)) {
       if (!Number.isInteger(v)) out.push(`${e.id}.${r} is not an integer`);
       const def = game.resources.get(r);

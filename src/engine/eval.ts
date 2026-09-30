@@ -197,7 +197,12 @@ export function evalCond(env: EvalEnv, cond: Cond, b: Bindings, trace?: Array<{ 
       return record(getEntity(env.state, evalEntityRef(env, cond.entity, b)).kind === cond.kind);
     case 'holds': {
       const entity = getEntity(env.state, evalEntityRef(env, cond.entity, b));
-      return record(entity.items.some((id) => env.state.items[id]?.defId === cond.item));
+      return record(
+        entity.items.some((id) => {
+          const item = env.state.items[id];
+          return item?.defId === cond.item && (cond.equipped === undefined || item.equipped === cond.equipped);
+        }),
+      );
     }
     case 'compare': {
       const l = evalNum(env, cond.left, b);

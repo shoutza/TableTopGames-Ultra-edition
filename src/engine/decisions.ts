@@ -3,6 +3,7 @@ import type { Decision, DecisionOption, Entity, GameState, PendingChoice } from 
 import type { CompiledGame } from './compile.ts';
 import type { OpContext } from './context.ts';
 import { evalCond, type Bindings, type EvalEnv } from './eval.ts';
+import { bagSpacesUsed, equipPlan, MAX_FREE_ITEM_ACTIONS, receivePlan } from './inventory.ts';
 import { computeModifiers, type ModStep } from './modifiers.ts';
 import { activeContestantId, effectiveValue, hasCapability, orderedEntityIds, reachableSpaces } from './queries.ts';
 import { GM } from './effects.ts';
@@ -81,6 +82,29 @@ export function actionAvailable(game: CompiledGame, state: GameState, actor: Ent
   return true;
 }
 
+/** Whether a held item can be used now (capability, cooldown, requirements, free-action allowance). */
+export function itemUsable(game: CompiledGame, state: GameState, actor: Entity, itemId: string): boolean {
+  const item = state.items[itemId];
+  const use = item ? game.items.get(item.defId)?.use : undefined;
+  if (!item || !use || item.holder !== actor.id || actor.status !== 'active') return false;
+  if (!hasCapability(game, state, actor, 'usesItems')) return false;
+  if ((state.cooldowns[`item:${itemId}`] ?? 0) > state.round) return false;
+  if (use.free && state.turn.itemActions >= MAX_FREE_ITEM_ACTIONS) return false;
+  if (use.requires && !holds(new CheckEnv(game, state), use.requires, { $actor: actor.id, $holder: actor.id, ...(actor.spaceId !== null ? { $space: actor.spaceId } : {}) })) return false;
+  return true;
+}
+
+/** Entities a targeted item may be used on. */
+export function itemTargets(game: CompiledGame, state: GameState, actor: Entity, target: { kind: string; range: 'here' | 'anywhere' }): string[] {
+  return orderedEntityIds(state)
+    .filter((id) => {
+      const e = state.entities[id];
+      if (!e || id === actor.id || e.kind !== target.kind || e.status !== 'active') return false;
+      return target.range === 'anywhere' || (e.spaceId !== null && e.spaceId === actor.spaceId);
+    })
+    .slice(0, 8);
+}
+
 /** Entities a targeted action may be aimed at. */
 export function actionTargets(game: CompiledGame, state: GameState, actor: Entity, action: ActionDef): string[] {
   const t = action.target;
@@ -109,6 +133,7 @@ export function attackTargets(game: CompiledGame, state: GameState, actor: Entit
 
 export function mainOptions(game: CompiledGame, state: GameState, actor: Entity): DecisionOption[] {
   const { core, rest, inventoryCapacity } = game.def.settings;
+  const freeUses: DecisionOption[] = [];
   const options: DecisionOption[] = [];
   const here = actor.spaceId;
   const resName = (id: string) => game.resources.get(id)?.name ?? id;
@@ -122,7 +147,7 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
         if (!quote) continue;
         const funds = effectiveValue(game, state, actor, quote.resource);
         if (funds === undefined || funds < quote.price) continue;
-        if ('item' in entry.grants && actor.items.length >= inventoryCapacity) continue;
+        if ('item' in entry.grants && receivePlan(game, state, actor, entry.grants.item) === null) continue;
         const what = 'item' in entry.grants ? (game.items.get(entry.grants.item)?.name ?? entry.grants.item) : `${entry.grants.amount} ${resName(entry.grants.resource)}`;
         options.push({
           id: `buy:${other.id}:${entry.id}`,
@@ -139,13 +164,20 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
     options.push({ id: `atk:${id}`, kind: 'attack', target: id, label: `Attack ${state.entities[id]?.name ?? id}` });
   }
   if (hasCapability(game, state, actor, 'usesItems')) {
+    // One option per usable item definition (per target), for the first copy that is ready.
     const seen = new Set<string>();
     for (const itemId of actor.items) {
-      const defId = state.items[itemId]?.defId;
-      const def = defId !== undefined ? game.items.get(defId) : undefined;
-      if (!def?.use || seen.has(def.id)) continue;
+      const item = state.items[itemId];
+      const def = item ? game.items.get(item.defId) : undefined;
+      if (!item || !def?.use || seen.has(def.id) || !itemUsable(game, state, actor, itemId)) continue;
       seen.add(def.id);
-      options.push({ id: `use:${itemId}`, kind: 'use', item: itemId, label: def.use.label ?? `Use ${def.name}` });
+      const use = def.use;
+      const base = use.label ?? `Use ${def.name}`;
+      const uses = item.charges !== null ? ` (${item.charges} uses left)` : '';
+      const list = use.free ? freeUses : options;
+      if (use.target) {
+        for (const t of itemTargets(game, state, actor, use.target)) list.push({ id: `use:${itemId}:${t}`, kind: 'use', item: itemId, target: t, free: use.free, label: `${base} on ${state.entities[t]?.name ?? t}${uses}` });
+      } else list.push({ id: `use:${itemId}`, kind: 'use', item: itemId, target: null, free: use.free, label: `${base}${uses}` });
     }
   }
   for (const action of game.def.actions) {
@@ -163,6 +195,32 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
   if (canAttemptFreeform(game, state, actor)) options.push({ id: 'freeform', kind: 'freeform', label: 'Attempt something unusual (the GM decides)' });
   options.push({ id: 'pass', kind: 'pass', label: 'Pass' });
   // Free actions (listed last): they do not use up the main action.
+  options.push(...freeUses);
+  if (actor.kind === 'contestant' && state.turn.itemActions < MAX_FREE_ITEM_ACTIONS) {
+    const equipSeen = new Set<string>();
+    for (const itemId of actor.items) {
+      const item = state.items[itemId];
+      const def = item ? game.items.get(item.defId) : undefined;
+      if (!item || !def || item.equipped || def.slot === undefined || equipSeen.has(def.id)) continue;
+      const plan = equipPlan(game, state, actor, itemId);
+      if (!plan) continue;
+      equipSeen.add(def.id);
+      const replaced = plan.replaces !== null ? game.items.get(state.items[plan.replaces]?.defId ?? '')?.name : undefined;
+      options.push({ id: `equip:${itemId}`, kind: 'equip', item: itemId, replaces: plan.replaces, label: `Equip ${def.name}${replaced ? ` (instead of ${replaced})` : ''}` });
+    }
+    // Discarding makes room: offered once the bag is full.
+    if (bagSpacesUsed(game, state, actor) >= inventoryCapacity) {
+      const dropSeen = new Set<string>();
+      for (const itemId of actor.items) {
+        const item = state.items[itemId];
+        const def = item ? game.items.get(item.defId) : undefined;
+        const key = `${item?.defId}:${item?.equipped}`;
+        if (!item || !def || dropSeen.has(key)) continue;
+        dropSeen.add(key);
+        options.push({ id: `drop:${itemId}`, kind: 'drop', item: itemId, label: `Discard ${def.name}${item.equipped ? ' (worn)' : ''}` });
+      }
+    }
+  }
   if (canProposeTrade(game, state, actor.id)) options.push({ id: 'trade', kind: 'trade', label: 'Propose a trade' });
   options.push(...payOptions(game, state, actor.id));
   return options;

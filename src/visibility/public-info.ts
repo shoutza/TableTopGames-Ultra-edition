@@ -1,6 +1,6 @@
 import type { CompiledGame } from '../engine/compile.ts';
 import { attachedRuleText, describeObjectiveGoal, describeStatus, makeNames, summarizeEffects, summarizeRule } from '../engine/explain.ts';
-import type { Effect } from '../schema/rules.ts';
+import type { Effect, Num } from '../schema/rules.ts';
 import type { Settings } from '../schema/definition.ts';
 import { describeItem } from './view.ts';
 
@@ -9,14 +9,98 @@ import { describeItem } from './view.ts';
  * Hidden rules and hidden statuses are excluded here, so nothing downstream can accidentally
  * reveal them. Deck contents are public (their order is not).
  */
+/** Average effects of one use of an item: on the user, and on its target (or others). */
+export interface UseEstimate {
+  self: Record<string, number>;
+  other: Record<string, number>;
+  selfStatuses: Array<{ status: string; stacks: number }>;
+  otherStatuses: Array<{ status: string; stacks: number }>;
+  /** How many times it can be used (1 for single-use items, up to 3 counted for reusable ones). */
+  uses: number;
+  targeted: boolean;
+}
+
+function average(n: Num): number | undefined {
+  if (typeof n === 'number') return n;
+  if (n.op === 'roll') return (n.count * (n.sides + 1)) / 2;
+  if (n.op === 'add') {
+    let s = 0;
+    for (const a of n.args) {
+      const v = average(a);
+      if (v === undefined) return undefined;
+      s += v;
+    }
+    return s;
+  }
+  return undefined;
+}
+
+function isSelf(target: unknown): boolean {
+  return target === '$actor' || target === '$holder';
+}
+
+function estimateInto(effects: Effect[], weight: number, est: UseEstimate, hpId: string): void {
+  const addTo = (bucket: Record<string, number>, r: string, v: number) => (bucket[r] = (bucket[r] ?? 0) + v * weight);
+  for (const e of effects) {
+    switch (e.op) {
+      case 'changeResource': {
+        const v = average(e.amount);
+        if (v !== undefined) addTo(isSelf(e.target) ? est.self : est.other, e.resource, v);
+        break;
+      }
+      case 'damage': {
+        const v = average(e.amount);
+        if (v !== undefined) addTo(isSelf(e.target) ? est.self : est.other, hpId, -v);
+        break;
+      }
+      case 'applyStatus':
+        (isSelf(e.target) ? est.selfStatuses : est.otherStatuses).push({ status: e.status, stacks: (e.stacks ?? 1) * weight });
+        break;
+      case 'if':
+        estimateInto(e.then, weight * 0.5, est, hpId);
+        if (e.else) estimateInto(e.else, weight * 0.5, est, hpId);
+        break;
+      case 'randomBranch': {
+        const total = e.branches.reduce((s, b) => s + b.weight, 0) || 1;
+        for (const b of e.branches) estimateInto(b.do, (weight * b.weight) / total, est, hpId);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
+export function estimateUse(game: CompiledGame, itemId: string): UseEstimate | null {
+  const use = game.items.get(itemId)?.use;
+  if (!use) return null;
+  const est: UseEstimate = { self: {}, other: {}, selfStatuses: [], otherStatuses: [], uses: use.consumed ? (use.charges ?? 1) : 3, targeted: use.target !== undefined };
+  estimateInto(use.effects, 1, est, game.def.settings.core.hp);
+  return est;
+}
+
 export interface PublicGameInfo {
   name: string;
   description: string;
-  settings: Pick<Settings, 'core' | 'startSpace' | 'movement' | 'inventoryCapacity' | 'rest' | 'combat' | 'ko' | 'victory' | 'objectives' | 'trading'>;
+  settings: Pick<Settings, 'core' | 'startSpace' | 'movement' | 'inventoryCapacity' | 'equipment' | 'rest' | 'combat' | 'ko' | 'victory' | 'objectives' | 'trading'>;
   resources: Array<{ id: string; name: string; role: 'pool' | 'stat'; visibility: 'public' | 'owner' | 'gm'; icon: string | undefined; tradeable: boolean }>;
   tags: Array<{ id: string; name: string }>;
   spaces: Array<{ id: string; name: string; tags: string[]; description: string | undefined }>;
-  items: Array<{ id: string; name: string; modifiers: Array<{ resource: string; add: number }>; concealed: boolean; usable: boolean; tradeable: boolean; text: string }>;
+  items: Array<{
+    id: string;
+    name: string;
+    modifiers: Array<{ resource: string; add: number }>;
+    concealed: boolean;
+    usable: boolean;
+    tradeable: boolean;
+    text: string;
+    slot: string | null;
+    stackSize: number;
+    value: number | null;
+    hint: string | null;
+    /** A rough, static estimate of what one use does (for valuing items before buying them). */
+    useEstimate: UseEstimate | null;
+  }>;
   statuses: Array<{
     id: string;
     name: string;
@@ -82,11 +166,11 @@ export function publicInfo(game: CompiledGame): PublicGameInfo {
   return {
     name: game.def.name,
     description: game.def.description,
-    settings: { core: s.core, startSpace: s.startSpace, movement: s.movement, inventoryCapacity: s.inventoryCapacity, rest: s.rest, combat: s.combat, ko: s.ko, victory: s.victory, objectives: s.objectives, trading: s.trading },
+    settings: { core: s.core, startSpace: s.startSpace, movement: s.movement, inventoryCapacity: s.inventoryCapacity, equipment: s.equipment, rest: s.rest, combat: s.combat, ko: s.ko, victory: s.victory, objectives: s.objectives, trading: s.trading },
     resources: game.def.resources.filter((r) => r.visibility !== 'gm').map((r) => ({ id: r.id, name: r.name, role: r.role, visibility: r.visibility, icon: r.icon, tradeable: r.tradeable })),
     tags: game.def.tags.map((t) => ({ id: t.id, name: t.name })),
     spaces: game.def.spaces.map((sp) => ({ id: sp.id, name: sp.name, tags: sp.tags, description: sp.description })),
-    items: game.def.items.map((i) => ({ id: i.id, name: i.name, modifiers: i.modifiers, concealed: i.concealed, usable: i.use !== undefined, tradeable: i.tradeable && !i.concealed, text: describeItem(i, names) })),
+    items: game.def.items.map((i) => ({ id: i.id, name: i.name, modifiers: i.modifiers, concealed: i.concealed, usable: i.use !== undefined, tradeable: i.tradeable && !i.concealed, text: describeItem(i, names), slot: i.slot ?? null, stackSize: i.stackSize, value: i.value ?? null, hint: i.aiHint ?? null, useEstimate: estimateUse(game, i.id) })),
     statuses: game.def.statuses
       .filter((st) => st.visibility === 'public')
       .map((st) => {

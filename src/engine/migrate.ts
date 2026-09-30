@@ -2,7 +2,8 @@ import type { MigrationIssue, MigrationPlan } from '../schema/proposal.ts';
 import type { GameState } from '../schema/state.ts';
 import type { CompiledGame } from './compile.ts';
 import type { OpContext } from './context.ts';
-import { clampDependents, removeEntity, removeItem, removeTag, spawnEnemy, teleport } from './effects.ts';
+import { clampAllDependents, clampDependents, removeEntity, removeItem, removeTag, spawnEnemy, teleport } from './effects.ts';
+import { bagSpaces } from './inventory.ts';
 import { runOperation, runRoot, type OpOutcome } from './resolve.ts';
 import { cloneJson, InvalidInput } from './util.ts';
 
@@ -96,9 +97,17 @@ export function planMigration(oldGame: CompiledGame, newGame: CompiledGame, stat
     if (held.length > 0) add({ id: `item.removed:${i.id}`, severity: 'confirm', title: `${i.name} is deleted`, detail: `${plural(held.length, 'copy', 'copies')} ${held.length === 1 ? 'is' : 'are'} held right now.`, options: [{ id: 'remove', label: 'Take them away from their holders' }] });
   }
   const cap = newGame.def.settings.inventoryCapacity;
-  if (cap < oldGame.def.settings.inventoryCapacity) {
-    const over = entities.filter((e) => e.items.length > cap);
-    if (over.length > 0) add({ id: 'inventory.capacity', severity: 'confirm', title: `Inventory shrinks to ${cap}`, detail: `${over.map((e) => `${e.name} holds ${e.items.length}`).join(', ')}.`, options: [{ id: 'drop', label: 'Drop their newest items beyond the limit' }] });
+  const unworn = entities.flatMap((e) => wornAfter(newGame, state, e).unequip.map((id) => ({ e, id })));
+  if (unworn.length > 0) add({ id: 'equipment.changed', severity: 'auto', title: `${plural(unworn.length, 'worn item')} ${unworn.length === 1 ? 'goes' : 'go'} back into the bag`, detail: 'Their equipment slot changed or is gone.' });
+  const over = entities.filter((e) => bagSpaces(newGame, wornAfter(newGame, state, e).carried) > cap);
+  if (over.length > 0) {
+    add({
+      id: 'inventory.capacity',
+      severity: 'confirm',
+      title: `${plural(over.length, 'contestant')} would carry more than fits (${cap} bag spaces)`,
+      detail: `${over.map((e) => `${e.name} needs ${bagSpaces(newGame, wornAfter(newGame, state, e).carried)}`).join(', ')}.`,
+      options: [{ id: 'drop', label: 'Drop their newest carried items until they fit' }],
+    });
   }
 
   // --- statuses -----------------------------------------------------------------------------
@@ -196,6 +205,32 @@ export function planMigration(oldGame: CompiledGame, newGame: CompiledGame, stat
   return { issues, blocked: issues.some((i) => i.severity === 'blocked') };
 }
 
+/**
+ * An entity's inventory under the new rules: which worn items must come off (their slot is gone
+ * or smaller) and what it then carries (definitions of the items in its bag).
+ */
+function wornAfter(game: CompiledGame, state: GameState, e: GameState['entities'][string]): { unequip: string[]; carried: string[] } {
+  const unequip: string[] = [];
+  const carried: string[] = [];
+  const used = new Map<string, number>();
+  for (const id of e.items) {
+    const item = state.items[id];
+    const def = item ? game.items.get(item.defId) : undefined;
+    if (!item || !def) continue;
+    if (item.equipped) {
+      const slot = def.slot !== undefined ? game.def.settings.equipment.find((s) => s.id === def.slot) : undefined;
+      const n = used.get(slot?.id ?? '') ?? 0;
+      if (slot && n < slot.count) {
+        used.set(slot.id, n + 1);
+        continue;
+      }
+      unequip.push(id);
+    }
+    carried.push(item.defId);
+  }
+  return { unequip, carried };
+}
+
 function tradeBroken(game: CompiledGame, state: GameState): boolean {
   const n = state.negotiation;
   if (!n) return false;
@@ -261,8 +296,22 @@ export function applyDefinitionChange(oldGame: CompiledGame, newGame: CompiledGa
         for (const item of Object.values(ctx.state.items)) {
           if (!newGame.items.has(item.defId)) removeItem(ctx, item.holder, item.id, cause, 'removed');
         }
+        // Worn items whose slot changed go back into the bag; then bags that overflow drop their newest items.
+        for (const e of live()) {
+          for (const id of wornAfter(newGame, ctx.state, e).unequip) {
+            const item = ctx.state.items[id];
+            if (!item) continue;
+            item.equipped = false;
+            ctx.emit({ type: 'itemEquipped', entity: e.id, item: id, itemDef: item.defId, equipped: false }, cause);
+          }
+        }
         if (answer('inventory.capacity') === 'drop') {
-          for (const e of live()) while (e.items.length > newGame.def.settings.inventoryCapacity) removeItem(ctx, e.id, e.items[e.items.length - 1] as string, cause, 'removed');
+          for (const e of live()) {
+            const carried = () => e.items.filter((id) => ctx.state.items[id]?.equipped === false);
+            while (bagSpaces(newGame, carried().map((id) => ctx.state.items[id]?.defId ?? '')) > newGame.def.settings.inventoryCapacity) {
+              removeItem(ctx, e.id, carried()[carried().length - 1] as string, cause, 'removed');
+            }
+          }
         }
         // Statuses of deleted definitions (hidden ones quietly), stack caps.
         for (const e of live()) {
@@ -313,6 +362,8 @@ export function applyDefinitionChange(oldGame: CompiledGame, newGame: CompiledGa
             teleport(ctx, e.id, newGame.def.settings.startSpace, false, cause);
           }
         }
+        // Modifiers may have changed (items, gear, statuses): pools bounded by other stats are re-clamped.
+        for (const e of live()) clampAllDependents(ctx, e.id, cause);
         // Names follow the definitions (renaming is cosmetic).
         for (const e of Object.values(ctx.state.entities)) {
           const def = e.kind === 'contestant' ? newGame.cast.get(e.defId) : e.kind === 'enemy' ? newGame.enemies.get(e.defId) : newGame.fixtures.get(e.defId);
@@ -344,7 +395,9 @@ export function applyDefinitionChange(oldGame: CompiledGame, newGame: CompiledGa
         ctx.state.objectives = ctx.state.objectives.filter((o) => newGame.objectives.has(o.defId));
         for (const key of Object.keys(ctx.state.cooldowns)) {
           const action = key.split(':')[0] as string;
-          if (action !== 'freeform' && !newGame.actions.has(action)) delete ctx.state.cooldowns[key];
+          if (action === 'item') {
+            if (!ctx.state.items[key.slice('item:'.length)]) delete ctx.state.cooldowns[key];
+          } else if (action !== 'freeform' && !newGame.actions.has(action)) delete ctx.state.cooldowns[key];
         }
         for (const key of Object.keys(ctx.state.ruleCounters)) if (!newGame.rules.has(key.split('@')[0] as string)) delete ctx.state.ruleCounters[key];
         ctx.state.queue = ctx.state.queue.filter((c) => c.rule === undefined || newGame.rules.has(c.rule));

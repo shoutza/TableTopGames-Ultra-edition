@@ -76,12 +76,33 @@ export const ItemDefSchema = z.strictObject({
   concealed: z.boolean().default(false),
   /** Contestants may hand it over in trades (concealed items never change hands in trades). */
   tradeable: z.boolean().default(true),
-  /** Optional use action (a main action); $actor and $holder are the user. */
+  /**
+   * Equipment slot (one of `settings.equipment`). Equipped items are worn, not carried: they take
+   * no bag space, and their modifiers and attached rules apply only while equipped.
+   */
+  slot: Id.optional(),
+  /** How many of this item share one bag space. */
+  stackSize: z.number().int().min(1).max(99).default(1),
+  /** Rough worth, in the core Gold resource: guides AI valuations of trades and purchases. */
+  value: z.number().int().min(0).max(1_000_000).optional(),
+  /** Advice for AI contestants on when to use or keep it ("Drink it when badly hurt"). */
+  aiHint: z.string().max(160).optional(),
+  /** Optional use action; $actor and $holder are the user, $target the chosen target (if any). */
   use: z
     .strictObject({
       label: z.string().min(1).max(60).optional(),
       effects: z.array(EffectSchema).min(1).max(12),
       consumed: z.boolean().default(true),
+      /** Uses before a consumed item is used up (default 1). */
+      charges: z.number().int().min(1).max(20).optional(),
+      /** The same item can be used again this many rounds later. */
+      cooldownRounds: z.number().int().min(1).max(50).optional(),
+      /** Used on someone: one option per possible target ($target). */
+      target: z.strictObject({ kind: EntityKindSchema, range: z.enum(['here', 'anywhere']) }).optional(),
+      /** Only usable when this holds ($actor = the user); must use information the user can see. */
+      requires: CondSchema.optional(),
+      /** A free action: using it does not take the turn's main action. */
+      free: z.boolean().default(false),
     })
     .optional(),
   /** Rules active only while the item is held ($holder = the holder). */
@@ -264,7 +285,10 @@ export const SettingsSchema = z.strictObject({
     /** Optional stat added to every movement roll (e.g. a Move stat that statuses lower). */
     bonus: Id.optional(),
   }),
+  /** Bag spaces (a stack of stackable items takes one space; equipped items take none). */
   inventoryCapacity: z.number().int().min(0).max(20),
+  /** Equipment slots (weapon, armour, trinkets …): worn items give their bonuses. */
+  equipment: z.array(z.strictObject({ id: Id, name: Name, count: z.number().int().min(1).max(4) })).max(8).default([]),
   rest: z.strictObject({ heal: z.number().int().min(0) }),
   combat: z.strictObject({
     damage: DamageSettingsSchema,

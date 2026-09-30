@@ -1,11 +1,12 @@
 import type { CompiledGame } from '../engine/compile.ts';
 import { attachedRuleText, describeCapabilityLoss, describeObjectiveGoal, describePromise, describeRule, describeStatus, namesFor, summarizeEffects, type Names } from '../engine/explain.ts';
+import { bagSpacesUsed, equippedIn, receivePlan } from '../engine/inventory.ts';
 import { effectiveTags, effectiveValue, hasCapability, reachableSpaces, suppressedCapabilities } from '../engine/queries.ts';
 import { isTradeableItem, isTradeableResource, tradePartners, termsView } from '../engine/trade.ts';
 import type { ItemDef, ObjectiveDef } from '../schema/definition.ts';
 import type { Capability } from '../schema/rules.ts';
 import type { Decision, DecisionOption, GameEvent, GameState, PromiseTerm, TradeTermsView } from '../schema/state.ts';
-import { effectHints, fightHint, landingHints, type FightHint, type Hint, type HintScope } from './hints.ts';
+import { effectHints, fightHint, landingHints, targetHints, type FightHint, type Hint, type HintScope } from './hints.ts';
 import { HIDDEN_RULE, recentVisibleEvents, redactStateFor, viewGame, visibleResourceIds, type VisibleEvent } from './redact.ts';
 
 export type { FightHint, Hint } from './hints.ts';
@@ -33,6 +34,23 @@ export interface ViewItem {
   concealed: boolean;
   usable: boolean;
   text: string;
+  /** Worn in its equipment slot (its bonuses apply). */
+  equipped: boolean;
+  /** Equipment slot name, for gear. */
+  slot: string | null;
+  /** Uses left, for items with charges. */
+  charges: number | null;
+  /** Rough worth in Gold, when the scenario gives one. */
+  value: number | null;
+  /** The GM's advice on when to use it (own items only). */
+  hint: string | null;
+}
+
+/** The viewer's bag and equipment slots. */
+export interface ViewInventory {
+  bagUsed: number;
+  bagCapacity: number;
+  slots: Array<{ id: string; name: string; count: number; items: string[] }>;
 }
 
 export interface ViewEntity {
@@ -161,7 +179,9 @@ export type OptionPreview =
       itemText: string | null;
     }
   | { kind: 'attack'; optionId: string; target: string; fight: FightHint }
-  | { kind: 'use'; optionId: string; item: string; name: string; consumed: boolean; hints: Hint[] }
+  | { kind: 'use'; optionId: string; item: string; name: string; consumed: boolean; hints: Hint[]; target: string | null; targetName: string | null; free: boolean; charges: number | null; aiHint: string | null }
+  | { kind: 'equip'; optionId: string; item: string; name: string; replaces: string | null; replacesName: string | null; changes: StatChange[] }
+  | { kind: 'drop'; optionId: string; item: string; name: string; worn: boolean; value: number | null; changes: StatChange[] }
   | {
       kind: 'act';
       optionId: string;
@@ -202,6 +222,13 @@ export function threatWeight(t: Threat): number {
   return Math.max(0, Math.min(1, (t.pKnockout - t.pWin - 0.1) * 2));
 }
 
+/** A change of one of the viewer's effective stats. */
+export interface StatChange {
+  resource: string;
+  from: number;
+  to: number;
+}
+
 export interface ContestantView {
   viewer: string;
   round: number;
@@ -211,6 +238,8 @@ export interface ContestantView {
   turnOrder: string[];
   roll: number | null;
   entities: ViewEntity[];
+  /** The viewer's own bag and equipment slots. */
+  inventory: ViewInventory;
   decision: (Decision & { previews: OptionPreview[] }) | null;
   /** Rivals who could reach and attack the viewer where it stands now (main decisions and choices). */
   threatsHere: Threat[];
@@ -279,13 +308,47 @@ function tradeableHoldings(game: CompiledGame, state: GameState, id: string): Vi
 
 /** Plain-language summary of an item's bonuses, use and attached rules. */
 export function describeItem(item: ItemDef, names: Names): string {
+  const use = item.use;
+  const useBits = use
+    ? [
+        use.target ? `on ${use.target.range === 'here' ? `a ${use.target.kind} here` : `any ${use.target.kind}`}` : '',
+        use.consumed ? (use.charges !== undefined && use.charges > 1 ? `${use.charges} uses` : 'once') : '',
+        use.free ? 'free action' : '',
+        use.cooldownRounds !== undefined ? `every ${use.cooldownRounds} rounds` : '',
+      ].filter(Boolean)
+    : [];
   const parts = [
-    ...item.modifiers.map((m) => `${m.add >= 0 ? '+' : ''}${m.add} ${names.resource(m.resource)}`),
-    ...(item.use ? [`use${item.use.consumed ? ' once' : ''}: ${summarizeEffects(item.use.effects, names)}`] : []),
+    ...(item.slot !== undefined ? [`worn (${item.slot.replace(/^[a-z]+\./, '')})`] : []),
+    ...item.modifiers.map((m) => `${m.add >= 0 ? '+' : ''}${m.add} ${names.resource(m.resource)}${item.slot !== undefined ? ' while worn' : ''}`),
+    ...(use ? [`use${useBits.length ? ` (${useBits.join(', ')})` : ''}: ${summarizeEffects(use.effects, names)}`] : []),
     ...item.rules.filter((r) => r.visibility === 'public').map((r) => attachedRuleText(r, names)),
+    ...(item.stackSize > 1 ? [`stacks ${item.stackSize} per space`] : []),
     ...(item.concealed ? ['others cannot see it'] : []),
   ];
   return parts.join('; ') || (item.description ?? '');
+}
+
+/** How the viewer's effective stats change if items are put on / taken off or removed. */
+function statChanges(scope: HintScope, equipped: Record<string, boolean>, removed: string[]): StatChange[] {
+  const { game, state, viewer } = scope;
+  const me = state.entities[viewer];
+  if (!me) return [];
+  const items = { ...state.items };
+  for (const [id, on] of Object.entries(equipped)) {
+    const it = items[id];
+    if (it) items[id] = { ...it, equipped: on };
+  }
+  for (const id of removed) delete items[id];
+  const after: GameState = { ...state, items, entities: { ...state.entities, [viewer]: { ...me, items: me.items.filter((id) => !removed.includes(id)) } } };
+  const meAfter = after.entities[viewer] ?? me;
+  const out: StatChange[] = [];
+  for (const r of game.def.resources) {
+    if (r.role !== 'stat' || me.resources[r.id] === undefined) continue;
+    const from = effectiveValue(game, state, me, r.id);
+    const to = effectiveValue(game, after, meAfter, r.id);
+    if (from !== undefined && to !== undefined && from !== to) out.push({ resource: r.id, from, to });
+  }
+  return out;
 }
 
 function distancesFrom(game: CompiledGame, state: GameState, from: string): Array<{ label: string; key: string; steps: number }> {
@@ -387,8 +450,14 @@ function previewOption(scope: HintScope, option: DecisionOption, decision: Decis
       const itemDef = grants && 'item' in grants ? game.items.get(grants.item) : undefined;
       let powerAfter: number | null = null;
       if (itemDef && me) {
-        const add = itemDef.modifiers.filter((m) => m.resource === core.power).reduce((s, m) => s + m.add, 0);
-        if (add !== 0) powerAfter = (effectiveValue(game, redacted, me, core.power) ?? 0) + add;
+        const powerOf = (defId: string | undefined) => game.items.get(defId ?? '')?.modifiers.filter((m) => m.resource === core.power).reduce((s, m) => s + m.add, 0) ?? 0;
+        let add = powerOf(itemDef.id);
+        // Gear counts only while worn: with its slot full, the gain is the swap for the weakest worn piece.
+        if (itemDef.slot !== undefined && receivePlan(game, redacted, me, itemDef.id) !== 'equip') {
+          const worn = equippedIn(game, redacted, me, itemDef.slot).map((id) => powerOf(redacted.items[id]?.defId));
+          add = worn.length > 0 ? add - Math.min(...worn) : 0;
+        }
+        if (add > 0 || (add < 0 && itemDef.slot === undefined)) powerAfter = (effectiveValue(game, redacted, me, core.power) ?? 0) + add;
       }
       return {
         kind: 'buy',
@@ -411,16 +480,44 @@ function previewOption(scope: HintScope, option: DecisionOption, decision: Decis
       return { kind: 'attack', optionId: option.id, target: option.target, fight };
     }
     case 'use': {
-      const defId = redacted.items[option.item]?.defId;
-      const def = defId !== undefined ? game.items.get(defId) : undefined;
+      const item = redacted.items[option.item];
+      const def = item ? game.items.get(item.defId) : undefined;
       const hints: Hint[] = [];
-      if (def?.use) effectHints(scope, def.use.effects, { $actor: viewer, $holder: viewer, ...(here ? { $space: here } : {}) }, true, 1, def.name, hints);
-      return { kind: 'use', optionId: option.id, item: option.item, name: def?.name ?? option.item, consumed: def?.use?.consumed ?? false, hints };
+      const target = option.target !== null ? { $target: option.target } : {};
+      const b = { $actor: viewer, $holder: viewer, ...target, ...(here ? { $space: here } : {}) };
+      if (def?.use) effectHints(scope, def.use.effects, b, true, 1, def.name, hints);
+      if (def?.use && option.target !== null) hints.push(...targetHints(scope, def.use.effects, b, option.target, def.name));
+      return {
+        kind: 'use',
+        optionId: option.id,
+        item: option.item,
+        name: def?.name ?? option.item,
+        consumed: def?.use?.consumed ?? false,
+        hints,
+        target: option.target,
+        targetName: option.target !== null ? names.entity(option.target) : null,
+        free: option.free,
+        charges: item?.charges ?? null,
+        aiHint: def?.aiHint ?? null,
+      };
+    }
+    case 'equip': {
+      const def = game.items.get(redacted.items[option.item]?.defId ?? '');
+      const replaced = option.replaces !== null ? game.items.get(redacted.items[option.replaces]?.defId ?? '') : undefined;
+      const flips: Record<string, boolean> = { [option.item]: true, ...(option.replaces !== null ? { [option.replaces]: false } : {}) };
+      return { kind: 'equip', optionId: option.id, item: option.item, name: def?.name ?? option.item, replaces: option.replaces, replacesName: replaced?.name ?? null, changes: statChanges(scope, flips, []) };
+    }
+    case 'drop': {
+      const item = redacted.items[option.item];
+      const def = game.items.get(item?.defId ?? '');
+      return { kind: 'drop', optionId: option.id, item: option.item, name: def?.name ?? option.item, worn: item?.equipped === true, value: def?.value ?? null, changes: statChanges(scope, {}, [option.item]) };
     }
     case 'act': {
       const action = game.actions.get(option.action);
       const hints: Hint[] = [];
-      if (action) effectHints(scope, action.effects, { $actor: viewer, ...(option.target !== null ? { $target: option.target } : {}), ...(here ? { $space: here } : {}) }, true, 1, action.name, hints);
+      const ab = { $actor: viewer, ...(option.target !== null ? { $target: option.target } : {}), ...(here ? { $space: here } : {}) };
+      if (action) effectHints(scope, action.effects, ab, true, 1, action.name, hints);
+      if (action && option.target !== null) hints.push(...targetHints(scope, action.effects, ab, option.target, action.name));
       return {
         kind: 'act',
         optionId: option.id,
@@ -501,9 +598,23 @@ export function buildContestantView(fullGame: CompiledGame, state: GameState, vi
       hiddenStats,
       tags: [...effectiveTags(game, e)],
       items: e.items.map((id) => {
-        const defId = redacted.items[id]?.defId ?? '';
+        const inst = redacted.items[id];
+        const defId = inst?.defId ?? '';
         const def = game.items.get(defId);
-        return { id, defId, name: names.item(defId), concealed: defId === 'concealed', usable: def?.use !== undefined, text: def ? describeItem(def, names) : 'unknown' };
+        const slot = def?.slot !== undefined ? (game.def.settings.equipment.find((s) => s.id === def.slot)?.name ?? def.slot) : null;
+        return {
+          id,
+          defId,
+          name: names.item(defId),
+          concealed: defId === 'concealed',
+          usable: def?.use !== undefined,
+          text: def ? describeItem(def, names) : 'unknown',
+          equipped: inst?.equipped === true,
+          slot,
+          charges: inst?.charges ?? null,
+          value: def?.value ?? null,
+          hint: e.id === viewer ? (def?.aiHint ?? null) : null,
+        };
       }),
       statuses: e.statuses.map((s) => {
         const def = game.statuses.get(s.defId);
@@ -562,6 +673,7 @@ export function buildContestantView(fullGame: CompiledGame, state: GameState, vi
     turnOrder: [...redacted.turnOrder],
     roll: redacted.turn.roll,
     entities,
+    inventory: inventoryOf(game, redacted, viewer),
     decision,
     threatsHere: mine && pending.kind !== 'move' && here ? threats(here) : [],
     decks: game.def.decks.map((d) => ({ id: d.id, name: d.name, drawCount: redacted.decks[d.id]?.draw.length ?? 0, discardCount: redacted.decks[d.id]?.discard.length ?? 0 })),
@@ -570,6 +682,16 @@ export function buildContestantView(fullGame: CompiledGame, state: GameState, vi
     commitments,
     recentEvents: recent,
     winners: redacted.winners,
+  };
+}
+
+function inventoryOf(game: CompiledGame, state: GameState, viewer: string): ViewInventory {
+  const me = state.entities[viewer];
+  if (!me) return { bagUsed: 0, bagCapacity: game.def.settings.inventoryCapacity, slots: [] };
+  return {
+    bagUsed: bagSpacesUsed(game, state, me),
+    bagCapacity: game.def.settings.inventoryCapacity,
+    slots: game.def.settings.equipment.map((s) => ({ id: s.id, name: s.name, count: s.count, items: equippedIn(game, state, me, s.id) })),
   };
 }
 

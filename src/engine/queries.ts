@@ -53,7 +53,9 @@ export function effectiveValue(game: CompiledGame, state: GameState, entity: Ent
   for (const itemId of entity.items) {
     const item = state.items[itemId];
     const itemDef = item ? game.items.get(item.defId) : undefined;
-    for (const m of itemDef?.modifiers ?? []) if (m.resource === resourceId) total += m.add;
+    // Gear with an equipment slot counts only while worn.
+    if (!item || !itemDef || (itemDef.slot !== undefined && !item.equipped)) continue;
+    for (const m of itemDef.modifiers) if (m.resource === resourceId) total += m.add;
   }
   for (const s of entity.statuses) {
     const statusDef = game.statuses.get(s.defId);
@@ -113,7 +115,7 @@ export function statusOf(entity: Entity, statusId: string): Entity['statuses'][n
 }
 
 /** Entities an attached rule currently applies to, in stable order. */
-export function holdersOf(state: GameState, owner: RuleOwner): string[] {
+export function holdersOf(game: CompiledGame, state: GameState, owner: RuleOwner): string[] {
   const out: string[] = [];
   for (const id of orderedEntityIds(state)) {
     const e = state.entities[id];
@@ -122,7 +124,14 @@ export function holdersOf(state: GameState, owner: RuleOwner): string[] {
       if (e.kind === 'enemy' && e.defId === owner.defId) out.push(id);
     } else if (owner.kind === 'status') {
       if (e.statuses.some((s) => s.defId === owner.defId)) out.push(id);
-    } else if (e.items.some((itemId) => state.items[itemId]?.defId === owner.defId)) out.push(id);
+    } else if (
+      e.items.some((itemId) => {
+        const item = state.items[itemId];
+        // Rules on gear with a slot apply only while it is worn.
+        return item?.defId === owner.defId && (item.equipped || game.items.get(owner.defId)?.slot === undefined);
+      })
+    )
+      out.push(id);
   }
   return out;
 }

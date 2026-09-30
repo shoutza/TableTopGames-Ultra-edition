@@ -2,7 +2,7 @@
   "id": "star-chase",
   "name": "Star Chase",
   "description": "Collect gold, buy stars from the wandering Star Vendor, and grow strong enough to slay the Demon for two stars of your own. Mystery spaces deal island events; rivals can ambush you for your gold.",
-  "rulesLanguageVersion": 2,
+  "rulesLanguageVersion": 3,
   "settings": {
     "core": {
       "hp": "res.hp",
@@ -16,6 +16,18 @@
       "bonus": "res.move"
     },
     "inventoryCapacity": 3,
+    "equipment": [
+      {
+        "id": "slot.weapon",
+        "name": "Weapon",
+        "count": 1
+      },
+      {
+        "id": "slot.armor",
+        "name": "Armor",
+        "count": 1
+      }
+    ],
     "rest": {
       "heal": 40
     },
@@ -691,7 +703,9 @@
           "resource": "res.power",
           "add": 60
         }
-      ]
+      ],
+      "slot": "slot.weapon",
+      "value": 6
     },
     {
       "id": "item.guardian_mail",
@@ -703,7 +717,9 @@
           "resource": "res.power",
           "add": 100
         }
-      ]
+      ],
+      "slot": "slot.armor",
+      "value": 12
     },
     {
       "id": "item.iron_sword",
@@ -715,7 +731,9 @@
           "resource": "res.power",
           "add": 150
         }
-      ]
+      ],
+      "slot": "slot.weapon",
+      "value": 15
     },
     {
       "id": "item.demon_blade",
@@ -727,7 +745,9 @@
           "resource": "res.power",
           "add": 300
         }
-      ]
+      ],
+      "slot": "slot.weapon",
+      "value": 32
     },
     {
       "id": "item.healing_potion",
@@ -745,7 +765,10 @@
           }
         ],
         "consumed": true
-      }
+      },
+      "stackSize": 3,
+      "value": 5,
+      "aiHint": "Drink it when your HP is low, especially before a fight you must win."
     },
     {
       "id": "item.smoke_bomb",
@@ -762,7 +785,9 @@
           }
         ],
         "consumed": true
-      }
+      },
+      "value": 6,
+      "aiHint": "Throw it when a much stronger rival could reach you next turn."
     },
     {
       "id": "item.shield_charm",
@@ -780,7 +805,9 @@
           }
         ],
         "consumed": true
-      }
+      },
+      "value": 8,
+      "aiHint": "Break it before a risky fight: two hits are blocked."
     },
     {
       "id": "item.lucky_coin",
@@ -809,6 +836,81 @@
           }
         }
       ]
+    },
+    {
+      "id": "item.firecracker",
+      "name": "Firecracker",
+      "icon": "🧨",
+      "description": "Throw it at a rival on your space: 2d10 damage.",
+      "stackSize": 2,
+      "value": 7,
+      "aiHint": "Throw it at a rival on your space to soften them up before you attack, or to finish them off.",
+      "use": {
+        "label": "Throw Firecracker",
+        "target": {
+          "kind": "contestant",
+          "range": "here"
+        },
+        "effects": [
+          {
+            "op": "damage",
+            "target": "$target",
+            "amount": {
+              "op": "roll",
+              "count": 2,
+              "sides": 10
+            }
+          }
+        ],
+        "consumed": true
+      }
+    },
+    {
+      "id": "item.spark_wand",
+      "name": "Spark Wand",
+      "icon": "🪄",
+      "description": "Three charges: zap anyone on your space for 15 damage (once per round).",
+      "value": 14,
+      "aiHint": "Zap a rival or monster on your space; it recharges each round, three uses in all.",
+      "use": {
+        "label": "Zap",
+        "target": {
+          "kind": "contestant",
+          "range": "here"
+        },
+        "effects": [
+          {
+            "op": "damage",
+            "target": "$target",
+            "amount": 15
+          }
+        ],
+        "consumed": true,
+        "charges": 3,
+        "cooldownRounds": 1
+      }
+    },
+    {
+      "id": "item.trail_mix",
+      "name": "Trail Mix",
+      "icon": "🥜",
+      "description": "A quick snack (free action): +10 HP.",
+      "stackSize": 5,
+      "value": 2,
+      "aiHint": "Eat it any time you are hurt; it does not use up your action.",
+      "use": {
+        "label": "Eat Trail Mix",
+        "effects": [
+          {
+            "op": "changeResource",
+            "target": "$actor",
+            "resource": "res.hp",
+            "amount": 10
+          }
+        ],
+        "consumed": true,
+        "free": true
+      }
     }
   ],
   "statuses": [
@@ -1037,6 +1139,26 @@
             "resource": "res.gold",
             "amount": 8
           }
+        },
+        {
+          "id": "entry.firecracker",
+          "grants": {
+            "item": "item.firecracker"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 7
+          }
+        },
+        {
+          "id": "entry.spark_wand",
+          "grants": {
+            "item": "item.spark_wand"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 14
+          }
         }
       ]
     },
@@ -1090,6 +1212,16 @@
           "price": {
             "resource": "res.bananas",
             "amount": 2
+          }
+        },
+        {
+          "id": "entry.trail_mix",
+          "grants": {
+            "item": "item.trail_mix"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 1
           }
         }
       ]

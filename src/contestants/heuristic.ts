@@ -7,6 +7,7 @@ import {
   type FightHint,
   type Hint,
   type OptionPreview,
+  type StatChange,
   type Threat,
   type TradePartnerView,
   type ViewEntity,
@@ -141,14 +142,84 @@ function statusValue(c: Ctx, statusId: string, stacks: number, duration?: number
   return v * f;
 }
 
+/** Value of an item definition's stat modifiers for this contestant. */
+function modifiersValue(c: Ctx, defId: string): number {
+  const item = c.info.items.find((i) => i.id === defId);
+  let v = 0;
+  for (const m of item?.modifiers ?? []) v += resourceValue(c, m.resource, m.add) * (m.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
+  return v;
+}
+
+/** What having one more use of an item is worth (before knowing when it will be used). */
+function useValue(c: Ctx, defId: string): number {
+  const est = c.info.items.find((i) => i.id === defId)?.useEstimate;
+  if (!est) return 0;
+  const hp = c.info.settings.core.hp;
+  const t = c.persona.traits;
+  let v = 0;
+  for (const [r, amt] of Object.entries(est.self)) {
+    // Healing is insurance: worth something even at full HP.
+    v += r === hp && amt > 0 ? Math.max(resourceValue(c, r, amt), amt * 0.25 * c.w.hp) : resourceValue(c, r, amt);
+  }
+  for (const s of est.selfStatuses) v += statusValue(c, s.status, s.stacks) * 0.7;
+  const bite = 0.5 + (t.aggression + t.vindictiveness) / 20;
+  for (const [r, amt] of Object.entries(est.other)) v += r === hp ? -amt * 0.8 * bite : -resourceValue(c, r, amt) * 0.5 * bite;
+  for (const s of est.otherStatuses) v -= statusValue(c, s.status, s.stacks) * 0.5 * bite;
+  return Math.max(0, v);
+}
+
 function itemValue(c: Ctx, itemId: string): number {
   const item = c.info.items.find((i) => i.id === itemId);
   if (!item) return 10;
-  if (c.me.items.length >= c.info.settings.inventoryCapacity) return 0;
-  let v = 0;
-  for (const m of item.modifiers) v += resourceValue(c, m.resource, m.add) * (m.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
-  if (item.usable) v += 14;
+  if (!hasRoomFor(c, itemId)) return 0;
+  let v = modifiersValue(c, itemId);
+  // Gear only helps while worn: with its slot full, it is worth only its improvement over the weakest worn piece.
+  if (item.slot) {
+    const slot = c.view.inventory.slots.find((s) => s.id === item.slot);
+    if (slot && slot.items.length >= slot.count) {
+      const worn = slot.items.map((id) => modifiersValue(c, c.me.items.find((i) => i.id === id)?.defId ?? ''));
+      v = Math.max(0, v - Math.min(...worn));
+    }
+  }
+  if (item.usable) v += 2 + useValue(c, itemId) * Math.min(3, item.useEstimate?.uses ?? 1) * 0.8;
   return v;
+}
+
+/** What a held item is worth keeping (for discarding decisions). */
+function keepValue(c: Ctx, held: ViewEntity['items'][number]): number {
+  const item = c.info.items.find((i) => i.id === held.defId);
+  if (!item) return 0;
+  let v = 0;
+  if (!item.slot || held.equipped) for (const m of item.modifiers) v += resourceValue(c, m.resource, m.add) * (m.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
+  if (item.usable) v += 2 + useValue(c, held.defId) * Math.min(3, held.charges ?? item.useEstimate?.uses ?? 1) * 0.8;
+  if (item.value !== null) v = Math.max(v, item.value * resourceValue(c, c.info.settings.core.gold, 1) * 0.5);
+  return v;
+}
+
+/** Stat changes (equipping, discarding) as a value. */
+function statChangesValue(c: Ctx, changes: StatChange[]): number {
+  let v = 0;
+  for (const ch of changes) v += resourceValue(c, ch.resource, ch.to - ch.from) * (ch.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
+  return v;
+}
+
+/** The best item for sale on this space that does not fit now (worth making room for). */
+function wantedHere(c: Ctx): number {
+  let best = 0;
+  for (const f of c.view.entities) {
+    if (f.kind !== 'fixture' || f.status !== 'active' || f.spaceId !== c.me.spaceId) continue;
+    for (const offer of f.shopEntries) {
+      const entry = c.info.shops.flatMap((sh) => sh.entries).find((e) => e.id === offer.entry);
+      if (!entry?.grantsItem || entry.price > (stat(c.me, entry.priceResource) || 0)) continue;
+      const item = c.info.items.find((i) => i.id === entry.grantsItem);
+      if (!item) continue;
+      let v = 0;
+      for (const m of item.modifiers) v += resourceValue(c, m.resource, m.add) * (m.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
+      if (item.usable) v += 2 + useValue(c, item.id) * Math.min(3, item.useEstimate?.uses ?? 1) * 0.8;
+      best = Math.max(best, v - entry.price * 1.2);
+    }
+  }
+  return best;
 }
 
 function koCost(c: Ctx, risk: number): number {
@@ -227,6 +298,7 @@ function protectionValue(c: Ctx, hints: Hint[]): number {
 }
 
 function hintValue(c: Ctx, h: Hint): number {
+  if (h.other !== undefined) return otherHintValue(c, h);
   let v = 0;
   if (h.resource !== undefined && h.min !== undefined && h.max !== undefined) v += resourceValue(c, h.resource, (h.min + h.max) / 2) + reachBonus(c, h.resource, (h.min + h.max) / 2);
   if (h.status !== undefined) v += statusValue(c, h.status, h.statusStacks ?? 1);
@@ -234,6 +306,39 @@ function hintValue(c: Ctx, h: Hint): number {
   if (h.losesItem) v -= 20;
   if (h.choice) v += 4;
   return v * h.p * (h.certain ? 1 : 0.8);
+}
+
+/**
+ * A change to someone else (the target of an item or action): what hurts a rival helps us, more so
+ * for aggressive or vindictive contestants and against the leader; hurting a trusted friend costs.
+ */
+function otherHintValue(c: Ctx, h: Hint): number {
+  const other = c.view.entities.find((e) => e.id === h.other);
+  if (!other) return 0;
+  const asMine = hintValue(c, { ...h, other: undefined });
+  if (other.kind === 'enemy') return -asMine * 0.4;
+  if (other.kind !== 'contestant') return 0;
+  const t = c.persona.traits;
+  const r = rel(c, other.id);
+  const leader = stat(other, c.info.settings.victory.resource) >= c.rivalStars && c.rivalStars > c.stars;
+  const rivalry = (0.35 + (t.aggression + t.vindictiveness) / 40) * (leader ? 1.5 : 1) * (r.trust >= 4 ? 0.2 : 1) + Math.max(0, -r.affinity) * 0.05;
+  return -asMine * rivalry;
+}
+
+/** Whether an item definition would fit (a free slot, or the bag). */
+function hasRoomFor(c: Ctx, defId: string): boolean {
+  const item = c.info.items.find((i) => i.id === defId);
+  const inv = c.view.inventory;
+  if (item?.slot) {
+    const slot = inv.slots.find((s) => s.id === item.slot);
+    if (slot && slot.items.length < slot.count) return true;
+  }
+  if (inv.bagUsed < inv.bagCapacity) return true;
+  // A partly filled stack of the same item still has room.
+  const size = item?.stackSize ?? 1;
+  if (size <= 1) return false;
+  const carried = c.me.items.filter((i) => i.defId === defId && !i.equipped).length;
+  return carried % size !== 0;
 }
 
 function hintsValue(c: Ctx, hints: Hint[], skipFights = false): number {
@@ -318,7 +423,15 @@ function scoreMain(c: Ctx, p: OptionPreview): number {
       return fightValue(c, p.fight, true);
     case 'use': {
       const defId = c.me.items.find((i) => i.id === p.item)?.defId;
-      return hintsValue(c, p.hints) + protectionValue(c, p.hints) - (p.consumed ? 6 : 0) + objectiveBonus(c, 'itemUsed', (w) => w.item === undefined || w.item === defId);
+      // A use with charges left costs less than using the item up.
+      const spend = p.consumed ? (p.charges !== null && p.charges > 1 ? 3 : 6) : 0;
+      return hintsValue(c, p.hints) + protectionValue(c, p.hints) - spend + objectiveBonus(c, 'itemUsed', (w) => w.item === undefined || w.item === defId);
+    }
+    case 'equip':
+      return statChangesValue(c, p.changes);
+    case 'drop': {
+      const held = c.me.items.find((i) => i.id === p.item);
+      return -(held ? keepValue(c, held) : 0) + statChangesValue(c, p.changes);
     }
     case 'act': {
       const cost = p.cost ? resourceValue(c, p.cost.resource, -p.cost.amount) : 0;
@@ -381,6 +494,8 @@ export function chooseHeuristic(view: ContestantView, info: PublicGameInfo, pers
   // Free actions first: they do not use up the main action.
   const pay = decision.previews.find((p): p is Extract<OptionPreview, { kind: 'pay' }> => p.kind === 'pay');
   if (pay && willPay(c, pay)) return withSay({ optionId: pay.optionId, reason: explainChoice(pay), scores: [] });
+  const freeItem = bestFreeItemAction(c, decision.previews);
+  if (freeItem) return withSay(freeItem);
   const tradeOption = decision.previews.find((p): p is Extract<OptionPreview, { kind: 'trade' }> => p.kind === 'trade');
   if (tradeOption) {
     const deal = bestProposal(c, tradeOption);
@@ -392,6 +507,31 @@ export function chooseHeuristic(view: ContestantView, info: PublicGameInfo, pers
   for (const s of scores) if (s.score > best.score) best = s;
   const preview = decision.previews.find((p) => p.optionId === best.optionId);
   return withSay({ optionId: best.optionId, reason: explainChoice(preview), scores });
+}
+
+/** Equip upgrades, use worthwhile free items, and throw away junk when something better is for sale here. */
+function bestFreeItemAction(c: Ctx, previews: OptionPreview[]): HeuristicChoice | null {
+  let best: { p: OptionPreview; v: number } | null = null;
+  const consider = (p: OptionPreview, v: number, threshold: number) => {
+    if (v > threshold && (!best || v > best.v)) best = { p, v };
+  };
+  for (const p of previews) {
+    if (p.kind === 'equip') consider(p, statChangesValue(c, p.changes), 1);
+    else if (p.kind === 'use' && p.free) consider(p, scoreMain(c, p), 5);
+  }
+  const drops = previews.filter((p): p is Extract<OptionPreview, { kind: 'drop' }> => p.kind === 'drop');
+  if (!best && drops.length > 0) {
+    const want = wantedHere(c);
+    let cheapest: { p: OptionPreview; keep: number } | null = null;
+    for (const p of drops) {
+      const held = c.me.items.find((i) => i.id === p.item);
+      const keep = (held ? keepValue(c, held) : 0) - statChangesValue(c, p.changes);
+      if (!cheapest || keep < cheapest.keep) cheapest = { p, keep };
+    }
+    if (cheapest && want > cheapest.keep + 8) best = { p: cheapest.p, v: want - cheapest.keep };
+  }
+  const chosen = best as { p: OptionPreview; v: number } | null;
+  return chosen ? { optionId: chosen.p.optionId, reason: explainChoice(chosen.p), scores: [] } : null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -436,7 +576,7 @@ function heldItemValue(c: Ctx, defId: string): number {
   if (!item) return 10;
   let v = 0;
   for (const m of item.modifiers) v += resourceValue(c, m.resource, m.add) * (m.resource === c.info.settings.core.power ? c.w.gear / Math.max(0.1, c.w.power) : 1);
-  if (item.usable) v += 14;
+  if (item.usable) v += 2 + useValue(c, defId) * Math.min(3, item.useEstimate?.uses ?? 1) * 0.8;
   return v;
 }
 
@@ -689,7 +829,11 @@ function explainChoice(p: OptionPreview | undefined): string {
     case 'attack':
       return `attacking ${p.fight.opponentName} (${Math.round(p.fight.odds.pAttackerWins * 100)}% to win)`;
     case 'use':
-      return `using ${p.name}`;
+      return `using ${p.name}${p.targetName ? ` on ${p.targetName}` : ''}`;
+    case 'equip':
+      return `equipping ${p.name}${p.replacesName ? ` instead of ${p.replacesName}` : ''}`;
+    case 'drop':
+      return `throwing away ${p.name} to make room`;
     case 'act':
       return `${p.name}${p.targetName ? ` on ${p.targetName}` : ''}`;
     case 'choose':

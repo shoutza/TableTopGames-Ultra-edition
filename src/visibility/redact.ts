@@ -68,7 +68,11 @@ export function redactStateFor(game: CompiledGame, state: GameState, viewer: str
       .map((s) => ({ ...s, id: `${entity.id}:${s.defId}` }));
   }
   for (const item of Object.values(copy.items)) {
-    if (item.holder !== viewer && isConcealedItem(game, item.defId)) item.defId = 'concealed';
+    if (item.holder !== viewer && isConcealedItem(game, item.defId)) {
+      item.defId = 'concealed';
+      item.equipped = false;
+      item.charges = null;
+    }
   }
   // Pile sizes and the discard pile are public; the order of the draw pile is not.
   for (const pile of Object.values(copy.decks)) pile.draw = pile.draw.map(() => '?');
@@ -125,7 +129,7 @@ export function visibleEvents(game: CompiledGame, events: GameEvent[], viewer: s
       if (mods) event.mods = mods;
       else delete event.mods;
     }
-    if ((event.type === 'itemGained' || event.type === 'itemLost' || event.type === 'itemUsed') && event.entity !== viewer && isConcealedItem(game, event.itemDef)) {
+    if ((event.type === 'itemGained' || event.type === 'itemLost' || event.type === 'itemUsed' || event.type === 'itemEquipped') && event.entity !== viewer && isConcealedItem(game, event.itemDef)) {
       event.itemDef = 'concealed';
     }
     if (event.type === 'purchased' && event.entity !== viewer) {

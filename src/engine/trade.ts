@@ -2,7 +2,8 @@ import type { Commitment, DecisionOption, EventCause, GameState, Goods, Negotiat
 import type { GoodsInput, PromiseInput, TradeOfferInput } from '../schema/trade.ts';
 import type { CompiledGame } from './compile.ts';
 import type { OpContext } from './context.ts';
-import { changeResource, removeItem } from './effects.ts';
+import { changeResource, removeItem, setEquipped } from './effects.ts';
+import { equippedIn, roomForAll, slotCount } from './inventory.ts';
 import { effectiveValue, getEntity, hasCapability } from './queries.ts';
 import { InvalidInput } from './util.ts';
 
@@ -110,15 +111,16 @@ function isEmpty(g: Goods): boolean {
   return Object.keys(g.resources).length === 0 && g.items.length === 0;
 }
 
-/** Items each side would hold afterwards must fit in its inventory. */
+/** Items each side would hold afterwards must fit in its inventory (free slots, then the bag). */
 function capacityProblem(game: CompiledGame, state: GameState, terms: TradeTerms, from: string, to: string, author: string): string | null {
-  const cap = game.def.settings.inventoryCapacity;
+  const defsOf = (items: string[]) => items.map((i) => state.items[i]?.defId ?? '');
   for (const [id, gives, gets] of [
-    [from, terms.give.items.length, terms.get.items.length],
-    [to, terms.get.items.length, terms.give.items.length],
+    [from, terms.give.items, terms.get.items],
+    [to, terms.get.items, terms.give.items],
   ] as const) {
-    const held = state.entities[id]?.items.length ?? 0;
-    if (held - gives + gets > cap) {
+    const entity = state.entities[id];
+    if (!entity) continue;
+    if (!roomForAll(game, state, entity, defsOf(gets), new Set(gives))) {
       const w = who(state, id, author);
       return `${w.name} cannot carry that many items`;
     }
@@ -206,12 +208,22 @@ export function proposeTrade(ctx: OpContext, actorId: string, offer: TradeOfferI
 }
 
 function moveItem(ctx: OpContext, itemId: string, fromId: string, toId: string, cause: EventCause): void {
-  const defId = ctx.state.items[itemId]?.defId;
-  if (defId === undefined) return;
+  const item = ctx.state.items[itemId];
+  if (!item) return;
+  const { defId, charges } = item;
   removeItem(ctx, fromId, itemId, cause, 'given');
-  ctx.state.items[itemId] = { id: itemId, defId, holder: toId };
+  ctx.state.items[itemId] = { id: itemId, defId, holder: toId, equipped: false, charges };
   getEntity(ctx.state, toId).items.push(itemId);
   ctx.emit({ type: 'itemGained', entity: toId, item: itemId, itemDef: defId }, cause);
+}
+
+/** After a trade: received gear goes into free slots (so the bag holds what the check counted). */
+function wearReceived(ctx: OpContext, entityId: string, items: string[], cause: EventCause): void {
+  const entity = getEntity(ctx.state, entityId);
+  for (const id of items) {
+    const slot = ctx.game.items.get(ctx.state.items[id]?.defId ?? '')?.slot;
+    if (slot !== undefined && equippedIn(ctx.game, ctx.state, entity, slot).length < slotCount(ctx.game, slot)) setEquipped(ctx, entityId, id, true, cause);
+  }
 }
 
 function executeTrade(ctx: OpContext, n: Negotiation, cause: EventCause): void {
@@ -227,6 +239,8 @@ function executeTrade(ctx: OpContext, n: Negotiation, cause: EventCause): void {
   // Items first leave both inventories, then arrive, so a swap never overflows a full inventory.
   const outgoing = [...n.terms.give.items.map((i) => [i, n.from, n.to] as const), ...n.terms.get.items.map((i) => [i, n.to, n.from] as const)];
   for (const [item, a, b] of outgoing) moveItem(ctx, item, a, b, inner);
+  wearReceived(ctx, n.to, n.terms.give.items, inner);
+  wearReceived(ctx, n.from, n.terms.get.items, inner);
   for (const [goods, a, b] of [
     [n.terms.give, n.from, n.to],
     [n.terms.get, n.to, n.from],

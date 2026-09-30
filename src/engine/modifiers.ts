@@ -118,7 +118,7 @@ export function computeModifiers(env: EvalEnv, on: ModifierEvent, b: Bindings, v
     // Nothing to prevent (e.g. a zero-damage hit): a consumable shield is not spent on it.
     if (def.modify.op === 'prevent' && out.value === 0) continue;
     if (!whereMatches(env.game, env.state, def.where, subject)) continue;
-    const holders: Array<string | undefined> = rule.owner ? holdersOf(env.state, rule.owner) : [undefined];
+    const holders: Array<string | undefined> = rule.owner ? holdersOf(env.game, env.state, rule.owner) : [undefined];
     for (const holder of holders) {
       if (!limitAllows(env.state, rule, holder)) continue;
       const bb: Bindings = { ...b, amount: out.value, ...(holder !== undefined ? { $holder: holder } : {}) };

@@ -44,6 +44,10 @@ export const ItemInstanceSchema = z.strictObject({
   id: z.string(),
   defId: z.string(),
   holder: z.string(),
+  /** Worn in its equipment slot (items with a slot only). */
+  equipped: z.boolean().default(false),
+  /** Uses left for items with charges (null = not counted). */
+  charges: z.number().int().min(0).nullable().default(null),
 });
 export type ItemInstance = z.infer<typeof ItemInstanceSchema>;
 
@@ -124,7 +128,11 @@ export const DecisionOptionSchema = z.discriminatedUnion('kind', [
   /** `price` is the price after modifiers, fixed when the option is offered. */
   z.strictObject({ id: z.string(), kind: z.literal('buy'), label: z.string(), fixture: z.string(), entry: z.string(), price: z.number().int() }),
   z.strictObject({ id: z.string(), kind: z.literal('attack'), label: z.string(), target: z.string() }),
-  z.strictObject({ id: z.string(), kind: z.literal('use'), label: z.string(), item: z.string() }),
+  z.strictObject({ id: z.string(), kind: z.literal('use'), label: z.string(), item: z.string(), target: z.string().nullable().default(null), free: z.boolean().default(false) }),
+  /** Wear an item in its slot (a free action); `replaces` goes back into the bag. */
+  z.strictObject({ id: z.string(), kind: z.literal('equip'), label: z.string(), item: z.string(), replaces: z.string().nullable() }),
+  /** Throw an item away to make room (a free action). */
+  z.strictObject({ id: z.string(), kind: z.literal('drop'), label: z.string(), item: z.string() }),
   z.strictObject({ id: z.string(), kind: z.literal('act'), label: z.string(), action: z.string(), target: z.string().nullable() }),
   z.strictObject({ id: z.string(), kind: z.literal('rest'), label: z.string() }),
   z.strictObject({ id: z.string(), kind: z.literal('pass'), label: z.string() }),
@@ -225,6 +233,8 @@ export const GameStateSchema = z.strictObject({
     over: z.boolean().default(false),
     /** The active contestant has proposed its trade for this turn. */
     traded: z.boolean().default(false),
+    /** Free item actions (equip, discard, free uses) taken this turn. */
+    itemActions: z.number().int().min(0).default(0),
   }),
   turnOrder: z.array(z.string()),
   entities: z.record(z.string(), EntitySchema),
@@ -291,7 +301,8 @@ export type EventBody =
   | { type: 'tagAdded'; entity: string; tag: string }
   | { type: 'tagRemoved'; entity: string; tag: string }
   | { type: 'itemGained'; entity: string; item: string; itemDef: string }
-  | { type: 'itemLost'; entity: string; item: string; itemDef: string; reason: 'removed' | 'used' | 'given' | 'lost' | 'consumed' }
+  | { type: 'itemLost'; entity: string; item: string; itemDef: string; reason: 'removed' | 'used' | 'given' | 'lost' | 'consumed' | 'discarded' }
+  | { type: 'itemEquipped'; entity: string; item: string; itemDef: string; equipped: boolean }
   | { type: 'itemUsed'; entity: string; item: string; itemDef: string }
   | { type: 'purchased'; entity: string; fixture: string; entry: string; priceResource: string; price: number; mods?: ModRecord[] | undefined }
   | { type: 'rested'; entity: string; healed: number }

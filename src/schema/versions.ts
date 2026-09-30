@@ -1,5 +1,5 @@
 /** Version constants recorded in every save so incompatible data is detected, never guessed. */
-export const ENGINE_VERSION = '0.4.0';
+export const ENGINE_VERSION = '0.5.0';
 /**
  * 2: statuses, modifiers, continuous and attached rules, decks, choices, custom actions.
  * 3: GM rulings (`askGm`). Older definitions are valid version 3 definitions.

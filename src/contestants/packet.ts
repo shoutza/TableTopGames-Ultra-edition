@@ -130,7 +130,8 @@ function rulesDigest(info: PublicGameInfo, names: Names): string {
     `GAME: ${info.name}. ${info.description}`,
     `Goal: first to ${v.threshold} ${resName(info, v.resource)} at the end of a round wins; otherwise most ${resName(info, v.resource)} after round ${v.roundLimit} (ties: ${v.ranking.slice(1).map((r) => resName(info, r)).join(', ')}).`,
     `Turn: roll 1d${s.movement.die}${bonus}, move up to that many steps along connections (or stay), then one action: buy at a shop here, attack ${s.combat.pvp ? 'an enemy or contestant' : 'an enemy'} here, use an item, a special action, rest (+${s.rest.heal} HP), or pass. Landing on a space triggers its rules; passing through does not.`,
-    `Combat: a wheel weighted by effective Power. Each spin, your chance = your Power ÷ (both Powers). The spin winner hits for ${damageText}, rounded, ${d.min}–${d.max} per hit (shields and armor may change hits). Up to ${s.combat.maxSpinsPerFight} spins per fight; survivors keep their HP. Items and statuses change Power (max ${s.inventoryCapacity} items).`,
+    `Combat: a wheel weighted by effective Power. Each spin, your chance = your Power ÷ (both Powers). The spin winner hits for ${damageText}, rounded, ${d.min}–${d.max} per hit (shields and armor may change hits). Up to ${s.combat.maxSpinsPerFight} spins per fight; survivors keep their HP. Items and statuses change Power.`,
+    `Inventory: a bag of ${s.inventoryCapacity} spaces (copies of a stackable item share a space)${s.equipment.length > 0 ? `; equipment slots ${s.equipment.map((x) => `${x.name}${x.count > 1 ? ` ×${x.count}` : ''}`).join(', ')}: gear gives its bonuses only while worn, and worn gear takes no bag space` : ''}. Equipping and throwing away items are free actions.`,
     ko,
     'Public rules:',
     ...info.rules.map((r) => `- ${r.name}: ${r.text}`),
@@ -194,7 +195,23 @@ function statLine(info: PublicGameInfo, e: ViewEntity): string {
 }
 
 function itemsText(e: ViewEntity): string {
-  return e.items.length ? e.items.map((i) => (i.concealed ? 'a concealed item' : i.name)).join(', ') : 'none';
+  if (!e.items.length) return 'none';
+  // Copies of the same item are listed once with a count; worn gear is marked.
+  const groups = new Map<string, { label: string; n: number }>();
+  for (const i of e.items) {
+    const label = i.concealed ? 'a concealed item' : `${i.name}${i.equipped ? ' (worn)' : ''}${i.charges !== null ? ` [${i.charges} uses]` : ''}`;
+    const g = groups.get(label);
+    if (g) g.n += 1;
+    else groups.set(label, { label, n: 1 });
+  }
+  return [...groups.values()].map((g) => (g.n > 1 ? `${g.n}× ${g.label}` : g.label)).join(', ');
+}
+
+/** GM tips for the viewer's own items that no option line shows (use options carry their own tip). */
+function itemTips(e: ViewEntity, view: ContestantView): string {
+  const shown = new Set((view.decision?.previews ?? []).flatMap((p) => (p.kind === 'use' ? [e.items.find((i) => i.id === p.item)?.defId] : [])));
+  const tips = [...new Map(e.items.filter((i) => i.hint && !shown.has(i.defId)).map((i) => [i.defId, `${i.name}: ${i.hint}`])).values()];
+  return tips.length ? ` · Tips: ${tips.join('; ')}` : '';
 }
 
 function fightLine(f: FightHint, maxSpins: number): string {
@@ -264,7 +281,17 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
       return `[${p.optionId}] Attack ${p.fight.opponentName} (${p.fight.theirPower} Power, ${p.fight.theirHp} HP): ${fightLine(p.fight, maxSpins)}`;
     case 'use': {
       const bits = hintsText(p.hints, false);
-      return `[${p.optionId}] Use ${p.name}${p.consumed ? ' (used up)' : ''}${bits.length ? ` — ${bits.join('; ')}` : ''}`;
+      const spend = p.consumed ? (p.charges !== null && p.charges > 1 ? ` (${p.charges} uses left)` : ' (used up)') : '';
+      const hint = p.aiHint ? ` [GM tip: ${p.aiHint}]` : '';
+      return `[${p.optionId}] Use ${p.name}${p.targetName ? ` on ${p.targetName}` : ''}${spend}${p.free ? ' (free action)' : ''}${bits.length ? ` — ${bits.join('; ')}` : ''}${hint}`;
+    }
+    case 'equip': {
+      const changes = p.changes.map((ch) => `${resName(info, ch.resource)} ${ch.from}→${ch.to}`).join(', ');
+      return `[${p.optionId}] Equip ${p.name}${p.replacesName ? ` (${p.replacesName} goes back in your bag)` : ''} (free action)${changes ? ` — ${changes}` : ''}`;
+    }
+    case 'drop': {
+      const changes = p.changes.map((ch) => `${resName(info, ch.resource)} ${ch.from}→${ch.to}`).join(', ');
+      return `[${p.optionId}] Throw away ${p.name}${p.worn ? ' (worn)' : ''} to make room (free action)${changes ? ` — ${changes}` : ''}`;
     }
     case 'act': {
       const bits = hintsText(p.hints, false);
@@ -352,7 +379,7 @@ export function buildInput(info: PublicGameInfo, view: ContestantView, mind: Con
   lines.push(`Current plan: ${mind.plan || 'none yet'}`);
   lines.push('');
   const place = me.spaceId ? names.space(me.spaceId) : 'nowhere';
-  lines.push(`YOU (${me.name}) at ${place}: ${statLine(info, me)} · Items: ${itemsText(me)} (${me.items.length}/${info.settings.inventoryCapacity})`);
+  lines.push(`YOU (${me.name}) at ${place}: ${statLine(info, me)} · Items: ${itemsText(me)} (bag ${view.inventory.bagUsed}/${view.inventory.bagCapacity})${itemTips(me, view)}`);
   if (me.suppressed.length > 0) lines.push(`Right now you ${me.suppressed.map((x) => `${describeCapabilityLoss(x.capability)} (${x.by})`).join('; ')}.`);
   const mine = view.objectives.filter((o) => o.mine && !o.done);
   if (mine.length > 0) lines.push(`YOUR SECRET OBJECTIVE${mine.length > 1 ? 'S' : ''}: ${mine.map((o) => objectiveLine(info, o)).join(' | ')}`);
