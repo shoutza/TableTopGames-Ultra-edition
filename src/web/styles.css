@@ -1259,3 +1259,56 @@ ul.changelog {
 .inv-slot .inv-actions select {
   max-width: 74px;
 }
+
+/* Phase track */
+.phase-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 13px;
+}
+.pt-round {
+  font-weight: 700;
+}
+.pt-order {
+  display: inline-flex;
+  gap: 4px;
+}
+.pt-who {
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 0 8px;
+  opacity: 0.85;
+}
+.pt-who.now {
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  font-weight: 700;
+  opacity: 1;
+}
+.pt-who.done {
+  opacity: 0.45;
+}
+.pt-who.out {
+  text-decoration: line-through;
+}
+.pt-phases {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  color: var(--muted);
+}
+.pt-phase.now {
+  color: var(--text);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 6px;
+  padding: 0 4px;
+}
+.pt-sep {
+  margin: 0 3px;
+  color: var(--line);
+}

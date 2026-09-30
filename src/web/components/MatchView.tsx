@@ -8,11 +8,14 @@ import { CombatWheel, fightsFrom, type FightAnimation } from './CombatWheel.tsx'
 import { EventLog, WhyPanel } from './EventLog.tsx';
 import { GmTools } from './GmTools.tsx';
 import { AiPanel, Inspector, Standings } from './Panels.tsx';
+import { PhaseTrack } from './PhaseTrack.tsx';
 import { RulingPanel } from './RulingPanel.tsx';
 import { Timeline } from './Timeline.tsx';
 import { EditorPage } from '../editor/EditorPage.tsx';
 
 type Tab = 'standings' | 'inspector' | 'gm' | 'timeline' | 'ai';
+
+const PHASE_NAMES: Record<string, string> = { roundStart: 'round starting', turnStart: 'turn start', roll: 'roll', move: 'move', main: 'action', turnEnd: 'turn end', roundEnd: 'round end', gameOver: 'game over' };
 
 const SPIN_MS: Record<Speed, number> = { fast: 150, normal: 750, slow: 1200 };
 
@@ -64,6 +67,10 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
     setError(null);
     api.control(matchId, speed ? { action, speed } : { action }).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   };
+  const play = (until: 'phase' | 'turn' | 'round' | null) => {
+    setError(null);
+    api.control(matchId, until ? { action: 'start', until } : { action: 'start' }).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+  };
   const setSpeed = (speed: Speed) => {
     api.control(matchId, { action: 'speed', speed }).catch((err: unknown) => setError(String(err)));
   };
@@ -89,7 +96,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
           <b>{def.name}</b> <span className="muted">{matchId}</span>
         </div>
         <div className="round">
-          Round {state.round}/{def.settings.victory.roundLimit} · {state.phase}
+          Round {state.phase === 'roundStart' ? state.round + 1 : state.round}/{def.settings.victory.roundLimit} · {PHASE_NAMES[state.phase] ?? state.phase}
           {active && state.phase !== 'gameOver' ? ` · ${state.entities[active]?.name}` : ''}
           {thinkingName
             ? ` · 🤔 ${thinkingName} is thinking…`
@@ -102,13 +109,24 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
         </div>
         <div className="controls">
           {status.running ? (
-            <button onClick={() => control('pause')}>⏸ Pause</button>
+            <button onClick={() => control('pause')}>⏸ Pause{status.until ? ` (playing to the next ${status.until})` : ''}</button>
           ) : (
-            <button disabled={status.over} onClick={() => control('start')}>
-              ▶ {state.round === 0 ? 'Start' : 'Resume'}
-            </button>
+            <>
+              <button className="primary" disabled={status.over} onClick={() => play('phase')} title="Play until the phase of the turn changes, then pause">
+                ⏭ Next phase
+              </button>
+              <button disabled={status.over} onClick={() => play('turn')} title="Play the rest of this turn; pause when the next contestant's turn starts">
+                Next turn
+              </button>
+              <button disabled={status.over} onClick={() => play('round')} title="Play the rest of this round; pause before the next one">
+                Next round
+              </button>
+              <button disabled={status.over} onClick={() => play(null)} title="Keep playing phases and turns until you pause">
+                ▶ Auto
+              </button>
+            </>
           )}
-          <button disabled={status.running || status.over} onClick={() => control('step')}>
+          <button disabled={status.running || status.over} onClick={() => control('step')} title="Exactly one engine operation">
             Step
           </button>
           <button onClick={() => control('save')}>💾 Save</button>
@@ -140,6 +158,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
       </header>
       {status.abortedMessage && <div className="banner error">An operation was stopped and rolled back: {status.abortedMessage}. The game is paused; fix or disable the rule, then resume.</div>}
       {error && <div className="banner error">{error}</div>}
+      <PhaseTrack def={def} state={state} />
       <RulingPanel data={latest} />
       {shown.phase === 'gameOver' && (
         <div className="banner ok">

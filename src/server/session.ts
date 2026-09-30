@@ -57,6 +57,9 @@ export interface OperationRecord {
   hash?: string | undefined;
 }
 
+/** How far the play loop runs before pausing by itself. */
+export type PlayUntil = 'phase' | 'turn' | 'round';
+
 export interface RulesVersion {
   mechanical: number;
   cosmetic: number;
@@ -448,8 +451,40 @@ export class MatchSession {
     this.notifyStatus();
   }
 
-  /** Starts (or resumes) the play loop. */
-  start(): void {
+  /** Where the play loop stops by itself: after the phase, the turn or the round changes (null = keeps going). */
+  until: PlayUntil | null = null;
+  private untilFrom: { phase: GameState['phase']; round: number; turn: number; turnKey: string } | null = null;
+
+  /** The turn in progress, or the one about to start (between rounds: the first turn of the next round). */
+  private turnKey(): string {
+    const s = this.state;
+    return s.phase === 'roundStart' || s.phase === 'roundEnd' ? `${s.round + 1}:0` : `${s.round}:${s.turn.index}`;
+  }
+
+  /** Whether the stop point of `until` has been reached. */
+  private reachedStop(): boolean {
+    const from = this.untilFrom;
+    if (!this.until || !from) return false;
+    const s = this.state;
+    if (s.phase === 'gameOver') return true;
+    switch (this.until) {
+      case 'phase':
+        return s.phase !== from.phase || s.turn.index !== from.turn || s.round !== from.round;
+      case 'turn':
+        // The turn in progress (or about to start) has been played and the next contestant's is about to start.
+        return s.phase === 'turnStart' && `${s.round}:${s.turn.index}` !== from.turnKey;
+      case 'round':
+        return s.phase === 'roundStart' && (s.round !== from.round || from.phase !== 'roundStart');
+    }
+  }
+
+  /**
+   * Starts (or resumes) the play loop. With `until`, it pauses by itself once the phase, the turn
+   * or the round has moved on (the GM steps through the game); without, it keeps going.
+   */
+  start(until: PlayUntil | null = null): void {
+    this.until = until;
+    this.untilFrom = until ? { phase: this.state.phase, round: this.state.round, turn: this.state.turn.index, turnKey: this.turnKey() } : null;
     // The ruling clock continues from where it stopped.
     if (this.rulingFrozen !== null && this.rulingSince) {
       this.rulingSince = { decisionId: this.rulingSince.decisionId, at: this.now() - (this.game.def.settings.adjudication.timeoutSeconds * 1000 - this.rulingFrozen) };
@@ -480,6 +515,11 @@ export class MatchSession {
           const r = await this.step();
           if (r === 'aborted') {
             this.activeMs += this.now() - t0;
+            break;
+          }
+          if (r === 'progress' && this.reachedStop()) {
+            this.activeMs += this.now() - t0;
+            this.pause();
             break;
           }
           if (r === 'waiting') {

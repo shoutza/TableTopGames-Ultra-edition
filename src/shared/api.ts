@@ -92,6 +92,8 @@ export interface StatusDto {
   speed: Speed;
   stateHash: string;
   savedAt: string | null;
+  /** While playing: where the match pauses by itself (next phase / turn / round), or null to keep going. */
+  until: 'phase' | 'turn' | 'round' | null;
   /** A GM ruling is waiting (the match does not go on until it is answered or times out). */
   ruling: { decisionId: string; timeLeftMs: number | null } | null;
   /** Ruleset versions: mechanical changes (shown to contestants) and cosmetic ones. */
@@ -169,6 +171,7 @@ export interface CreateMatchRequest {
 export interface ControlRequest {
   action: 'start' | 'pause' | 'step' | 'save' | 'speed' | 'resetProvider';
   speed?: Speed | undefined;
+  until?: 'phase' | 'turn' | 'round' | undefined;
 }
 
 export interface ContestantViewResponse {

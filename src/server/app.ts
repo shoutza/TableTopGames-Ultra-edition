@@ -109,6 +109,8 @@ function changeLogFrom(lines: HistoryLine[]): ChangeLogEntry[] {
 const ControlSchema = z.strictObject({
   action: z.enum(['start', 'pause', 'step', 'save', 'speed', 'resetProvider']),
   speed: z.enum(['fast', 'normal', 'slow']).optional(),
+  /** With start: play until the next phase, turn or round, then pause. */
+  until: z.enum(['phase', 'turn', 'round']).optional(),
 });
 
 async function readJson(req: http.IncomingMessage): Promise<unknown> {
@@ -216,6 +218,7 @@ export class GmApp {
       speed: h.speed,
       stateHash: stateHash(s.state),
       savedAt: h.savedAt,
+      until: s.running && !s.paused ? s.until : null,
       ruling: s.state.pendingDecision?.actor === GM ? { decisionId: s.state.pendingDecision.id, timeLeftMs: s.rulingTimeLeft() } : null,
       rulesVersion: { ...s.rulesVersion },
     };
@@ -635,7 +638,7 @@ export class GmApp {
     const s = h.session;
     switch (req.action) {
       case 'start':
-        s.start();
+        s.start(req.until ?? null);
         break;
       case 'pause':
         s.pause();
