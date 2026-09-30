@@ -368,10 +368,14 @@ export class MatchSession {
   /** Set by runToEnd: nobody is at the table, so rulings resolve to "No effect" at once. */
   private unattended = false;
 
+  /** Time left on the ruling clock when the match was paused (the clock stops while paused). */
+  private rulingFrozen: number | null = null;
+
   /** Milliseconds left before the waiting ruling times out (null when none is waiting). */
   rulingTimeLeft(): number | null {
     const d = this.state.pendingDecision;
     if (!d || d.actor !== GM || !this.rulingSince || this.rulingSince.decisionId !== d.id) return null;
+    if (this.paused && this.rulingFrozen !== null) return this.rulingFrozen;
     return Math.max(0, this.rulingSince.at + this.game.def.settings.adjudication.timeoutSeconds * 1000 - this.now());
   }
 
@@ -446,6 +450,11 @@ export class MatchSession {
 
   /** Starts (or resumes) the play loop. */
   start(): void {
+    // The ruling clock continues from where it stopped.
+    if (this.rulingFrozen !== null && this.rulingSince) {
+      this.rulingSince = { decisionId: this.rulingSince.decisionId, at: this.now() - (this.game.def.settings.adjudication.timeoutSeconds * 1000 - this.rulingFrozen) };
+    }
+    this.rulingFrozen = null;
     if (this.running) {
       this.paused = false;
       this.notifyStatus();
@@ -462,7 +471,7 @@ export class MatchSession {
           // Let the wheel finish (including fights started by GM commands) before moving on.
           const watching = this.animationUntil - t0;
           if (watching > 0) {
-            await new Promise((res) => setTimeout(res, watching));
+            await this.sleep(watching);
             if (this.paused) {
               this.activeMs += this.now() - t0;
               break;
@@ -475,19 +484,11 @@ export class MatchSession {
           }
           if (r === 'waiting') {
             // A GM ruling: sleep until it is answered, the match is paused, or its time runs out.
-            const left = this.rulingTimeLeft() ?? 1000;
-            await new Promise<void>((res) => {
-              const timer = setTimeout(res, Math.max(50, left));
-              this.wake = () => {
-                clearTimeout(timer);
-                res();
-              };
-            });
-            this.wake = null;
+            await this.sleep(Math.max(50, this.rulingTimeLeft() ?? 1000));
             this.activeMs += this.now() - t0;
             continue;
           }
-          if (r === 'progress' && this.stepDelayMs > 0) await new Promise((res) => setTimeout(res, this.stepDelayMs));
+          if (r === 'progress' && this.stepDelayMs > 0) await this.sleep(this.stepDelayMs);
           this.activeMs += this.now() - t0;
         }
       } catch (err) {
@@ -503,7 +504,29 @@ export class MatchSession {
     })();
   }
 
+  /** A pause in the play loop that ends early when the match is paused or a ruling is answered. */
+  private sleep(ms: number): Promise<void> {
+    if (this.paused) return Promise.resolve();
+    return new Promise<void>((res) => {
+      const timer = setTimeout(done, ms);
+      function done() {
+        clearTimeout(timer);
+        res();
+      }
+      this.wake = () => {
+        this.wake = null;
+        done();
+      };
+    });
+  }
+
+  /** Waits until the play loop has stopped after a pause (it may be finishing a step). */
+  async settled(): Promise<void> {
+    if (this.running && this.paused) await this.loop;
+  }
+
   pause(): void {
+    if (!this.paused) this.rulingFrozen = this.rulingTimeLeft();
     this.paused = true;
     this.wake?.();
     this.notifyStatus();

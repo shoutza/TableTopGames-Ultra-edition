@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GmCommandInput } from '../schema/commands.ts';
+import type { CheckResult, Proposal, ProposalAnswers } from '../schema/proposal.ts';
 import type {
   AiCallDto,
+  ApplyChangeResponse,
+  CheckpointDto,
   ContestantViewResponse,
   ControlRequest,
   EventDto,
   FiringDto,
+  MatchDefinitionResponse,
   MatchListItem,
+  MatchProposalResponse,
   MatchSnapshotDto,
   MatchUpdateDto,
+  RulesVersion,
+  ScenarioDto,
+  ScenarioListItem,
 } from '../shared/api.ts';
 
 /** Thin client for the GM API plus a live match hook fed by Server-Sent Events. */
@@ -26,7 +34,18 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   listMatches: () => request<MatchListItem[]>('GET', '/api/matches'),
-  scenarios: () => request<Array<{ id: string; name: string; description: string }>>('GET', '/api/scenarios'),
+  scenarios: () => request<ScenarioListItem[]>('GET', '/api/scenarios'),
+  scenario: (id: string) => request<ScenarioDto>('GET', `/api/scenarios/${encodeURIComponent(id)}`),
+  checkDefinition: (definition: unknown) => request<CheckResult>('POST', '/api/scenarios/check', { definition }),
+  proposeScenario: (definition: unknown, base: string | null) => request<Proposal>('POST', '/api/scenarios/propose', { definition, base }),
+  saveScenario: (id: string, definition: unknown, answers: Pick<ProposalAnswers, 'questions'>) => request<{ ok: true; definition: unknown }>('PUT', `/api/scenarios/${encodeURIComponent(id)}`, { definition, answers }),
+  deleteScenario: (id: string) => request<{ ok: true }>('DELETE', `/api/scenarios/${encodeURIComponent(id)}`),
+  matchDefinition: (matchId: string) => request<MatchDefinitionResponse>('GET', `/api/matches/${matchId}/definition`),
+  proposeMatch: (matchId: string, definition: unknown) => request<MatchProposalResponse>('POST', `/api/matches/${matchId}/propose`, { definition }),
+  applyMatch: (matchId: string, definition: unknown, answers: ProposalAnswers, baseVersion: RulesVersion) => request<ApplyChangeResponse>('POST', `/api/matches/${matchId}/apply`, { definition, answers, baseVersion }),
+  ruling: (matchId: string, optionId: string) => request<{ ok: true }>('POST', `/api/matches/${matchId}/ruling`, { optionId }),
+  checkpoints: (matchId: string) => request<CheckpointDto[]>('GET', `/api/matches/${matchId}/checkpoints`),
+  rewind: (matchId: string, rev: number) => request<{ ok: true; rev: number; round: number; backup: string }>('POST', `/api/matches/${matchId}/rewind`, { rev }),
   createMatch: (scenario: string, seed?: string) => request<{ matchId: string }>('POST', '/api/matches', seed ? { scenario, seed } : { scenario }),
   control: (matchId: string, body: ControlRequest) => request<{ ok: true }>('POST', `/api/matches/${matchId}/control`, body),
   gm: (matchId: string, cmd: GmCommandInput) => request<{ ok: true }>('POST', `/api/matches/${matchId}/gm`, cmd),

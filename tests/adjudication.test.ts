@@ -118,6 +118,27 @@ describe('rulings in a live match', () => {
     expect(session.operations.at(-1)?.input).toMatchObject({ optionId: 'ch:none', source: 'timeout' });
   });
 
+  it('the ruling clock stops while the match is paused', async () => {
+    let clock = 1_000_000;
+    const g = miniGame({ rules: [bribe], mutate: freeform });
+    const session = await MatchSession.create(g, { matchId: 'rule3', seed: 'ruling' }, { provider: null, config: DEFAULT_CONTROLLER_CONFIG, price: null, now: () => clock });
+    const actor = session.state.turnOrder[0] as string;
+    while (session.state.pendingDecision?.kind !== 'move') await session.step();
+    session.gm(GmCommandSchema.parse({ type: 'teleport', entity: actor, space: 'space.s2', asLanding: true }));
+    session.paused = false;
+    expect(await session.step()).toBe('waiting');
+    clock += 5_000;
+    session.pause();
+    clock += 60_000;
+    expect(session.rulingTimeLeft()).toBe(25_000);
+    expect(await session.step()).toBe('waiting');
+    session.start();
+    expect(session.rulingTimeLeft()).toBe(25_000);
+    session.pause();
+    await session.idle();
+    expect(session.state.pendingDecision?.actor).toBe(GM);
+  });
+
   it('the GM can answer at any time', async () => {
     const g = miniGame({ rules: [bribe] });
     const session = await MatchSession.create(g, { matchId: 'rule2', seed: 'ruling' }, { provider: null, config: DEFAULT_CONTROLLER_CONFIG, price: null });

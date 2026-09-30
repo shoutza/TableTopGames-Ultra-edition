@@ -9,6 +9,7 @@ import { ambiguityQuestions, applyAnswers } from '../src/authoring/questions.ts'
 import { GmCommandSchema } from '../src/schema/commands.ts';
 import { GameDefinitionSchema, type GameDefinitionInput } from '../src/schema/definition.ts';
 import type { GameState } from '../src/schema/state.ts';
+import { blankScenario, generateBoard, type BoardShape } from '../src/shared/templates.ts';
 import { choose, expectOk, miniDefinition, miniGame, startMini, type TestRule } from './helpers/mini.ts';
 
 /** M6: definition changes — diffs, migrations, questions, dry runs and proposals. */
@@ -247,6 +248,14 @@ describe('dry runs', () => {
     expect(run?.text).toContain('Fish');
   });
 
+  it('show where the trigger does not match (another kind of space)', () => {
+    const g = miniGame({ rules: [bananaRule] });
+    const [run] = dryRun(g, waiting(g), ['rule.bananas'], { simulate: 0 });
+    expect(run?.fired[0]?.trigger).toMatch(/lands on S2$/);
+    expect(run?.notFired[0]).toMatchObject({ checks: [{ ok: false }], results: ['did not fire (the trigger does not match)'] });
+    expect(run?.notFired[0]?.checks[0]?.text).toContain('Blue');
+  });
+
   it('probe modifiers and continuous rules', () => {
     const halve: TestRule = { id: 'rule.halve', kind: 'modifier', on: 'damage', modify: { op: 'scale', num: 1, den: 2, rounding: 'floor' } };
     const aura: TestRule = { id: 'rule.aura', kind: 'continuous', applies: { op: 'all', kind: 'contestant' }, when: { op: 'spaceHasTag', space: { op: 'spaceOf', entity: '$it' }, tag: 'tag.blue' }, modifiers: [{ resource: 'res.power', add: 10 }] };
@@ -299,5 +308,28 @@ describe('proposals', () => {
     expect(result.texts['rules:rule.bananas']).toMatch(/lands on a Blue space.*2 Bananas/);
     expect(result.stats).toMatchObject({ spaces: 6, connections: 5, rules: 1 });
     expect(locate(miniDefinition(), 'entry.star')).toEqual(['shops', 0, 'entries', 1]);
+  });
+});
+
+describe('templates', () => {
+  it('the blank scenario is valid and playable', () => {
+    const { result, game } = checkDefinition(blankScenario());
+    expect(result.issues.filter((i) => i.severity !== 'info')).toEqual([]);
+    expect(result.stats.spaces).toBe(30);
+    expect(game && startMini(game).state.pendingDecision).toBeTruthy();
+  });
+
+  it.each(['ring', 'grid', 'line', 'figure8', 'spokes'] as BoardShape[])('generates a connected %s board', (shape) => {
+    for (const n of [2, 7, 30, 64]) {
+      const d = blankScenario() as unknown as Record<string, unknown> & { settings: { startSpace: string }; enemies: Array<{ spawns: string[] }>; fixtures: Array<{ start: unknown }> };
+      const b = generateBoard(shape, n, { pattern: ['tag.coin', ''], oneWay: shape === 'ring' });
+      Object.assign(d, { spaces: b.spaces, connections: b.connections, layout: b.layout });
+      d.settings.startSpace = b.spaces[0]?.id as string;
+      d.enemies[0] = { ...d.enemies[0], spawns: [b.spaces.at(-1)?.id as string] } as (typeof d.enemies)[number];
+      d.fixtures[0] = { ...d.fixtures[0], start: { space: b.spaces[0]?.id } } as (typeof d.fixtures)[number];
+      const { result } = checkDefinition(d);
+      expect(result.issues.filter((i) => i.severity === 'error' || i.code === 'unreachable-space')).toEqual([]);
+      expect(result.stats.spaces).toBe(n);
+    }
   });
 });

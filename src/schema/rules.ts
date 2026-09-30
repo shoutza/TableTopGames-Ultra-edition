@@ -232,6 +232,40 @@ export interface ContinuousRule extends RuleBase {
 
 export type RuleDef = ReactionRule | ModifierRule | ContinuousRule;
 
+export type EntityScopeBinding = '$actor' | '$target' | '$holder';
+
+/** Bindings each trigger provides ($holder is added for attached rules). */
+export const TRIGGER_BINDINGS: Record<TriggerEvent, { entities: EntityScopeBinding[]; space: boolean; amount: boolean }> = {
+  roundStarted: { entities: [], space: false, amount: false },
+  roundEnded: { entities: [], space: false, amount: false },
+  turnStarted: { entities: ['$actor'], space: false, amount: false },
+  turnEnded: { entities: ['$actor'], space: false, amount: false },
+  left: { entities: ['$actor'], space: true, amount: false },
+  entered: { entities: ['$actor'], space: true, amount: false },
+  landed: { entities: ['$actor'], space: true, amount: false },
+  resourceChanged: { entities: ['$target'], space: false, amount: true },
+  purchased: { entities: ['$actor', '$target'], space: false, amount: false },
+  defeated: { entities: ['$actor', '$target'], space: false, amount: false },
+  itemGained: { entities: ['$actor'], space: false, amount: false },
+  itemLost: { entities: ['$actor'], space: false, amount: false },
+  itemUsed: { entities: ['$actor'], space: true, amount: false },
+  statusApplied: { entities: ['$target'], space: false, amount: true },
+  statusRemoved: { entities: ['$target'], space: false, amount: true },
+  damaged: { entities: ['$actor', '$target'], space: false, amount: true },
+  cardDrawn: { entities: ['$actor'], space: true, amount: false },
+  actionUsed: { entities: ['$actor', '$target'], space: true, amount: false },
+  spawned: { entities: ['$target'], space: true, amount: false },
+};
+
+/** Bindings each modifier kind provides (`amount` is the value being modified). */
+export const MODIFIER_BINDINGS: Record<ModifierEvent, EntityScopeBinding[]> = {
+  damage: ['$actor', '$target'],
+  resourceChange: ['$target'],
+  price: ['$actor'],
+  moveRoll: ['$actor'],
+  statusApply: ['$actor', '$target'],
+};
+
 // ---------------------------------------------------------------------------------------------
 // Zod schemas (runtime validation of imported definitions and saves)
 // ---------------------------------------------------------------------------------------------

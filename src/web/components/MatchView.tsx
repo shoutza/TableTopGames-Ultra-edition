@@ -8,8 +8,11 @@ import { CombatWheel, fightsFrom, type FightAnimation } from './CombatWheel.tsx'
 import { EventLog, WhyPanel } from './EventLog.tsx';
 import { GmTools } from './GmTools.tsx';
 import { AiPanel, Inspector, Standings } from './Panels.tsx';
+import { RulingPanel } from './RulingPanel.tsx';
+import { Timeline } from './Timeline.tsx';
+import { EditorPage } from '../editor/EditorPage.tsx';
 
-type Tab = 'standings' | 'inspector' | 'gm' | 'ai';
+type Tab = 'standings' | 'inspector' | 'gm' | 'timeline' | 'ai';
 
 const SPIN_MS: Record<Speed, number> = { fast: 150, normal: 750, slow: 1200 };
 
@@ -27,6 +30,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('standings');
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const namesRef = useRef(new Map<string, { name: string; color: string }>());
   const { data: latest, connected } = useMatch(
@@ -71,6 +75,10 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
   const shown = data.state;
   const thinkingName = status.thinking ? state.entities[status.thinking]?.name : null;
 
+  if (editing) {
+    return <EditorPage target={{ kind: 'match', matchId, paused: !status.running, onPause: () => control('pause') }} onClose={() => setEditing(false)} />;
+  }
+
   return (
     <main className="match">
       <header className="topbar">
@@ -86,8 +94,11 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
           {thinkingName
             ? ` · 🤔 ${thinkingName} is thinking…`
             : pending
-              ? ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind === 'choice' ? `choice: ${pending.prompt ?? ''}` : pending.kind === 'trade' ? (pending.prompt ?? 'trade') : pending.kind})`
+              ? pending.actor === 'gm'
+                ? ' · ⚖ waiting for your ruling'
+                : ` · awaiting ${state.entities[pending.actor]?.name} (${pending.kind === 'choice' ? `choice: ${pending.prompt ?? ''}` : pending.kind === 'trade' ? (pending.prompt ?? 'trade') : pending.kind})`
               : ''}
+          {status.rulesVersion.mechanical > 1 ? ` · rules v${status.rulesVersion.mechanical}` : ''}
         </div>
         <div className="controls">
           {status.running ? (
@@ -101,6 +112,9 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
             Step
           </button>
           <button onClick={() => control('save')}>💾 Save</button>
+          <button onClick={() => setEditing(true)} title="Change the rules, board or cast of this match">
+            ✏️ Edit rules
+          </button>
           <select value={status.speed} onChange={(e) => setSpeed(e.target.value as Speed)} aria-label="Speed">
             <option value="slow">Slow</option>
             <option value="normal">Normal</option>
@@ -126,6 +140,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
       </header>
       {status.abortedMessage && <div className="banner error">An operation was stopped and rolled back: {status.abortedMessage}. The game is paused; fix or disable the rule, then resume.</div>}
       {error && <div className="banner error">{error}</div>}
+      <RulingPanel data={latest} />
       {shown.phase === 'gameOver' && (
         <div className="banner ok">
           🏆 {(shown.winners ?? []).map((w) => shown.entities[w]?.name).join(' & ')} win — {shown.endReason}
@@ -150,9 +165,9 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
         </div>
         <aside className="side">
           <nav className="tabs">
-            {(['standings', 'inspector', 'gm', 'ai'] as const).map((t) => (
+            {(['standings', 'inspector', 'gm', 'timeline', 'ai'] as const).map((t) => (
               <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-                {t === 'standings' ? 'Standings' : t === 'inspector' ? 'Inspector' : t === 'gm' ? 'GM tools' : 'AI'}
+                {t === 'standings' ? 'Standings' : t === 'inspector' ? 'Inspector' : t === 'gm' ? 'GM tools' : t === 'timeline' ? 'Timeline' : 'AI'}
               </button>
             ))}
           </nav>
@@ -160,6 +175,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
             {tab === 'standings' && <Standings data={data} selected={selectedEntity} onSelect={selectEntity} />}
             {tab === 'inspector' && <Inspector data={data} entityId={selectedEntity} />}
             {tab === 'gm' && <GmTools data={latest} entityId={selectedEntity} teleportTarget={selectedSpace} />}
+            {tab === 'timeline' && <Timeline data={latest} onEditRules={() => setEditing(true)} />}
             {tab === 'ai' && <AiPanel data={latest} />}
           </div>
         </aside>

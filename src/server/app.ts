@@ -550,6 +550,7 @@ export class GmApp {
     if (level === 'none') return { ok: true, level, rulesVersion: { ...s.rulesVersion }, invalidated: null };
     let invalidated: string | null = null;
     if (level === 'mechanical') {
+      await s.settled();
       if (s.running) throw new HttpError(409, 'pause the match before changing its rules (names, looks and personas can change while it plays)');
       if (s.over) throw new HttpError(409, 'the match is over');
       const plan = planMigration(s.game, fin.game, s.state);
@@ -590,6 +591,7 @@ export class GmApp {
   private async rewind(h: Hosted, body: unknown): Promise<{ ok: true; rev: number; round: number; backup: string }> {
     const { rev } = RewindSchema.parse(body);
     const s = h.session;
+    await s.settled();
     if (s.running) throw new HttpError(409, 'pause the match before rewinding');
     if (rev > s.state.rev) throw new HttpError(422, `revision ${rev} is in the future`);
     if (h.saveTimer) {

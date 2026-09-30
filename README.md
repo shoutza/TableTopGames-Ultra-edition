@@ -36,7 +36,8 @@ npm run fuzz -- --runs 500 --gm 0.2          # random play + random GM edits, ch
 
 ### Using the GM app
 
-1. Create a match (Star Chase), press **Start**. Contestants pick strategies, then play.
+1. On the home page pick a scenario and press **Play** (Star Chase is built in), then **Start**.
+   Contestants pick strategies, then play.
 2. Click a token or standings row to inspect it: stats (base vs. effective Power), items,
    personality, strategy, plan, and **View as contestant** (the exact packet its model sees).
 3. **GM tools** act on the selected entity: adjust or set resources, add/remove tags, teleport
@@ -51,3 +52,23 @@ npm run fuzz -- --runs 500 --gm 0.2          # random play + random GM edits, ch
 5. **Save** writes a snapshot; matches also autosave a moment after every operation, on pause and on
    shutdown, so a crash loses at most the last fraction of a second. After a restart, open the
    match from the list and resume — the state hash in the top bar matches.
+6. **Edit rules** (top bar, or the *Timeline* tab) opens the editor on the match's own rules. Names,
+   looks and personalities apply at once; rule changes need a pause and are reviewed first (what
+   changes, what contestants are told, what happens to the match, questions, dry runs). Changes
+   that cannot apply mid-match are blocked with the reason.
+7. When a rule asks you (`askGm`) or a contestant attempts something freeform, the **ruling panel**
+   shows the question and options; the match waits (the clock runs only while playing).
+8. **Timeline → Rewind** goes back to the start of any round; the rest is replayed from the recorded
+   inputs (no model calls) and a backup of the cut history is kept.
+
+### Making scenarios
+
+**+ New scenario** starts a small playable scenario (a 30-space ring, coins, hazards, a market and a
+troll). Every section has forms and a JSON tab: the **Board** (add, drag, connect, paint tags, or
+generate rings, grids, figure eights and hubs), resources, tags, items, statuses, shops, fixtures,
+enemies, decks and cards, actions, secret objectives, the cast and their personalities, the rules
+(reactions, modifiers and continuous effects with condition trees and nested effects) and all
+settings. Problems show up live in the right column (click to jump there); **Review & save** shows
+the changes, asks about easy-to-miss details and dry-runs new rules before saving. Built-in scenarios
+are saved as copies; **Import / Export** read and write the scenario JSON. Your scenarios live in
+`data/scenarios/`.

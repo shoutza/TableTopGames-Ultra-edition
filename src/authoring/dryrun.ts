@@ -2,7 +2,7 @@ import type { CompiledGame, CompiledRule } from '../engine/compile.ts';
 import type { FiringRecord } from '../engine/context.ts';
 import { CheckEnv } from '../engine/decisions.ts';
 import { GM } from '../engine/effects.ts';
-import { describeCond, describeEvent, describeRule, namesFor } from '../engine/explain.ts';
+import { describeCond, describeEvent, describeRule, describeTrigger, namesFor } from '../engine/explain.ts';
 import { applyGmCommand } from '../engine/gm.ts';
 import { computeModifiers } from '../engine/modifiers.ts';
 import { effectiveValue, suppressedCapabilities } from '../engine/queries.ts';
@@ -66,23 +66,25 @@ function record(game: CompiledGame, targets: Set<string>, out: Extract<OpOutcome
     const list = c.fired.get(f.rule) ?? [];
     if (list.length >= MAX_FIRED) continue;
     const results = out.events.filter((e) => e.cause.firing === f.id).map((e) => text(e));
-    list.push({ trigger: `${probe ? `${probe}: ` : ''}${text(bySeq.get(f.trigger))}`, checks: f.checks, results: results.length > 0 ? results : ['(no visible change)'] });
+    list.push({ trigger: probe ?? text(bySeq.get(f.trigger)), checks: f.checks, results: results.length > 0 ? results : ['(no visible change)'] });
     c.fired.set(f.rule, list);
   }
   for (const m of misses) {
     if (!targets.has(m.rule)) continue;
     const list = c.missed.get(m.rule) ?? [];
     if (list.length >= MAX_MISSED) continue;
-    list.push({ trigger: `${probe ? `${probe}: ` : ''}${text(m.trigger)}`, checks: m.checks, results: ['did not fire'] });
+    list.push({ trigger: probe ?? text(m.trigger), checks: m.checks, results: ['did not fire'] });
     c.missed.set(m.rule, list);
   }
 }
 
-function run(game: CompiledGame, targets: Set<string>, c: Collector, fn: () => OpOutcome, probe: string | null): GameState | null {
+/** Runs one operation and records examples; `touched` lists the target rules that fired or were checked. */
+function run(game: CompiledGame, targets: Set<string>, c: Collector, fn: () => OpOutcome, probe: string | null): { state: GameState | null; touched: Set<string> } {
   const { result, misses } = observeMisses(fn);
-  if (!result.ok) return null;
+  if (!result.ok) return { state: null, touched: new Set() };
   record(game, targets, result, misses, c, probe);
-  return result.state;
+  const touched = new Set([...(result.firings as FiringRecord[]).map((f) => f.rule), ...misses.map((m) => m.rule)].filter((r) => targets.has(r)));
+  return { state: result.state, touched };
 }
 
 function gm(game: CompiledGame, state: GameState, cmd: GmCommandInput): OpOutcome {
@@ -150,7 +152,13 @@ function probeReaction(game: CompiledGame, base: GameState, rule: ReactionRule, 
       const applied = gm(game, base, { type: 'applyStatus', entity: cmd.entity, status: cmd.status });
       if (applied.ok) from = applied.state;
     }
-    run(game, targets, c, () => gm(game, from, cmd), label);
+    const { state, touched } = run(game, targets, c, () => gm(game, from, cmd), label);
+    // The probe ran but the rule was never even considered: its trigger's filter did not match.
+    if (state && !touched.has(rule.id)) {
+      const list = c.missed.get(rule.id) ?? [];
+      if (list.length < MAX_MISSED) list.push({ trigger: label, checks: [{ text: describeTrigger(rule.trigger, names), ok: false }], results: ['did not fire (the trigger does not match)'] });
+      c.missed.set(rule.id, list);
+    }
   }
 }
 
@@ -161,11 +169,11 @@ function simulate(game: CompiledGame, base: GameState, targets: Set<string>, c: 
   for (let i = 0; i < operations && nextStepKind(state) !== 'gameOver'; i++) {
     const d = state.pendingDecision;
     let next: GameState | null;
-    if (!d) next = run(game, targets, c, () => advance(game, state), null);
+    if (!d) next = run(game, targets, c, () => advance(game, state), null).state;
     else {
       const plain = d.options.filter((o) => o.kind !== 'trade' && o.kind !== 'freeform' && o.id !== 'tr:counter');
       const option = d.actor === GM ? 'ch:none' : (plain[Math.floor(rand() * plain.length)]?.id ?? 'pass');
-      next = run(game, targets, c, () => answerDecision(game, state, { decisionId: d.id, optionId: option }), null);
+      next = run(game, targets, c, () => answerDecision(game, state, { decisionId: d.id, optionId: option }), null).state;
     }
     if (!next) break;
     state = next;

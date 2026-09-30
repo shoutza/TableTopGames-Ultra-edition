@@ -198,9 +198,47 @@ cautious banker remains weakest; balance should be revisited with model-driven c
 full state (deltas are M8); separate non-blocking dialogue calls are deferred.
 
 ## M6 — GM authoring and live edits
-Board editor, definition editors (resources, items, enemies with stats and rewards, shops, cast,
-victory), constrained rule editor, proposal pipeline with ambiguity probes and dry runs, ruleset
-versioning and migrations, rewind, `askGm` and freeform attempts.
+- [x] `askGm` effect and freeform attempts: the game waits for a GM ruling (authored options or
+      "No effect"; also the result on timeout, counted in playing time); ruling panel with countdown
+- [x] Scenario library: built-in scenarios (read-only, "save as copy") and the GM's own
+      (`data/scenarios/`); create, duplicate, delete, import and export JSON, play any valid scenario
+- [x] Editor with every definition section as forms, a JSON tab per entry and for the whole scenario,
+      undo/redo, live check (problems located and clickable), generated plain-language text for rules,
+      id renaming everywhere, a draft kept in the browser
+- [x] Board editor: add, drag, connect (one-way or both), paint tags, delete; start space; generators
+      (ring, grid, winding line, figure eight, hub and spokes, with tag patterns)
+- [x] Rule editor: reaction / modifier / continuous; trigger with the filters its event supports;
+      AND / OR / NOT condition trees; effect lists with nested if / for each / random outcomes /
+      choices / GM rulings; limits, priority, visibility; a metadata-driven node editor so every
+      primitive of the language is reachable without JSON, and a `{ }` JSON switch on every node
+- [x] Proposal pipeline for every save and every live change: diff by level, public summary,
+      migration plan (auto / confirm / blocked with the reason), code-generated ambiguity questions
+      (teleport landing, rounding with real numbers, "everyone" and the actor, status stacking),
+      dry runs with fired and not-fired examples
+- [x] Live changes: cosmetic and personality changes apply while playing; mechanical changes apply
+      while paused as one operation that withdraws and re-issues the waiting decision; ruleset
+      versions and a change log; contestants are told what changed (hidden rules left out) and
+      reconsider their strategy
+- [x] Rewind to the start of any round by replaying recorded inputs (hash-checked, history backup
+      kept, minds rebuilt from what each contestant had seen); play continues from there
+
+**Acceptance (headless Chromium, offline contestants):** a new scenario is built without touching
+JSON — a 30-space figure-eight board generated with a Coin / Hazard pattern, a space painted Lair,
+renamed and dragged, one more space added and connected, a rule made from forms — reviewed (dry runs
+shown), saved and played to round 3. In a running Star Chase match, changing the Coin rule while a
+move decision waits shows the review ("what contestants are told", before/after, dry runs), applies
+as version 2 and logs "📜 The rules changed (version 2): … — the waiting decision d1 was withdrawn and
+asked again". Deleting a playing cast member is blocked ("Captain Brine is playing in this match.
+Contestants cannot be removed mid-match …") and cannot be applied. A new `askGm` rule brings up the
+ruling panel; answering it continues play. Rewinding from round 3 to round 2 reproduces the recorded
+state hash and play continues to round 3 again. No console errors. Bugs found and fixed on the way: a
+fresh condition defaulted to an empty tag (invalid at once), new entries kept their placeholder ids,
+a paused match could refuse a rewind while its loop was still finishing a combat animation, and dry
+runs repeated probe text and missed "trigger does not match" examples.
+
+**Done when:** a GM builds a 30-space board and runs a match without touching JSON; a rule changed
+mid-match visibly invalidates the waiting decision; incompatible edits are blocked with an
+explanation; rewinding to round N and continuing works.
 
 ## M7 — Natural-language authoring (optional AI feature)
 Separately configured authoring model, depth-bounded proposal schema, unsupported/ambiguity reporting,
