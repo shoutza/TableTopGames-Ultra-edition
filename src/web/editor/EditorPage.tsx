@@ -80,6 +80,8 @@ export function EditorPage({ target, onClose, onPlay }: { target: EditorTarget; 
   const [draft, setDraft] = useState<Json | null>(null);
   const [saved, setSaved] = useState<Json | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  /** The saved scenario this draft started from (itself, or the one it copies): reviews compare against it. */
+  const [sourceId, setSourceId] = useState<string | null>(null);
   const [builtIn, setBuiltIn] = useState(false);
   const [baseVersion, setBaseVersion] = useState<RulesVersion | null>(null);
   const [changes, setChanges] = useState<ChangeLogEntry[]>([]);
@@ -113,12 +115,14 @@ export function EditorPage({ target, onClose, onPlay }: { target: EditorTarget; 
           def = r.definition as Json;
           setBuiltIn(r.builtIn);
           setSavedId(r.builtIn ? null : r.id);
+          setSourceId(r.id);
         } else if (target.copyFrom) {
           const r = await api.scenario(target.copyFrom);
           const list = await api.scenarios();
           let id = `${r.id}-copy`;
           for (let i = 2; list.some((s) => s.id === id); i++) id = `${r.id}-copy${i}`;
           def = { ...(r.definition as Json), id, name: `${String((r.definition as Json)['name'])} (copy)`.slice(0, 80) };
+          setSourceId(r.id);
         } else {
           const list = await api.scenarios();
           let id = 'my-scenario';
@@ -276,7 +280,7 @@ export function EditorPage({ target, onClose, onPlay }: { target: EditorTarget; 
           if (existing?.builtIn) throw new Error(`“${id}” is a built-in scenario; give your copy another id (Overview).`);
           if (existing && !window.confirm(`A scenario with the id “${id}” already exists (${existing.name}). Replace it?`)) return;
         }
-        const base = savedId === id ? savedId : null;
+        const base = savedId === id ? savedId : sourceId;
         setReview({ proposal: await api.proposeScenario(def, base), needsPause: false });
       }
     } catch (err) {
@@ -304,11 +308,12 @@ export function EditorPage({ target, onClose, onPlay }: { target: EditorTarget; 
         setNotice(r.level === 'mechanical' ? `Rules changed (version ${r.rulesVersion.mechanical}).${r.invalidated ? ` The waiting decision ${r.invalidated} was withdrawn and asked again.` : ''}` : 'Applied.');
       } else {
         const id = String(draft['id'] ?? '');
-        const r = await api.saveScenario(id, draft, { questions: answers.questions });
+        const r = await api.saveScenario(id, draft, { questions: answers.questions }, savedId === id ? savedId : sourceId);
         const def = r.definition as Json;
         setDraft(def);
         setSaved(def);
         setSavedId(id);
+        setSourceId(id);
         setBuiltIn(false);
         writeStored(key, null);
         writeStored(storageKey({ kind: 'scenario', id }), null);

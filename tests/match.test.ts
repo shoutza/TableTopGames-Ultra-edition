@@ -37,7 +37,7 @@ describe('starter scenario', () => {
     }
     expect(real / turns).toBeGreaterThanOrEqual(1.5);
     expect(demonFights).toBeGreaterThan(0);
-  });
+    }, 30_000); // 25 complete matches: CPU-bound, slower while other suites run in parallel
 
   it('never mutates a committed state (every input state is frozen)', () => {
     const created = expectOk(createMatch(starter, { matchId: 'frozen', seed: 'frozen' }));

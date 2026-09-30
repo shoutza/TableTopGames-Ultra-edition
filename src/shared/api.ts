@@ -213,6 +213,8 @@ export interface ScenarioProposalRequest {
 export interface SaveScenarioRequest {
   definition: unknown;
   answers: Pick<ProposalAnswers, 'questions'>;
+  /** The scenario the review compared against (default: the saved version of this id). */
+  base?: string | null;
 }
 
 /** Review a change to a running match's rules. */

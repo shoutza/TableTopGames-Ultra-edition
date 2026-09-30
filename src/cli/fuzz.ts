@@ -1,4 +1,6 @@
-import { advance, answerDecision, applyGmCommand, createMatch, effectiveValue, GM, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
+import { advance, answerDecision, applyGmCommand, cloneJson, createMatch, effectiveValue, GM, loadGame, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
+import { applyDefinitionChange, planMigration } from '../engine/migrate.ts';
+import type { GameDefinition } from '../schema/definition.ts';
 import { resourceBounds } from '../engine/queries.ts';
 import { GmCommandSchema, type GmCommandInput } from '../schema/commands.ts';
 import type { TradeOfferInput } from '../schema/trade.ts';
@@ -93,10 +95,161 @@ export function checkInvariants(game: CompiledGame, state: GameState): string[] 
     else if (goal.kind === 'count' && o.progress > goal.times) out.push(`objective ${o.id} over-counted`);
   }
   if (state.phase === 'gameOver' && (!state.winners || state.winners.length === 0)) out.push('game over without winners');
+  // Everything in the state refers to the current definition (checked hard after rule changes).
+  for (const e of Object.values(state.entities)) {
+    if (e.status === 'removed') continue;
+    for (const r of Object.keys(e.resources)) {
+      const def = game.resources.get(r);
+      if (!def) out.push(`${e.id} has unknown resource ${r}`);
+      else if (!def.appliesTo.includes(e.kind)) out.push(`${e.id} (${e.kind}) has ${r}`);
+    }
+    for (const r of game.def.resources) if (r.appliesTo.includes(e.kind) && e.resources[r.id] === undefined) out.push(`${e.id} lacks ${r.id}`);
+    for (const t of e.tags) if (!game.tags.has(t)) out.push(`${e.id} has unknown tag ${t}`);
+    if (e.spaceId !== null && !game.spaces.has(e.spaceId)) out.push(`${e.id} stands on unknown space ${e.spaceId}`);
+    const known = e.kind === 'contestant' ? game.cast.has(e.defId) : e.kind === 'enemy' ? game.enemies.has(e.defId) : game.fixtures.has(e.defId);
+    if (!known) out.push(`${e.id} has unknown definition ${e.defId}`);
+  }
+  for (const item of Object.values(state.items)) if (!game.items.has(item.defId)) out.push(`item ${item.id} has unknown definition ${item.defId}`);
+  for (const [id, pile] of Object.entries(state.decks)) {
+    const deck = game.decks.get(id);
+    if (!deck) {
+      out.push(`unknown deck ${id}`);
+      continue;
+    }
+    const total = deck.cards.reduce((n, c) => n + c.count, 0);
+    if (pile.draw.length + pile.discard.length !== total) out.push(`deck ${id} has ${pile.draw.length + pile.discard.length} cards, expected ${total}`);
+    for (const c of [...pile.draw, ...pile.discard]) if (!game.cards.has(c)) out.push(`deck ${id} holds unknown card ${c}`);
+  }
+  for (const c of state.queue) if (c.rule !== undefined && !game.rules.has(c.rule)) out.push(`queued choice from unknown rule ${c.rule}`);
   return out;
 }
 
-type Step = { kind: 'auto' } | { kind: 'answer'; optionId: string; trade?: TradeOfferInput; attempt?: string } | { kind: 'gm'; cmd: GmCommandInput };
+type Step =
+  | { kind: 'auto' }
+  | { kind: 'answer'; optionId: string; trade?: TradeOfferInput; attempt?: string }
+  | { kind: 'gm'; cmd: GmCommandInput }
+  | { kind: 'rules'; game: CompiledGame; answers: Record<string, string>; label: string };
+
+type Json = Record<string, unknown>;
+
+/** Whether an id appears anywhere in the definition except as the `id` of its own entry. */
+function referenced(def: GameDefinition, id: string, skip: unknown): boolean {
+  let found = false;
+  const visit = (v: unknown, key: string | null): void => {
+    if (found || v === skip) return;
+    if (v === id && key !== 'id') found = true;
+    else if (Array.isArray(v)) v.forEach((x) => visit(x, null));
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Json)) visit(x, k);
+  };
+  visit(def, null);
+  return found;
+}
+
+/**
+ * A random change to the running match's definition: removing unreferenced entries or spaces,
+ * tightening bounds, changing stats, capacities, dice and victory, adding resources, enemies and
+ * rules (including GM rulings), and changes that must be blocked (removing a playing contestant,
+ * turning a pool into a stat). Returns null when the mutation does not compile.
+ */
+function randomDefinitionChange(rand: () => number, game: CompiledGame, state: GameState): { game: CompiledGame; label: string } | null {
+  const def = cloneJson(game.def);
+  const pick = <T>(list: T[]): T | undefined => list[Math.floor(rand() * list.length)];
+  const kinds = ['removeEntry', 'removeItem', 'removeItem', 'removeSpace', 'bounds', 'enemyStats', 'capacity', 'addResource', 'addEnemy', 'addRule', 'ruling', 'die', 'victory', 'stacks', 'removeCast', 'role'] as const;
+  const kind = pick([...kinds]) as (typeof kinds)[number];
+  const suffix = `${state.rev}_${Math.floor(rand() * 1000)}`;
+  switch (kind) {
+    case 'removeEntry': {
+      const sections = ['items', 'statuses', 'enemies', 'decks', 'objectives', 'actions', 'rules', 'tags', 'fixtures', 'shops'] as const;
+      const section = pick([...sections]) as (typeof sections)[number];
+      const list = def[section] as Array<{ id: string }>;
+      const candidates = list.filter((e) => !referenced(def, e.id, e));
+      const victim = pick(candidates);
+      if (!victim) return null;
+      (def as unknown as Record<string, unknown>)[section] = list.filter((e) => e !== victim);
+      break;
+    }
+    case 'removeItem': {
+      // An item and the shop entries selling it (as long as each shop keeps something to sell).
+      const item = pick(def.items);
+      if (!item) return null;
+      for (const shop of def.shops) shop.entries = shop.entries.filter((en) => !('item' in en.grants) || en.grants.item !== item.id);
+      if (def.shops.some((shop) => shop.entries.length === 0)) return null;
+      def.items = def.items.filter((x) => x !== item);
+      if (referenced(def, item.id, null)) return null;
+      break;
+    }
+    case 'removeSpace': {
+      const victim = pick(def.spaces.filter((sp) => sp.id !== def.settings.startSpace));
+      if (!victim) return null;
+      const rest = { ...def, connections: [], layout: { ...def.layout, positions: {} } };
+      if (referenced(rest as GameDefinition, victim.id, victim)) return null;
+      def.spaces = def.spaces.filter((sp) => sp !== victim);
+      def.connections = def.connections.filter((c) => c.a !== victim.id && c.b !== victim.id);
+      delete def.layout.positions[victim.id];
+      break;
+    }
+    case 'bounds': {
+      const r = pick(def.resources.filter((x) => x.role === 'pool' && x.maxFrom === undefined));
+      if (!r) return null;
+      r.max = Math.max(r.min + 1, Math.floor((r.max ?? 200) * (0.2 + rand() * 0.6)));
+      r.default = Math.min(r.default, r.max);
+      break;
+    }
+    case 'enemyStats': {
+      const e = pick(def.enemies);
+      if (!e) return null;
+      e.power = Math.max(1, Math.round(e.power * (0.5 + rand())));
+      e.maxHp = Math.max(1, Math.round(e.maxHp * (0.3 + rand())));
+      break;
+    }
+    case 'capacity':
+      def.settings.inventoryCapacity = Math.floor(rand() * def.settings.inventoryCapacity);
+      break;
+    case 'addResource':
+      def.resources.push({ id: `res.fz${suffix}`, name: `Fuzz ${suffix}`, role: 'pool', appliesTo: ['contestant'], default: Math.floor(rand() * 5), min: 0, max: 20, visibility: 'public', tradeable: rand() < 0.5 });
+      break;
+    case 'addEnemy': {
+      const space = pick(def.spaces);
+      if (!space) return null;
+      def.enemies.push({ id: `enemy.fz${suffix}`, name: `Fuzzling ${suffix}`, tags: [], power: 50 + Math.floor(rand() * 150), maxHp: 20 + Math.floor(rand() * 60), regenPerRound: 0, respawnAfterRounds: rand() < 0.5 ? null : 2, rewards: [{ op: 'changeResource', target: '$actor', resource: def.settings.core.gold, amount: 3 }], spawns: [space.id], boss: false, rules: [] });
+      break;
+    }
+    case 'addRule':
+      def.rules.push({ id: `rule.fz${suffix}`, name: `Fuzz tax ${suffix}`, kind: 'reaction', enabled: true, visibility: rand() < 0.3 ? 'hidden' : 'public', priority: 0, trigger: { event: 'landed' }, effects: [{ op: 'changeResource', target: '$actor', resource: def.settings.core.gold, amount: -1 - Math.floor(rand() * 3) }] });
+      break;
+    case 'ruling':
+      def.rules.push({ id: `rule.fzgm${suffix}`, name: `Fuzz ruling ${suffix}`, kind: 'reaction', enabled: true, visibility: 'public', priority: 0, limits: { maxPerRound: 1 }, trigger: { event: 'turnStarted' }, effects: [{ op: 'askGm', question: 'Lucky?', about: '$actor', options: [{ id: 'yes', label: 'Yes', effects: [{ op: 'changeResource', target: '$actor', resource: def.settings.core.gold, amount: 2 }] }] }] });
+      break;
+    case 'die':
+      def.settings.movement.die = 2 + Math.floor(rand() * 10);
+      break;
+    case 'victory':
+      def.settings.victory.threshold = Math.max(1, def.settings.victory.threshold + (rand() < 0.5 ? -1 : 1));
+      break;
+    case 'stacks': {
+      const st = pick(def.statuses.filter((x) => x.stacking === 'stack'));
+      if (!st) return null;
+      st.maxStacks = Math.max(1, st.maxStacks - 1 - Math.floor(rand() * 3));
+      if (st.maxStacks === 1) st.stacking = 'refresh';
+      break;
+    }
+    case 'removeCast': {
+      const playing = pick(state.turnOrder);
+      const castId = playing ? state.entities[playing]?.defId : undefined;
+      if (!castId || def.cast.length < 2) return null;
+      def.cast = def.cast.filter((c) => c.id !== castId);
+      break;
+    }
+    case 'role': {
+      const r = pick(def.resources.filter((x) => x.role === 'pool' && !x.tradeable && x.maxFrom === undefined && !referenced({ ...def, resources: [] } as GameDefinition, x.id, x)));
+      if (!r) return null;
+      r.role = 'stat';
+      break;
+    }
+  }
+  const loaded = loadGame(def);
+  return loaded.ok ? { game: loaded.game, label: kind } : null;
+}
 
 function randomOffer(rand: () => number, game: CompiledGame, state: GameState, actor: string): TradeOfferInput {
   const pick = <T,>(list: T[]): T | undefined => list[Math.floor(rand() * list.length)];
@@ -160,28 +313,46 @@ export interface FuzzResult {
   aborted: number;
   gm: number;
   trades: number;
+  rulesChanges: number;
+  blocked: number;
   problems: string[];
   hash: string;
 }
 
 /** One fuzzed match. `gmRate` is the chance of a GM command before each step. */
-export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperations?: number; gmRate?: number } = {}): FuzzResult {
+export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperations?: number; gmRate?: number; rulesRate?: number } = {}): FuzzResult {
   const rand = mulberry32(hashSeed(seed));
   const created = createMatch(game, { matchId: `fuzz-${seed}`, seed });
-  if (!created.ok) return { seed, operations: 0, refused: 0, aborted: 0, gm: 0, trades: 0, problems: [`create: ${created.message}`], hash: '' };
+  if (!created.ok) return { seed, operations: 0, refused: 0, aborted: 0, gm: 0, trades: 0, rulesChanges: 0, blocked: 0, problems: [`create: ${created.message}`], hash: '' };
   let state = created.state;
+  const initial = game;
   const steps: Step[] = [];
-  const result: FuzzResult = { seed, operations: 0, refused: 0, aborted: 0, gm: 0, trades: 0, problems: [], hash: '' };
+  const result: FuzzResult = { seed, operations: 0, refused: 0, aborted: 0, gm: 0, trades: 0, rulesChanges: 0, blocked: 0, problems: [], hash: '' };
   const max = options.maxOperations ?? 1500;
   const gmRate = options.gmRate ?? 0.08;
-  const apply = (step: Step, s: GameState): OpOutcome => {
-    if (step.kind === 'auto') return advance(game, s);
-    if (step.kind === 'gm') return applyGmCommand(game, s, GmCommandSchema.parse(step.cmd));
-    return answerDecision(game, s, { decisionId: s.pendingDecision?.id as string, optionId: step.optionId, ...(step.trade ? { trade: step.trade } : {}), ...(step.attempt ? { attempt: step.attempt } : {}) });
+  const rulesRate = options.rulesRate ?? 0;
+  const apply = (step: Step, s: GameState, g: CompiledGame): OpOutcome => {
+    if (step.kind === 'auto') return advance(g, s);
+    if (step.kind === 'gm') return applyGmCommand(g, s, GmCommandSchema.parse(step.cmd));
+    if (step.kind === 'rules') return applyDefinitionChange(g, step.game, s, { answers: step.answers, version: 2, summary: [step.label] });
+    return answerDecision(g, s, { decisionId: s.pendingDecision?.id as string, optionId: step.optionId, ...(step.trade ? { trade: step.trade } : {}), ...(step.attempt ? { attempt: step.attempt } : {}) });
   };
   for (let i = 0; i < max && nextStepKind(state) !== 'gameOver'; i++) {
     let step: Step;
-    if (rand() < gmRate) step = { kind: 'gm', cmd: randomGm(rand, game, state) };
+    const change = rand() < rulesRate ? randomDefinitionChange(rand, game, state) : null;
+    if (change) {
+      const plan = planMigration(game, change.game, state);
+      const answers: Record<string, string> = {};
+      for (const issue of plan.issues) if (issue.options && issue.options.length > 0) answers[issue.id] = (issue.options[Math.floor(rand() * issue.options.length)] as { id: string }).id;
+      step = { kind: 'rules', game: change.game, answers, label: change.label };
+      if (plan.blocked) {
+        // Blocked changes must be refused without touching the state.
+        const out = apply(step, state, game);
+        result.blocked++;
+        if (out.ok) result.problems.push(`step ${i}: blocked change (${change.label}) was applied`);
+        continue;
+      }
+    } else if (rand() < gmRate) step = { kind: 'gm', cmd: randomGm(rand, game, state) };
     else if (nextStepKind(state) === 'auto') step = { kind: 'auto' };
     else {
       const d = state.pendingDecision;
@@ -196,7 +367,7 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
     }
     let out: OpOutcome;
     try {
-      out = apply(step, state);
+      out = apply(step, state, game);
     } catch (err) {
       result.problems.push(`step ${i} (${JSON.stringify(step).slice(0, 200)}) threw: ${err instanceof Error ? err.stack?.split('\n').slice(0, 3).join(' | ') : String(err)}`);
       break;
@@ -208,7 +379,7 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
       if (step.kind === 'answer') {
         const plain = state.pendingDecision?.options.find((o) => o.kind !== 'trade' && o.kind !== 'freeform' && o.id !== 'tr:counter');
         if (plain) step = { kind: 'answer', optionId: plain.id };
-        const retry = apply(step, state);
+        const retry = apply(step, state, game);
         if (!retry.ok) {
           result.problems.push(`step ${i}: plain answer refused: ${retry.message}`);
           break;
@@ -217,6 +388,11 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
       } else continue;
     }
     if (step.kind === 'gm') result.gm++;
+    if (step.kind === 'rules') {
+      result.rulesChanges++;
+      game = step.game;
+      if (out.events.every((e) => e.type !== 'rulesChanged')) result.problems.push(`step ${i}: no rulesChanged event`);
+    }
     if (out.events.some((e) => e.type === 'tradeCompleted')) result.trades++;
     if (out.state.rev !== state.rev + 1) result.problems.push(`step ${i}: rev ${state.rev} → ${out.state.rev}`);
     state = out.state;
@@ -224,15 +400,19 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
     result.operations++;
     const problems = checkInvariants(game, state);
     if (problems.length > 0) {
-      result.problems.push(...problems.map((p) => `step ${i} (${step.kind}${step.kind === 'answer' ? ` ${step.optionId}` : step.kind === 'gm' ? ` ${step.cmd.type}` : ''}): ${p}`));
+      result.problems.push(...problems.map((p) => `step ${i} (${step.kind}${step.kind === 'answer' ? ` ${step.optionId}` : step.kind === 'gm' ? ` ${step.cmd.type}` : step.kind === 'rules' ? ` ${step.label} ${JSON.stringify(step.answers)}` : ''}): ${p}`));
       break;
     }
   }
   result.hash = stateHash(state);
   // Determinism: replaying the same inputs reaches the same state.
   if (result.problems.length === 0) {
-    let replay = expectState(createMatch(game, { matchId: `fuzz-${seed}`, seed }));
-    for (const step of steps) replay = expectState(apply(step, replay));
+    let g = initial;
+    let replay = expectState(createMatch(g, { matchId: `fuzz-${seed}`, seed }));
+    for (const step of steps) {
+      replay = expectState(apply(step, replay, g));
+      if (step.kind === 'rules') g = step.game;
+    }
     if (stateHash(replay) !== result.hash) result.problems.push('replay reached a different state');
   }
   return result;
@@ -246,8 +426,7 @@ function expectState(out: OpOutcome): GameState {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { parseArgs } = await import('node:util');
   const { loadStarter } = await import('./headless.ts');
-  const { loadGame, cloneJson } = await import('../engine/index.ts');
-  const { values } = parseArgs({ options: { runs: { type: 'string', default: '50' }, seed: { type: 'string', default: 'fuzz' }, gm: { type: 'string', default: '0.08' }, eliminate: { type: 'boolean', default: false } } });
+  const { values } = parseArgs({ options: { runs: { type: 'string', default: '50' }, seed: { type: 'string', default: 'fuzz' }, gm: { type: 'string', default: '0.08' }, rules: { type: 'string', default: '0' }, eliminate: { type: 'boolean', default: false } } });
   let game = loadStarter();
   if (values.eliminate) {
     const def = cloneJson(game.def);
@@ -259,11 +438,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let ops = 0;
   let refused = 0;
   let trades = 0;
+  let changes = 0;
+  let blocked = 0;
   let bad = 0;
   const started = performance.now();
   for (let i = 0; i < Number(values.runs); i++) {
-    const r = fuzzMatch(game, `${values.seed}-${i}`, { gmRate: Number(values.gm) });
+    const r = fuzzMatch(game, `${values.seed}-${i}`, { gmRate: Number(values.gm), rulesRate: Number(values.rules) });
     ops += r.operations;
+    changes += r.rulesChanges;
+    blocked += r.blocked;
     refused += r.refused;
     trades += r.trades;
     if (r.problems.length > 0) {
@@ -271,6 +454,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.log(`✗ ${r.seed}: ${r.problems.slice(0, 3).join('\n    ')}`);
     }
   }
-  console.log(`${values.runs} fuzzed matches · ${ops} operations · ${refused} refused inputs · ${trades} trades · ${bad} with problems · ${((performance.now() - started) / 1000).toFixed(1)}s`);
+  console.log(`${values.runs} fuzzed matches · ${ops} operations · ${refused} refused inputs · ${trades} trades · ${changes} rule changes (${blocked} blocked) · ${bad} with problems · ${((performance.now() - started) / 1000).toFixed(1)}s`);
   process.exit(bad > 0 ? 1 : 0);
 }

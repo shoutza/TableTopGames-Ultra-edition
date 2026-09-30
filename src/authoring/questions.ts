@@ -121,22 +121,37 @@ function ruleActorBound(rule: Json): boolean {
   return false;
 }
 
-/** Questions for everything new or changed in the definition. */
-export function ambiguityQuestions(def: GameDefinition, changes: DiffEntry[]): Question[] {
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Questions for everything new or changed in the definition. With the old definition, nested
+ * entries (attached rules, cards) that did not change are not asked about again.
+ */
+export function ambiguityQuestions(def: GameDefinition, changes: DiffEntry[], oldDef?: GameDefinition | null): Question[] {
   const out: Question[] = [];
   const touched = new Set(changes.filter((c) => c.change !== 'removed' && c.level === 'mechanical').map((c) => `${c.section}:${c.id}`));
   const d = def as unknown as Record<string, Json[]>;
+  const o = (oldDef ?? {}) as unknown as Record<string, Json[] | undefined>;
   for (const section of ['rules', 'items', 'statuses', 'enemies', 'decks', 'actions', 'objectives']) {
     (d[section] ?? []).forEach((entry, index) => {
       if (!touched.has(`${section}:${entry['id']}`)) return;
+      const old = (o[section] ?? []).find((x) => x['id'] === entry['id']);
+      const oldNested = (key: string, id: unknown) => ((old?.[key] ?? []) as Json[]).find((x) => x['id'] === id);
       const where = `${SECTION_LABEL[section]} “${String(entry['name'])}”`;
       // Rules decide whether $actor is bound; cards, actions, item uses and rewards always have one.
       if (section === 'rules') walk(entry, [section, index], { where, actorBound: ruleActorBound(entry), out });
-      else {
+      else if (section === 'decks') {
+        ((entry['cards'] ?? []) as Json[]).forEach((card, j) => {
+          if (!same(card, oldNested('cards', card['id']))) walk(card, [section, index, 'cards', j], { where: `${where}, card “${String(card['name'])}”`, actorBound: true, out });
+        });
+      } else {
         const rules = (entry['rules'] ?? []) as Json[];
-        rules.forEach((r, j) => walk(r, [section, index, 'rules', j], { where: `${where}, rule “${String(r['name'])}”`, actorBound: ruleActorBound(r), out }));
+        rules.forEach((r, j) => {
+          if (!same(r, oldNested('rules', r['id']))) walk(r, [section, index, 'rules', j], { where: `${where}, rule “${String(r['name'])}”`, actorBound: ruleActorBound(r), out });
+        });
         const { rules: _r, ...rest } = entry;
-        walk(rest, [section, index], { where, actorBound: true, out });
+        const { rules: _o, ...oldRest } = old ?? {};
+        if (!old || !same(rest, oldRest)) walk(rest, [section, index], { where, actorBound: true, out });
       }
     });
   }

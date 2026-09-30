@@ -87,7 +87,7 @@ const CreateMatchSchema = z.strictObject({ scenario: z.string().max(80).optional
 const DefinitionBody = z.strictObject({ definition: z.unknown() });
 const ScenarioProposalSchema = z.strictObject({ definition: z.unknown(), base: z.string().max(80).nullable() });
 const QuestionAnswers = z.record(z.string().max(200), z.string().max(80));
-const SaveScenarioSchema = z.strictObject({ definition: z.unknown(), answers: z.strictObject({ questions: QuestionAnswers }) });
+const SaveScenarioSchema = z.strictObject({ definition: z.unknown(), answers: z.strictObject({ questions: QuestionAnswers }), base: z.string().max(80).nullable().optional() });
 const VersionSchema = z.strictObject({ mechanical: z.number().int(), cosmetic: z.number().int() });
 const ApplyChangeSchema = z.strictObject({
   definition: z.unknown(),
@@ -505,7 +505,9 @@ export class GmApp {
     if (method === 'PUT') {
       const body = SaveScenarioSchema.parse(await readJson(req));
       if (this.library.isBuiltIn(id)) throw new HttpError(409, `"${id}" is a built-in scenario; save it as a copy under a new id`);
-      const base = this.library.get(id)?.game ?? null;
+      // The same comparison the review used (the scenario it was copied from, for a copy).
+      const baseId = body.base === undefined ? id : body.base;
+      const base = baseId === null ? null : (this.library.get(baseId)?.game ?? null);
       const fin = finalizeDefinition(body.definition, base, body.answers);
       if (!fin.ok) return send(res, 422, { error: fin.check.issues.find((i) => i.severity === 'error')?.message ?? 'the scenario has problems', check: fin.check });
       if (fin.def.id !== id) throw new HttpError(422, `the scenario's id is "${fin.def.id}", not "${id}"`);

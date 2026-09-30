@@ -218,6 +218,18 @@ describe('ambiguity questions', () => {
     compileGame(patched);
   });
 
+  it('asks only about the cards that changed in a deck', () => {
+    const deck = (cards: unknown[]) => (d: GameDefinitionInput) => {
+      d.decks = [{ id: 'deck.d', name: 'Deck', cards: cards as never }];
+    };
+    const storm = { id: 'card.storm', name: 'Storm', effects: [{ op: 'changeResource', target: { op: 'all', kind: 'contestant' }, resource: 'res.gold', amount: -1 }] };
+    const base = edit(deck([storm]));
+    const next = edit(deck([storm, { ...storm, id: 'card.gale', name: 'Gale' }]));
+    const qs = ambiguityQuestions(next.def, diffGames(base, next), base.def);
+    expect(qs.map((q) => q.where)).toEqual(['deck “Deck”, card “Gale”']);
+    expect(ambiguityQuestions(next.def, diffGames(base, next))).toHaveLength(2);
+  });
+
   it('only asks about new or changed content', () => {
     const tide: TestRule = { id: 'rule.tide', trigger: { event: 'landed' }, effects: [{ op: 'teleport', target: '$actor', to: { op: 'space', id: 'space.s0' } }] };
     const base = miniGame({ rules: [tide] });

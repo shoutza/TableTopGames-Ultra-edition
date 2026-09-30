@@ -29,6 +29,13 @@ const LEVEL_TEXT: Record<string, string> = {
   mechanical: 'Rules change: applied as one step; the waiting decision is withdrawn and asked again',
 };
 
+const SCENARIO_LEVEL_TEXT: Record<string, string> = {
+  none: 'No changes',
+  cosmetic: 'Cosmetic changes only (names, looks, layout)',
+  ai: 'Personality changes only',
+  mechanical: 'Rule changes (matches already running keep their own copy of the rules)',
+};
+
 export function ProposalDialog({ proposal, mode, needsPause, paused, onPause, busy, error, confirmLabel, onConfirm, onCancel }: Props) {
   const [questions, setQuestions] = useState<Record<string, string>>({});
   const [migration, setMigration] = useState<Record<string, string>>(() => {
@@ -72,7 +79,7 @@ export function ProposalDialog({ proposal, mode, needsPause, paused, onPause, bu
           )}
           {proposal.ok && (
             <>
-              <p className={`level level-${proposal.level}`}>{LEVEL_TEXT[proposal.level]}</p>
+              <p className={`level level-${proposal.level}`}>{mode === 'match' ? LEVEL_TEXT[proposal.level] : SCENARIO_LEVEL_TEXT[proposal.level]}</p>
               {blocked.length > 0 && (
                 <section className="card bad">
                   <h3>⛔ Cannot be applied to this match</h3>

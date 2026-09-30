@@ -240,6 +240,26 @@ runs repeated probe text and missed "trigger does not match" examples.
 mid-match visibly invalidates the waiting decision; incompatible edits are blocked with an
 explanation; rewinding to round N and continuing works.
 
+## Bug-fix pass (after M6)
+- [x] Fuzzer: random rule changes mid-match (`npm run fuzz -- --rules 0.05`): removing unreferenced
+      entries, spaces and items (with their shop entries), tightening bounds, changing enemy stats,
+      capacities, dice and victory, adding resources, enemies, rules and GM rulings, and changes that
+      must be blocked; random answers to every confirmation. New invariants: everything in the state
+      refers to the current definition (resources, tags, spaces, items, cards, queued choices, deck
+      sizes). ≈ 16k changes over 1,100 matches (elimination mode included): 0 problems, replays exact.
+- [x] Pausing now stops the play loop at once (its sleeps between steps, during combat animations
+      and while a ruling waits end on pause), so a pause, a rule change or a rewind right after
+      pressing Pause no longer waits or is refused
+- [x] The ruling clock stops while the match is paused and continues on resume
+- [x] Saving a copy of a scenario is reviewed against the scenario it was copied from, so only the
+      real edits raise questions and dry runs; questions about decks and attached rules cover only
+      the cards and rules that changed
+- [x] The scenario review no longer talks about withdrawing a waiting decision (that is match-only)
+- [x] CPU-heavy test suites (25 full matches, fuzz sweeps) have explicit timeouts
+
+**Status:** `npm run sim -- --matches 400`: 0 rule faults, 0 aborts, 117 ms per match, median 3
+accepted trades; 192 tests pass.
+
 ## M7 — Natural-language authoring (optional AI feature)
 Separately configured authoring model, depth-bounded proposal schema, unsupported/ambiguity reporting,
 one-time command proposals, optional reviewer.

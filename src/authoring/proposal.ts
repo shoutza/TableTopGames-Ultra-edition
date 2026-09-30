@@ -64,7 +64,7 @@ export function buildProposal(draft: unknown, ctx: ProposalContext): BuiltPropos
   const changes = diffGames(ctx.base, game);
   const level = changeLevel(changes);
   const migration = ctx.state && ctx.base && level === 'mechanical' ? planMigration(ctx.base, game, ctx.state) : null;
-  const questions = ambiguityQuestions(game.def, changes);
+  const questions = ambiguityQuestions(game.def, changes, ctx.base?.def);
   const dryRuns: Proposal['dryRuns'] = [];
   if (ctx.dryRun !== false && level === 'mechanical') {
     const ids = changedRules(ctx.base, game);
@@ -84,7 +84,7 @@ export type FinalizeResult = { ok: true; game: CompiledGame; def: GameDefinition
 export function finalizeDefinition(draft: unknown, base: CompiledGame | null, answers: Pick<ProposalAnswers, 'questions'>): FinalizeResult {
   const first = checkDefinition(draft);
   if (!first.game) return { ok: false, check: first.result };
-  const questions = ambiguityQuestions(first.game.def, diffGames(base, first.game));
+  const questions = ambiguityQuestions(first.game.def, diffGames(base, first.game), base?.def);
   const unknown = Object.keys(answers.questions).find((id) => !questions.some((q) => q.id === id && q.options.some((o) => o.id === answers.questions[id])));
   if (unknown) return { ok: false, check: { ...first.result, ok: false, issues: [{ severity: 'error', code: 'bad-answer', message: `No such question or answer: ${unknown}`, path: null }] } };
   const patched = applyAnswers(first.game.def, questions, answers.questions);

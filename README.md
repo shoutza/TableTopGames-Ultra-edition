@@ -32,6 +32,7 @@ npm run sim -- --seed demo --log             # one match, full event log
 npm run sim -- --controllers mock            # one match through the model pipeline, offline
 npm run sim -- --controllers llm             # one match with gpt-6-luna (needs OPENAI_API_KEY)
 npm run fuzz -- --runs 500 --gm 0.2          # random play + random GM edits, checking invariants
+npm run fuzz -- --runs 300 --rules 0.05      # … plus random rule changes mid-match (migrations)
 ```
 
 ### Using the GM app
