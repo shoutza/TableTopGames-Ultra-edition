@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server/main.ts",
-    "start": "node --env-file-if-exists=.env src/server/main.ts",
+    "build": "vite build",
+    "start": "node --env-file-if-exists=.env src/server/main.ts --serve-dist",
     "sim": "node --env-file-if-exists=.env src/cli/sim.ts",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.server.json && tsc -p tsconfig.web.json",
     "test": "vitest run",

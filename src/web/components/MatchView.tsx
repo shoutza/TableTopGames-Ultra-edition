@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { EventDto, Speed } from '../../shared/api.ts';
-import { api, useMatch } from '../api.ts';
+import { api, useMatch, type MatchData } from '../api.ts';
+import { frameAt } from '../display.ts';
 import { activeId, entityColor, formatMs, formatUsd } from '../format.ts';
 import { Board } from './Board.tsx';
 import { CombatWheel, fightsFrom, type FightAnimation } from './CombatWheel.tsx';
@@ -12,8 +13,14 @@ type Tab = 'standings' | 'inspector' | 'gm' | 'ai';
 
 const SPIN_MS: Record<Speed, number> = { fast: 150, normal: 750, slow: 1200 };
 
+/** A fight waiting to be replayed, with the match data as it was just before the fight. */
+interface QueuedFight {
+  anim: FightAnimation;
+  before: MatchData;
+}
+
 export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => void }) {
-  const [fights, setFights] = useState<FightAnimation[]>([]);
+  const [fights, setFights] = useState<QueuedFight[]>([]);
   const [animate, setAnimate] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<string | null>(null);
@@ -22,17 +29,17 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
   const [error, setError] = useState<string | null>(null);
 
   const namesRef = useRef(new Map<string, { name: string; color: string }>());
-  const { data, connected } = useMatch(
+  const { data: latest, connected } = useMatch(
     matchId,
     useCallback(
-      (events: EventDto[]) => {
+      (events: EventDto[], before: MatchData) => {
         if (!animate) return;
         const found = fightsFrom(
           events,
           (id) => namesRef.current.get(id)?.name ?? id,
           (id) => namesRef.current.get(id)?.color ?? '#888',
         );
-        if (found.length > 0) setFights((q) => [...q, ...found].slice(-6));
+        if (found.length > 0) setFights((q) => [...q, ...found.map((anim) => ({ anim, before: frameAt(before, events, anim.startSeq) }))].slice(-6));
       },
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [animate],
@@ -40,8 +47,13 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
   );
   const done = useCallback(() => setFights((q) => q.slice(1)), []);
 
-  if (!data) return <main className="loading">{connected ? 'Loading match…' : 'Connecting…'}</main>;
-  const { definition: def, state, status, metrics } = data;
+  if (!latest) return <main className="loading">{connected ? 'Loading match…' : 'Connecting…'}</main>;
+  const queued = animate ? fights[0] : undefined;
+  const current = queued?.anim;
+  // While the wheel replays a fight, the board, standings and inspector keep showing the values
+  // from before it, so neither HP bars nor Power totals spoil the result.
+  const data = queued ? queued.before : latest;
+  const { definition: def, state, status, metrics } = latest;
   for (const e of Object.values(state.entities)) namesRef.current.set(e.id, { name: e.name, color: e.kind === 'contestant' ? entityColor(def, e) : e.kind === 'enemy' ? '#922b21' : '#7d6608' });
   const active = activeId(state);
   const control = (action: 'start' | 'pause' | 'step' | 'save', speed?: Speed) => {
@@ -55,8 +67,8 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
     setSelectedEntity(id);
     if (tab === 'standings') setTab('inspector');
   };
-  const current = fights[0];
   const pending = state.pendingDecision;
+  const shown = data.state;
   const thinkingName = status.thinking ? state.entities[status.thinking]?.name : null;
 
   return (
@@ -91,7 +103,15 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
             <option value="fast">Fast</option>
           </select>
           <label className="check">
-            <input type="checkbox" checked={animate} onChange={(e) => setAnimate(e.target.checked)} /> Wheel
+            <input
+              type="checkbox"
+              checked={animate}
+              onChange={(e) => {
+                setAnimate(e.target.checked);
+                if (!e.target.checked) setFights([]);
+              }}
+            />{' '}
+            Wheel
           </label>
         </div>
         <div className="meta muted">
@@ -102,16 +122,16 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
       </header>
       {status.abortedMessage && <div className="banner error">An operation was stopped and rolled back: {status.abortedMessage}. The game is paused; fix or disable the rule, then resume.</div>}
       {error && <div className="banner error">{error}</div>}
-      {state.phase === 'gameOver' && (
+      {shown.phase === 'gameOver' && (
         <div className="banner ok">
-          🏆 {(state.winners ?? []).map((w) => state.entities[w]?.name).join(' & ')} win — {state.endReason}
+          🏆 {(shown.winners ?? []).map((w) => shown.entities[w]?.name).join(' & ')} win — {shown.endReason}
         </div>
       )}
       <section className="layout">
         <div className="board-wrap">
           <Board
             def={def}
-            state={state}
+            state={shown}
             effective={data.effective}
             selectedEntity={selectedEntity}
             selectedSpace={selectedSpace}
@@ -122,7 +142,7 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
               if (selectedEntity) setTab('gm');
             }}
           />
-          {current && animate && <CombatWheel fight={current} spinMs={SPIN_MS[status.speed]} onDone={done} />}
+          {current && <CombatWheel fight={current} spinMs={SPIN_MS[status.speed]} onDone={done} />}
         </div>
         <aside className="side">
           <nav className="tabs">
@@ -135,14 +155,14 @@ export function MatchView({ matchId, onExit }: { matchId: string; onExit: () => 
           <div className="tab-body">
             {tab === 'standings' && <Standings data={data} selected={selectedEntity} onSelect={selectEntity} />}
             {tab === 'inspector' && <Inspector data={data} entityId={selectedEntity} />}
-            {tab === 'gm' && <GmTools data={data} entityId={selectedEntity} teleportTarget={selectedSpace} />}
-            {tab === 'ai' && <AiPanel data={data} />}
+            {tab === 'gm' && <GmTools data={latest} entityId={selectedEntity} teleportTarget={selectedSpace} />}
+            {tab === 'ai' && <AiPanel data={latest} />}
           </div>
         </aside>
       </section>
       <section className="bottom">
-        <EventLog data={data} selected={selectedEvent} onSelect={setSelectedEvent} holdAfter={current && animate ? current.startSeq : null} />
-        <div className="why-wrap">{selectedEvent !== null ? <WhyPanel data={data} seq={selectedEvent} onPick={setSelectedEvent} /> : <p className="muted">Click any event to see why it happened.</p>}</div>
+        <EventLog data={latest} selected={selectedEvent} onSelect={setSelectedEvent} holdAfter={current ? current.startSeq : null} />
+        <div className="why-wrap">{selectedEvent !== null ? <WhyPanel data={latest} seq={selectedEvent} onPick={setSelectedEvent} /> : <p className="muted">Click any event to see why it happened.</p>}</div>
       </section>
     </main>
   );

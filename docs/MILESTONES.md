@@ -79,6 +79,14 @@ it onto a Blue space with "counts as landing" off (no bananas) and then on (bana
 grants Power and watches it challenge the Demon with a visible wheel, restarts the server, loads the
 save, and continues with an identical state hash.
 
+**Follow-ups (done):**
+- [x] Board, standings and inspector show the values from when a fight started until the wheel
+      finishes (previously HP and Power jumped to the result immediately)
+- [x] Autosave a moment after every committed operation (previously only at round end), so a crash
+      loses at most a fraction of a second; covered by a server test
+- [x] The play loop waits for the wheel after any fight, including fights started by GM commands
+- [x] `npm run build` writes the web bundle to `dist-web/`; `npm start` serves it without Vite
+
 ## M4 — Mechanics breadth
 Statuses (durations, stacking, granted tags, capability suppression), transformation templates,
 contestant-vs-contestant combat, bosses and GM enemy spawning, event deck with pending choices, custom

@@ -169,12 +169,25 @@ export class MatchSession {
     this.history.push(...events);
     this.firings.push(...firings);
     this.operations.push(rec);
-    this.lastSpins = events.filter((e) => e.type === 'spin').length;
+    this.extendAnimation(events);
     for (const l of this.listeners) l.onCommit?.(rec, events, firings, this.state);
   }
 
-  /** Spins in the most recent operation (used to pace live viewing). */
-  private lastSpins = 0;
+  /**
+   * Wall-clock time until which live viewers are still watching combat animations. Every commit
+   * with fights (decisions, automatic steps and GM commands alike) pushes it out, and the play
+   * loop waits for it before the next step.
+   */
+  private animationUntil = 0;
+
+  private extendAnimation(events: GameEvent[]): void {
+    if (this.spinDelayMs <= 0) return;
+    const spins = events.filter((e) => e.type === 'spin').length;
+    const fights = events.filter((e) => e.type === 'fightStarted').length;
+    if (spins === 0) return;
+    const settle = Math.max(600, this.spinDelayMs * 1.6);
+    this.animationUntil = Math.max(this.animationUntil, this.now()) + spins * this.spinDelayMs + fights * settle;
+  }
 
   private notifyStatus(): void {
     for (const l of this.listeners) l.onStatus?.();
@@ -305,13 +318,21 @@ export class MatchSession {
       try {
         while (!this.paused && !this.over) {
           const t0 = this.now();
+          // Let the wheel finish (including fights started by GM commands) before moving on.
+          const watching = this.animationUntil - t0;
+          if (watching > 0) {
+            await new Promise((res) => setTimeout(res, watching));
+            if (this.paused) {
+              this.activeMs += this.now() - t0;
+              break;
+            }
+          }
           const r = await this.step();
           if (r === 'aborted') {
             this.activeMs += this.now() - t0;
             break;
           }
-          const pause = (r === 'progress' ? this.stepDelayMs : 0) + this.lastSpins * this.spinDelayMs;
-          if (pause > 0) await new Promise((res) => setTimeout(res, pause));
+          if (r === 'progress' && this.stepDelayMs > 0) await new Promise((res) => setTimeout(res, this.stepDelayMs));
           this.activeMs += this.now() - t0;
         }
       } finally {

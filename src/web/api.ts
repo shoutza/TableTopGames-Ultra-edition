@@ -51,22 +51,34 @@ function merge(prev: MatchData, u: MatchUpdateDto): MatchData {
   return { ...prev, state: u.state, events: [...prev.events, ...u.events], firings, bySeq, minds: u.minds, effective: u.effective, status: u.status, metrics: u.metrics, aiCalls };
 }
 
-/** Live match data. `fresh` receives events that arrived after the initial snapshot. */
-export function useMatch(matchId: string, onFreshEvents: (events: EventDto[]) => void): { data: MatchData | null; connected: boolean } {
+/**
+ * Live match data. `onFreshEvents` receives events that arrived after the initial snapshot,
+ * together with the data as it was just before them (used to show pre-fight values while the
+ * combat wheel replays a fight).
+ */
+export function useMatch(matchId: string, onFreshEvents: (events: EventDto[], before: MatchData) => void): { data: MatchData | null; connected: boolean } {
   const [data, setData] = useState<MatchData | null>(null);
   const [connected, setConnected] = useState(false);
+  const latest = useRef<MatchData | null>(null);
   const callback = useRef(onFreshEvents);
   callback.current = onFreshEvents;
   useEffect(() => {
+    latest.current = null;
     const es = new EventSource(`/api/matches/${matchId}/stream`);
     es.addEventListener('snapshot', (e) => {
-      setData(fromSnapshot(JSON.parse((e as MessageEvent<string>).data) as MatchSnapshotDto));
+      const snapshot = fromSnapshot(JSON.parse((e as MessageEvent<string>).data) as MatchSnapshotDto);
+      latest.current = snapshot;
+      setData(snapshot);
       setConnected(true);
     });
     es.addEventListener('update', (e) => {
       const update = JSON.parse((e as MessageEvent<string>).data) as MatchUpdateDto;
-      setData((prev) => (prev ? merge(prev, update) : prev));
-      if (update.events.length > 0) callback.current(update.events);
+      const before = latest.current;
+      if (!before) return;
+      const next = merge(before, update);
+      latest.current = next;
+      setData(next);
+      if (update.events.length > 0) callback.current(update.events, before);
     });
     es.onerror = () => setConnected(false);
     es.onopen = () => setConnected(true);

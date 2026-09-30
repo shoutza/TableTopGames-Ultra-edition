@@ -201,8 +201,9 @@ The engine never equalizes an encounter, never scales enemies down, and never re
   `regenPerRound` setting.
 - The engine records every spin (`share`, `roll`, `winner`, `damage`, `hpAfter`). **The UI animation replays
   the recorded result**; it never computes outcomes. The contestant AI only decides whether to fight.
-  During live play the session pauses briefly per spin (speed setting) and the event log holds back
-  the fight's result until the wheel finishes, so the log does not spoil it.
+  During live play the session waits for the wheel (per-spin delay from the speed setting, also for
+  fights started by GM commands). Until the wheel finishes, the event log holds back the fight's
+  result and the board, standings and inspector show the match as it was when the fight started.
 
 Examples of per-spin chance against a 500-Power demon: 80 → 13.8 %, 250 → 33.3 %, 500 → 50 %,
 1,000 → 66.7 %.
@@ -375,8 +376,9 @@ its event (die values, wheel rolls).
 | GM intervention | adjust/set resource, add/remove tag, teleport (as-landing checkbox), grant/remove item, announce | Between operations, running or paused | Pending decision re-issued with a new ID; in-flight model request aborted. Reactions fire unless "silent". |
 | Definition change | rules, items, enemies, victory (M6) | Paused only, as a proposal | All decisions invalidated |
 
-**Saves** (`data/matches/<id>/`): `manifest.json` (engine, rules-language and save-format versions),
-`snapshot.json` (definition + full state including RNG, phase, pending decision, contestant minds),
+**Saves** (`data/matches/<id>/`): `snapshot.json` (engine, rules-language and save-format versions,
+definition, full state including RNG, phase, pending decision, contestant minds; rewritten atomically
+a moment after every committed operation, so a crash loses at most a fraction of a second),
 `history.jsonl` (events + operation records with inputs, including accepted AI decisions),
 `ai-calls.jsonl` (packets, responses, usage, latency, outcome). Loading uses the snapshot.
 Re-simulating recorded inputs with the same engine version reproduces the same state hashes (used by

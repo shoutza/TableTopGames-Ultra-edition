@@ -14,8 +14,9 @@ Requires Node.js 22.18 or newer (the server runs TypeScript sources directly).
 ```sh
 npm install
 cp .env.example .env      # optional: add OPENAI_API_KEY for model-driven contestants
-npm run dev               # GM app at http://127.0.0.1:5173
+npm run dev               # GM app at http://127.0.0.1:5173 (hot reload)
 npm run check             # typecheck (core, server, web) + tests
+npm run build && npm start  # serve the prebuilt web bundle from dist-web/ instead of Vite
 ```
 
 Without an API key everything still runs: contestants use the deterministic offline controller.
@@ -41,5 +42,6 @@ npm run sim -- --controllers llm             # one match with gpt-6-luna (needs 
    correction* to change state without triggering rules.
 4. Fights play on the combat wheel, replaying the engine's recorded spins. Click any log line to
    see why it happened (rule, triggering event, conditions checked).
-5. **Save** writes a snapshot; matches also autosave at every round end and on pause. After a
-   restart, open the match from the list and resume — the state hash in the top bar matches.
+5. **Save** writes a snapshot; matches also autosave a moment after every operation, on pause and on
+   shutdown, so a crash loses at most the last fraction of a second. After a restart, open the
+   match from the list and resume — the state hash in the top bar matches.

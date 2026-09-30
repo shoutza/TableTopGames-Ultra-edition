@@ -48,7 +48,14 @@ interface Hosted {
   sentFirings: number;
   sentCalls: number;
   pushTimer: ReturnType<typeof setTimeout> | null;
+  saveTimer: ReturnType<typeof setTimeout> | null;
 }
+
+/**
+ * Snapshots are written shortly after every committed operation (debounced), so a crash loses at
+ * most the last fraction of a second of play; history lines beyond the snapshot are dropped on load.
+ */
+const AUTOSAVE_DELAY_MS = 300;
 
 class HttpError extends Error {
   readonly status: number;
@@ -217,17 +224,31 @@ export class GmApp {
   }
 
   private save(h: Hosted): void {
+    if (h.saveTimer) {
+      clearTimeout(h.saveTimer);
+      h.saveTimer = null;
+    }
     const s = h.session;
     h.savedAt = this.store.saveSnapshot(s.matchId, h.scenario, h.definitionJson, s.state, [...s.minds.values()], s.activeMs);
   }
 
+  private scheduleSave(h: Hosted): void {
+    if (h.saveTimer) return;
+    h.saveTimer = setTimeout(() => {
+      h.saveTimer = null;
+      this.save(h);
+      this.schedulePush(h);
+    }, AUTOSAVE_DELAY_MS);
+  }
+
   private host(session: MatchSession, scenario: string, definitionJson: unknown, savedAt: string | null): Hosted {
-    const h: Hosted = { session, scenario, definitionJson, clients: new Set(), speed: 'normal', savedAt, sentEvents: 0, sentFirings: 0, sentCalls: 0, pushTimer: null };
+    const h: Hosted = { session, scenario, definitionJson, clients: new Set(), speed: 'normal', savedAt, sentEvents: 0, sentFirings: 0, sentCalls: 0, pushTimer: null, saveTimer: null };
     this.applySpeed(h, 'normal');
     session.subscribe({
       onCommit: (record, events, firings: FiringRecord[]) => {
         this.store.appendHistory(session.matchId, record, events, firings);
-        if (events.some((e) => e.type === 'roundEnded' || e.type === 'gameOver')) this.save(h);
+        if (events.some((e) => e.type === 'gameOver')) this.save(h);
+        else this.scheduleSave(h);
         this.schedulePush(h);
       },
       onAiCall: (record: AiCallRecord) => {
