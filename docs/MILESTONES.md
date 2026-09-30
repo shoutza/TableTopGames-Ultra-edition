@@ -166,6 +166,24 @@ per-decision input p50 ≈ 560 / p95 ≈ 1,060.
 tests cover objectives, concealed items and memory; a strategy is revised within ≤ 2 of the
 contestant's own turns after its key opportunity is removed.
 
+## Hardening pass (after M5)
+- [x] Fuzzer (`npm run fuzz`, `tests/fuzz.test.ts`): seeded random decisions, random trade terms and
+      random GM edits; after every operation it checks the state schema, inventories, resource
+      bounds, statuses, decisions, negotiations, promises and objectives, and that a replay of the
+      same inputs reaches the same state. Found and fixed: a respawning enemy got its definition's
+      full HP even when its max HP had been lowered. 2,000 fuzzed matches (≈ 800k operations,
+      including elimination mode and heavy GM use) are clean.
+- [x] A crash in contestant code can no longer stop a match or the server: a failing decision
+      falls back to the offline player (recorded in the AI panel with the error), and any
+      unexpected error in the play loop pauses the match with a message instead of an unhandled
+      rejection
+- [x] View building ~2.5× cheaper (lazy fight-preview copies, shallow move previews, backward scan
+      for recent events): headless matches 326 → 130 ms
+- [x] Event log: "X chose: …" lines are shown only when the contestant said something (the result
+      line always follows)
+- [x] Balance: contestants no longer lend a rival the gold for an immediate Star; the banker values
+      some armour (it was every rival's favourite target)
+
 ## M6 — GM authoring and live edits
 Board editor, definition editors (resources, items, enemies with stats and rewards, shops, cast,
 victory), constrained rule editor, proposal pipeline with ambiguity probes and dry runs, ruleset

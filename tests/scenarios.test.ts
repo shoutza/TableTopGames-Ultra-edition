@@ -212,6 +212,17 @@ describe('statuses', () => {
     expect(r2.state.entities[ogre]?.statuses).toHaveLength(0);
   });
 
+  it('a respawning enemy returns at its current max HP (lowered by the GM), not its definition’s', () => {
+    const g = game();
+    let { state } = startMini(g);
+    const ogre = entityByName(state, 'Ogre');
+    state = gm(g, state, { type: 'setResource', entity: ogre, resource: 'res.max_hp', value: 20 }).state;
+    state = gm(g, state, { type: 'setResource', entity: ogre, resource: 'res.hp', value: 0 }).state;
+    expect(state.entities[ogre]?.status).toBe('defeated');
+    const r = idleUntil(g, state, (s) => s.entities[ogre]?.status === 'active');
+    expect(r.state.entities[ogre]?.resources['res.hp']).toBe(20);
+  });
+
   it('removing a max-HP status re-clamps HP', () => {
     const g = game([], statuses([{ id: 'status.vigor', name: 'Vigor', duration: null, modifiers: [{ resource: 'res.max_hp', add: 50 }] }]));
     let { state } = startMini(g);

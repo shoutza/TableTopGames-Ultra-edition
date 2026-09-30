@@ -196,10 +196,11 @@ export function advance(game: CompiledGame, state: GameState): OpOutcome {
         runRoot(ctx, () => {
           for (const e of Object.values(ctx.state.entities)) {
             if (e.kind === 'enemy' && e.status === 'defeated' && e.respawnRound !== null && e.respawnRound <= ctx.state.round) {
-              const def = game.enemies.get(e.defId);
+              const { core } = game.def.settings;
               e.status = 'active';
               e.respawnRound = null;
-              e.resources[game.def.settings.core.hp] = def?.maxHp ?? e.resources[game.def.settings.core.maxHp] ?? 1;
+              // Back at full HP: the enemy's current (effective) max HP, which the GM may have changed.
+              e.resources[core.hp] = Math.max(1, effectiveValue(game, ctx.state, e, core.maxHp) ?? game.enemies.get(e.defId)?.maxHp ?? 1);
               ctx.emit({ type: 'respawned', entity: e.id, space: e.spaceId ?? '' }, { kind: 'system' });
             }
           }

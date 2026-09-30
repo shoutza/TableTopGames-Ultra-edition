@@ -88,7 +88,8 @@ export function EventLog({ data, selected, onSelect, holdAfter }: { data: MatchD
   const bottom = useRef<HTMLDivElement>(null);
   // While the wheel replays a fight, later lines wait so the log does not spoil the result.
   const events = useMemo(
-    () => (all ? data.events : data.events.filter((e) => !NOISE.has(e.type))).filter((e) => holdAfter === null || e.seq <= holdAfter).slice(-600),
+    // "X chose: …" repeats the result line that follows; it stays only when the contestant said something.
+    () => (all ? data.events : data.events.filter((e) => !NOISE.has(e.type) && !(e.type === 'decided' && !e.say))).filter((e) => holdAfter === null || e.seq <= holdAfter).slice(-600),
     [data.events, all, holdAfter],
   );
   useEffect(() => {

@@ -499,12 +499,20 @@ function partnerValue(c: Ctx, partnerId: string, partnerGets: ViewGoods, partner
   return v;
 }
 
-/** Helping the leader towards victory is a cost in itself. */
-function leaderPenalty(c: Ctx, partnerId: string, partnerGain: number): number {
+/**
+ * Helping a rival towards victory is a cost in itself: more so for the leader, and most when the
+ * deal lets them buy a Star right away.
+ */
+function leaderPenalty(c: Ctx, partnerId: string, partnerGain: number, partnerGoldDelta = 0): number {
   const victory = c.info.settings.victory.resource;
   const partner = c.view.entities.find((e) => e.id === partnerId);
-  const theirs = partner ? stat(partner, victory) : 0;
-  return theirs > c.stars && theirs >= c.rivalStars && partnerGain > 0 ? partnerGain * 0.5 : 0;
+  if (!partner) return 0;
+  const theirs = stat(partner, victory);
+  let v = theirs > c.stars && theirs >= c.rivalStars && partnerGain > 0 ? partnerGain * 0.5 : 0;
+  const price = c.starPrice;
+  const gold = stat(partner, c.info.settings.core.gold);
+  if (price !== null && partnerGoldDelta > 0 && gold < price && gold + partnerGoldDelta >= price) v += 30 * c.w.stars;
+  return v;
 }
 
 const goods = (resources: Record<string, number> = {}, items: string[] = []): ViewGoods => ({ resources, items });
@@ -524,7 +532,8 @@ function bestProposal(c: Ctx, option: Extract<OptionPreview, { kind: 'trade' }>)
     const mine = tradeValue(c, get, give) + promises.reduce((v, p) => v + promiseValue(c, p, partner.id), 0);
     const theirs = partnerValue(c, partner.id, give, get, promises.map((p) => ({ ...p, byYou: !p.byYou })));
     if (theirs < 2) return;
-    const gain = mine - leaderPenalty(c, partner.id, theirs) + rel(c, partner.id).affinity * 0.5;
+    const goldToPartner = (give.resources[c.info.settings.core.gold] ?? 0) - (get.resources[c.info.settings.core.gold] ?? 0);
+    const gain = mine - leaderPenalty(c, partner.id, theirs, goldToPartner) + rel(c, partner.id).affinity * 0.5;
     if (gain < threshold || (best && gain <= best.gain)) return;
     best = {
       gain,
@@ -579,7 +588,8 @@ function bestProposal(c: Ctx, option: Extract<OptionPreview, { kind: 'trade' }>)
 function answerValue(c: Ctx, n: ViewNegotiation): number {
   const mine = tradeValue(c, n.youGet, n.youGive) + n.promises.reduce((v, p) => v + promiseValue(c, p, n.partner), 0);
   const theirs = partnerValue(c, n.partner, n.youGive, n.youGet, n.promises.map((p) => ({ ...p, byYou: !p.byYou })));
-  let v = mine - leaderPenalty(c, n.partner, theirs);
+  const gold = c.info.settings.core.gold;
+  let v = mine - leaderPenalty(c, n.partner, theirs, (n.youGive.resources[gold] ?? 0) - (n.youGet.resources[gold] ?? 0));
   if (rel(c, n.partner).affinity <= -4) v -= 15;
   return v;
 }

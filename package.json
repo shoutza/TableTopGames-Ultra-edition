@@ -15,7 +15,8 @@
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.server.json && tsc -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "fuzz": "node src/cli/fuzz.ts"
   },
   "dependencies": {
     "openai": "^7.25.0",

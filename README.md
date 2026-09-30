@@ -31,6 +31,7 @@ npm run sim -- --matches 200 --rounds 30     # longer matches (no early win) to 
 npm run sim -- --seed demo --log             # one match, full event log
 npm run sim -- --controllers mock            # one match through the model pipeline, offline
 npm run sim -- --controllers llm             # one match with gpt-6-luna (needs OPENAI_API_KEY)
+npm run fuzz -- --runs 500 --gm 0.2          # random play + random GM edits, checking invariants
 ```
 
 ### Using the GM app

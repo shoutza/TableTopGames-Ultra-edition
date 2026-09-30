@@ -161,6 +161,50 @@ describe('match session', () => {
   });
 });
 
+describe('trade answers through the session', () => {
+  it('terms the engine refuses get one repair attempt with the engine’s (view-safe) reason', async () => {
+    const session = await MatchSession.create(starter, { matchId: 'tr', seed: 'trade-repair' }, { provider: null, config: DEFAULT_CONTROLLER_CONFIG, price: null });
+    while (!(session.state.pendingDecision?.kind === 'main' && session.state.pendingDecision.options.some((o) => o.id === 'trade'))) await session.step();
+    const actor = session.state.pendingDecision.actor;
+    const partner = session.state.turnOrder.find((id) => id !== actor) as string;
+    const seen: string[] = [];
+    const provider = new MockProvider((req) => {
+      seen.push(req.input);
+      const decisionId = /DECISION (d\d+)/.exec(req.input)?.[1];
+      const trade = (gold: number) => ({ with: partner, give: { resources: [{ resource: 'res.gold', amount: gold }], items: [] }, get: { resources: [], items: [] }, promises: [], message: 'a gift' });
+      if (!decisionId) return mockOk({});
+      return mockOk({ decisionId, optionId: 'trade', say: null, plan: null, strategyUpdate: null, trade: trade(seen.length === 1 ? 500 : 1), reason: 'test' });
+    });
+    (session.deps as { provider: unknown }).provider = provider;
+    for (const m of session.minds.values()) m.controller = 'llm';
+    await session.step();
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toContain('Your previous answer was rejected: you have only');
+    expect(session.calls.at(-1)?.source).toBe('repaired');
+    expect(session.history.some((e) => e.type === 'tradeProposed' && e.from === actor && e.to === partner)).toBe(true);
+    expect(session.state.pendingDecision).toMatchObject({ actor: partner, kind: 'trade' });
+  });
+});
+
+describe('robustness', () => {
+  it('a provider that throws (a bug, not an API error) never stops the match', async () => {
+    const provider = new MockProvider(async (req) => {
+      if (req.purpose === 'strategy') return mockOk({ archetype: /- (\w+): /.exec(req.input)?.[1], summary: 's', priorities: ['p'], avoid: [], plan: 'p', reason: 'r' });
+      throw new Error('boom');
+    });
+    const session = await MatchSession.create(starter, { matchId: 'boom', seed: 'boom' }, { provider, config: DEFAULT_CONTROLLER_CONFIG, price: null });
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      await session.runToEnd();
+    } finally {
+      console.error = quiet;
+    }
+    expect({ over: session.over, aborted: session.abortedMessage }).toEqual({ over: true, aborted: null });
+    expect(session.calls.find((c) => c.source === 'fallback')?.errors).toEqual(['unknown: internal error: boom']);
+  });
+});
+
 describe('OpenAI adapter', () => {
   function fakeFetch(respond: (body: Record<string, unknown>) => { status: number; json: unknown }) {
     const seen: Array<Record<string, unknown>> = [];

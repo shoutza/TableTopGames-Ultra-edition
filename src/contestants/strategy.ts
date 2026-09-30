@@ -208,7 +208,8 @@ export function weightsFor(persona: Persona, archetype: Archetype | null): Weigh
   };
   switch (archetype) {
     case 'banker':
-      return { ...w, gold: w.gold * 1.4, power: w.power * 0.5, gear: w.gear * 0.3, fightThreshold: Math.max(w.fightThreshold, 0.9), koTolerance: Math.min(w.koTolerance, 0.05) };
+      // Some armour: a banker with no Power is every rival's favourite target.
+      return { ...w, gold: w.gold * 1.4, power: w.power * 0.8, gear: w.gear * 0.8, fightThreshold: Math.max(w.fightThreshold, 0.9), koTolerance: Math.min(w.koTolerance, 0.05) };
     case 'gearUp':
       return { ...w, gear: w.gear * 2.2, power: w.power * 1.2 };
     case 'powerFarmer':

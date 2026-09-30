@@ -1,4 +1,4 @@
-import { applyToMind, chooseStrategy, decide, ProviderHealth, withoutTrade, type ControllerConfig, type DecisionResult } from '../contestants/controller.ts';
+import { applyToMind, chooseStrategy, decide, decideOffline, ProviderHealth, withoutTrade, type ControllerConfig, type DecisionResult } from '../contestants/controller.ts';
 import { prepareMind } from '../contestants/memory.ts';
 import { newMind, type ContestantMind } from '../contestants/mind.ts';
 import { namesFromView } from '../contestants/packet.ts';
@@ -62,6 +62,19 @@ export interface SessionDeps {
   config: ControllerConfig;
   price: Price | null;
   now?: () => number;
+}
+
+/** The offline player's answer, or else the first option that needs no terms ("pass" preferred). */
+function safeDecision(offline: () => DecisionResult, options: Array<{ id: string; kind: string }>, cause: unknown): DecisionResult {
+  // Recorded as a failed attempt so the GM sees it in the AI panel and the call log.
+  const attempts = [{ ok: false, errorKind: 'unknown' as const, error: `internal error: ${cause instanceof Error ? cause.message : String(cause)}`, usage: null, latencyMs: 0 }];
+  try {
+    return { ...offline(), source: 'fallback', attempts };
+  } catch (err) {
+    console.error('offline player failed too:', err);
+    const plain = options.find((o) => o.kind === 'pass') ?? options.find((o) => o.kind !== 'trade' && o.id !== 'tr:counter') ?? options[0];
+    return { optionId: plain?.id ?? 'pass', say: null, plan: null, strategyUpdate: null, trade: null, reason: 'fallback after an internal error', source: 'fallback', attempts, packetTokens: 0, packet: null };
+  }
 }
 
 function sumUsage(list: Array<LlmUsage | null>): LlmUsage {
@@ -280,6 +293,10 @@ export class MatchSession {
     let result: DecisionResult;
     try {
       result = await decide({ view, info: this.info, mind, persona, provider: this.deps.provider, config: this.deps.config, health: this.health, signal: controller.signal, validate });
+    } catch (err) {
+      // A bug in contestant code must not stop the match: fall back to the offline player, then to a plain option.
+      console.error(`decision for ${decision.actor} failed:`, err);
+      result = safeDecision(() => decideOffline({ view, info: this.info, mind, persona }), decision.options, err);
     } finally {
       this.inFlight = null;
     }
@@ -347,6 +364,12 @@ export class MatchSession {
           if (r === 'progress' && this.stepDelayMs > 0) await new Promise((res) => setTimeout(res, this.stepDelayMs));
           this.activeMs += this.now() - t0;
         }
+      } catch (err) {
+        // Never crash the server: pause the match and tell the GM.
+        console.error(`match ${this.matchId} stopped:`, err);
+        this.paused = true;
+        this.abortedMessage = `internal error: ${err instanceof Error ? err.message : String(err)}`;
+        for (const l of this.listeners) l.onAbort?.(this.abortedMessage);
       } finally {
         this.running = false;
         this.notifyStatus();

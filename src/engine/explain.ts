@@ -767,7 +767,7 @@ export function describeObjectiveGoal(def: ObjectiveDef, n: Names): string {
     case 'landed':
       return `Land on ${w.space !== undefined ? n.space(w.space) : w.spaceTag !== undefined ? article(`${n.tag(w.spaceTag)} space`) : 'a space'} ${times(g.times)}`;
     case 'defeated': {
-      const foe = w.enemy !== undefined ? n.enemy(w.enemy) : w.targetTag !== undefined ? `a foe tagged ${n.tag(w.targetTag)}` : w.targetKind === 'contestant' ? 'a rival contestant' : 'a foe';
+      const foe = w.enemy !== undefined ? article(n.enemy(w.enemy)) : w.targetTag !== undefined ? `a foe tagged ${n.tag(w.targetTag)}` : w.targetKind === 'contestant' ? 'a rival contestant' : 'a foe';
       return `Defeat ${foe} ${times(g.times)}`;
     }
     case 'purchased':
