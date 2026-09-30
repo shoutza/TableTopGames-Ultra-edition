@@ -21,6 +21,28 @@ import { BudgetExceeded, InvalidInput, RuleFault, cloneJson } from './util.ts';
  * - Every operation ends by issuing the next decision (queued choices first).
  */
 
+/** A reaction whose trigger matched but whose conditions did not hold (recorded only in dry runs). */
+export interface MissRecord {
+  rule: string;
+  trigger: GameEvent;
+  bindings: Record<string, string | number>;
+  checks: Array<{ text: string; ok: boolean }>;
+}
+
+let missObserver: ((miss: MissRecord) => void) | null = null;
+
+/** Runs `fn` while recording every rule whose conditions failed (for dry runs; synchronous). */
+export function observeMisses<T>(fn: () => T): { result: T; misses: MissRecord[] } {
+  const misses: MissRecord[] = [];
+  const previous = missObserver;
+  missObserver = (m) => misses.push(m);
+  try {
+    return { result: fn(), misses };
+  } finally {
+    missObserver = previous;
+  }
+}
+
 export type OpOutcome =
   | { ok: true; state: GameState; events: GameEvent[]; firings: FiringRecord[]; faults: FaultRecord[] }
   | { ok: false; kind: 'invalid'; message: string }
@@ -156,7 +178,10 @@ function fireRule(ctx: OpContext, rule: CompiledRule, ev: GameEvent, b: Bindings
     fault(ctx, rule, ev, err.message);
     return;
   }
-  if (!ok) return;
+  if (!ok) {
+    missObserver?.({ rule: def.id, trigger: ev, bindings: Object.fromEntries(Object.entries(b).filter(([, v]) => v !== undefined)) as Record<string, string | number>, checks });
+    return;
+  }
 
   const firingId = ctx.countFiring(def.id, depth);
   const sp = ctx.savepoint();

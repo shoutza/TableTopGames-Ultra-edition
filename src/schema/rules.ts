@@ -111,6 +111,11 @@ export type Effect =
   | { op: 'drawCard'; deck: string; for: EntityRef }
   | { op: 'offerChoice'; to: EntityRef; prompt: string; options: ChoiceOption[]; default: string }
   | { op: 'announce'; text: string }
+  /**
+   * Hands a situation to the GM: the game waits for a ruling (one of the authored options, or "no
+   * effect" — also the result when the GM does not answer in time).
+   */
+  | { op: 'askGm'; question: string; about?: EntityRef | undefined; options?: ChoiceOption[] | undefined }
   | { op: 'if'; cond: Cond; then: Effect[]; else?: Effect[] | undefined }
   | { op: 'forEach'; of: Selector; do: Effect[] }
   | { op: 'randomBranch'; branches: Array<{ weight: number; do: Effect[] }> };
@@ -352,6 +357,7 @@ export const EffectSchema: z.ZodType<Effect> = z.lazy(() =>
       default: z.string().min(1).max(40),
     }),
     z.strictObject({ op: z.literal('announce'), text: z.string().min(1).max(280) }),
+    z.strictObject({ op: z.literal('askGm'), question: z.string().min(1).max(300), about: EntityRefSchema.optional(), options: z.array(ChoiceOptionSchema).max(4).optional() }),
     z.strictObject({ op: z.literal('if'), cond: CondSchema, then: z.array(EffectSchema).max(12), else: z.array(EffectSchema).max(12).optional() }),
     z.strictObject({ op: z.literal('forEach'), of: SelectorSchema, do: z.array(EffectSchema).min(1).max(12) }),
     z.strictObject({

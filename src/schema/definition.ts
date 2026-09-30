@@ -291,6 +291,17 @@ export const SettingsSchema = z.strictObject({
   }),
   /** Secret objectives dealt to each contestant at match start (when the definition has any). */
   objectives: z.strictObject({ perContestant: z.number().int().min(0).max(3).default(1) }).default({ perContestant: 1 }),
+  /** GM adjudication: rulings asked by rules (`askGm`) and contestants' freeform attempts. */
+  adjudication: z
+    .strictObject({
+      /** Contestants may, as their main action, describe something unusual they attempt; the GM rules. */
+      freeform: z.boolean().default(false),
+      /** Rounds before the same contestant may attempt something freeform again. */
+      freeformCooldownRounds: z.number().int().min(0).max(50).default(3),
+      /** A live match waits this long for a ruling; then the result is "no effect". */
+      timeoutSeconds: z.number().int().min(5).max(3600).default(90),
+    })
+    .default({ freeform: false, freeformCooldownRounds: 3, timeoutSeconds: 90 }),
   trading: z
     .strictObject({
       /** Contestants may propose one trade per turn (as a free action before their main action). */
@@ -318,8 +329,8 @@ export const GameDefinitionSchema = z.strictObject({
   id: Id,
   name: Name,
   description: z.string().max(2000).default(''),
-  /** Version 1 definitions are valid version 2 definitions (version 2 only added primitives). */
-  rulesLanguageVersion: z.union([z.literal(1), z.literal(RULES_LANGUAGE_VERSION)]).transform(() => RULES_LANGUAGE_VERSION),
+  /** Older definitions are valid current definitions (later versions only added primitives). */
+  rulesLanguageVersion: z.union([z.literal(1), z.literal(2), z.literal(RULES_LANGUAGE_VERSION)]).transform(() => RULES_LANGUAGE_VERSION),
   settings: SettingsSchema,
   resources: z.array(ResourceDefSchema).min(1).max(64),
   tags: z.array(TagDefSchema).max(128).default([]),

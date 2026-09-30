@@ -1,4 +1,4 @@
-import type { Effect, ModifierEvent, ModifierRule } from '../schema/rules.ts';
+import type { ChoiceOption, Effect, ModifierEvent, ModifierRule } from '../schema/rules.ts';
 import type { EventCause, ModRecord, PendingChoice } from '../schema/state.ts';
 import { damageFor } from './combat.ts';
 import type { OpContext } from './context.ts';
@@ -546,6 +546,39 @@ export function offerChoice(ctx: OpContext, e: Extract<Effect, { op: 'offerChoic
   });
 }
 
+/** The GM's own "chooser" id for rulings. */
+export const GM = 'gm';
+
+/**
+ * Queues a ruling for the GM: the authored options plus "No effect" (the default, also used when the
+ * GM does not answer in time). Effects of the chosen option run with the asking rule's bindings.
+ */
+export function queueGmRuling(ctx: OpContext, question: string, about: string | null, options: ChoiceOption[], b: Bindings, cause: EventCause): string {
+  ctx.countChoice();
+  ctx.state.counters.choice += 1;
+  const id = `c${ctx.state.counters.choice}`;
+  const all = [...options.filter((o) => o.id !== 'none'), { id: 'none', label: 'No effect', effects: [] }];
+  const asked = ctx.emit({ type: 'gmAsked', choice: id, question, about }, cause);
+  const saved: PendingChoice['bindings'] = {};
+  if (b.$actor !== undefined) saved.$actor = b.$actor;
+  if (b.$target !== undefined) saved.$target = b.$target;
+  if (b.$space !== undefined) saved.$space = b.$space;
+  if (b.$it !== undefined) saved.$it = b.$it;
+  if (b.$holder !== undefined) saved.$holder = b.$holder;
+  if (b.amount !== undefined) saved.amount = b.amount;
+  ctx.state.queue.push({
+    id,
+    chooser: GM,
+    prompt: question,
+    options: cloneJson(all),
+    default: 'none',
+    bindings: saved,
+    offeredSeq: asked.seq,
+    ...(cause.rule !== undefined ? { rule: cause.rule } : {}),
+  });
+  return id;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Rule effects
 // ---------------------------------------------------------------------------------------------
@@ -651,6 +684,11 @@ export function applyEffect(ctx: OpContext, e: Effect, b: Bindings, cause: Event
     case 'announce':
       ctx.emit({ type: 'announced', text: fillTemplate(ctx, e.text, b) }, cause);
       return;
+    case 'askGm': {
+      const about = e.about !== undefined ? evalEntityRef(ctx, e.about, b) : null;
+      queueGmRuling(ctx, fillTemplate(ctx, e.question, b), about, e.options ?? [], b, cause);
+      return;
+    }
     case 'if':
       if (evalCond(ctx, e.cond, b)) applyEffects(ctx, e.then, b, cause);
       else if (e.else) applyEffects(ctx, e.else, b, cause);

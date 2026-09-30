@@ -5,6 +5,7 @@ import type { OpContext } from './context.ts';
 import { evalCond, type Bindings, type EvalEnv } from './eval.ts';
 import { computeModifiers, type ModStep } from './modifiers.ts';
 import { activeContestantId, effectiveValue, hasCapability, orderedEntityIds, reachableSpaces } from './queries.ts';
+import { GM } from './effects.ts';
 import { awaitingParty, canProposeTrade, negotiationOptions, payOptions } from './trade.ts';
 import { RuleFault, UnknownValue } from './util.ts';
 
@@ -159,6 +160,7 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
   const hp = effectiveValue(game, state, actor, core.hp);
   const maxHp = effectiveValue(game, state, actor, core.maxHp);
   if (hp !== undefined && maxHp !== undefined && hp < maxHp && rest.heal > 0) options.push({ id: 'rest', kind: 'rest', label: `Rest (+${rest.heal} HP)` });
+  if (canAttemptFreeform(game, state, actor)) options.push({ id: 'freeform', kind: 'freeform', label: 'Attempt something unusual (the GM decides)' });
   options.push({ id: 'pass', kind: 'pass', label: 'Pass' });
   // Free actions (listed last): they do not use up the main action.
   if (canProposeTrade(game, state, actor.id)) options.push({ id: 'trade', kind: 'trade', label: 'Propose a trade' });
@@ -166,8 +168,15 @@ export function mainOptions(game: CompiledGame, state: GameState, actor: Entity)
   return options;
 }
 
+/** A freeform attempt is offered when the scenario allows it and the contestant's cooldown is over. */
+export function canAttemptFreeform(game: CompiledGame, state: GameState, actor: Entity): boolean {
+  return game.def.settings.adjudication.freeform && actor.status === 'active' && (state.cooldowns[`freeform:${actor.id}`] ?? 0) <= state.round;
+}
+
 /** Options the chooser may pick now, or null when the choice must resolve to its default automatically. */
 export function choiceOptions(game: CompiledGame, state: GameState, choice: PendingChoice): DecisionOption[] | null {
+  // GM rulings: every option is available (the GM sees everything); requirements are only hints.
+  if (choice.chooser === GM) return choice.options.map((o) => ({ id: `ch:${o.id}`, kind: 'choose' as const, label: o.label, option: o.id }));
   const chooser = state.entities[choice.chooser];
   if (!chooser || chooser.status !== 'active') return null;
   const env = new CheckEnv(game, state);
@@ -195,7 +204,7 @@ export function issueNextDecision(ctx: OpContext): void {
   if (head) {
     const options = choiceOptions(ctx.game, s, head);
     // An unanswerable choice (chooser gone, nothing legal) resolves to its default in the next automatic step.
-    if (options) s.pendingDecision = newDecision(ctx, head.chooser, 'choice', options, { choice: head.id, prompt: head.prompt });
+    if (options) s.pendingDecision = newDecision(ctx, head.chooser, head.chooser === GM ? 'ruling' : 'choice', options, { choice: head.id, prompt: head.prompt });
     return;
   }
   const n = s.negotiation;

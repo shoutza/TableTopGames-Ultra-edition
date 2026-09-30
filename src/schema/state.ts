@@ -135,13 +135,16 @@ export const DecisionOptionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ id: z.string(), kind: z.literal('pay'), label: z.string(), commitment: z.string() }),
   /** Answer to an offer or counteroffer; a counteroffer carries new terms. */
   z.strictObject({ id: z.string(), kind: z.literal('tradeAnswer'), label: z.string(), answer: z.enum(['accept', 'reject', 'counter']) }),
+  /** Attempt something the rules do not cover; the answer carries the attempt text and the GM rules. */
+  z.strictObject({ id: z.string(), kind: z.literal('freeform'), label: z.string() }),
 ]);
 export type DecisionOption = z.infer<typeof DecisionOptionSchema>;
 
 export const DecisionSchema = z.strictObject({
   id: z.string(),
   actor: z.string(),
-  kind: z.enum(['move', 'main', 'choice', 'trade']),
+  /** `ruling`: a decision for the GM (actor "gm"), from `askGm` or a freeform attempt. */
+  kind: z.enum(['move', 'main', 'choice', 'trade', 'ruling']),
   issuedRev: z.number().int(),
   options: z.array(DecisionOptionSchema).min(1),
   /** For choices: the queued choice this decision answers, and its prompt. */
@@ -170,6 +173,8 @@ export const PendingChoiceSchema = z.strictObject({
   ),
   default: z.string(),
   bindings: z.strictObject({
+    /** GM rulings keep the acting entity of the rule that asked. */
+    $actor: z.string().optional(),
     $target: z.string().optional(),
     $space: z.string().optional(),
     $it: z.string().optional(),
@@ -336,6 +341,9 @@ export type EventBody =
   | { type: 'cardDrawn'; entity: string; deck: string; card: string; name: string }
   | { type: 'choiceOffered'; entity: string; choice: string; prompt: string; options: string[] }
   | { type: 'choiceMade'; entity: string; choice: string; option: string; label: string; automatic: boolean }
+  | { type: 'gmAsked'; choice: string; question: string; about: string | null }
+  | { type: 'attempted'; entity: string; text: string; choice: string }
+  | { type: 'rulesChanged'; version: number; summary: string[]; invalidated: string | null }
   | { type: 'objectiveAssigned'; entity: string; objective: string; def: string }
   | { type: 'objectiveCompleted'; entity: string; objective: string; def: string }
   | { type: 'tradeProposed'; negotiation: string; from: string; to: string; terms: TradeTermsView; message: string | null }

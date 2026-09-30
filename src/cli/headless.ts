@@ -6,7 +6,7 @@ import { prepareMind } from '../contestants/memory.ts';
 import { newMind, type ContestantMind } from '../contestants/mind.ts';
 import { namesFromView } from '../contestants/packet.ts';
 import { ARCHETYPE_INFO, castCandidates, defaultStrategy } from '../contestants/strategy.ts';
-import { advance, answerDecision, createMatch, loadGame, nextStepKind, type CompiledGame } from '../engine/index.ts';
+import { advance, answerDecision, createMatch, GM, loadGame, nextStepKind, type CompiledGame } from '../engine/index.ts';
 import type { Archetype } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
 import { publicInfo } from '../visibility/public-info.ts';
@@ -90,7 +90,11 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
       const decision = state.pendingDecision;
       if (!decision) throw new Error('missing decision');
       decisions++;
-      if (decision.options.length === 1) {
+      if (decision.actor === GM) {
+        // No GM at a headless table: rulings resolve to "No effect".
+        forced++;
+        out = answerDecision(game, state, { decisionId: decision.id, optionId: 'ch:none' });
+      } else if (decision.options.length === 1) {
         forced++;
         const t0 = performance.now();
         out = answerDecision(game, state, { decisionId: decision.id, optionId: (decision.options[0] as { id: string }).id });

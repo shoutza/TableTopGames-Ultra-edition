@@ -179,7 +179,8 @@ export type OptionPreview =
   | { kind: 'choose'; optionId: string; option: string; label: string; hints: Hint[]; unknown: boolean }
   | { kind: 'trade'; optionId: string; partners: TradePartnerView[]; youHold: ViewGoods; maxPromiseRounds: number }
   | { kind: 'pay'; optionId: string; commitment: string; to: string; toName: string; resource: string; amount: number }
-  | { kind: 'tradeAnswer'; optionId: string; answer: 'accept' | 'reject' | 'counter'; negotiation: ViewNegotiation };
+  | { kind: 'tradeAnswer'; optionId: string; answer: 'accept' | 'reject' | 'counter'; negotiation: ViewNegotiation }
+  | { kind: 'freeform'; optionId: string; cooldownRounds: number };
 
 export interface Threat {
   rival: string;
@@ -460,6 +461,8 @@ function previewOption(scope: HintScope, option: DecisionOption, decision: Decis
       const c = redacted.commitments.find((x) => x.id === option.commitment);
       return { kind: 'pay', optionId: option.id, commitment: option.commitment, to: c?.to ?? '', toName: names.entity(c?.to ?? ''), resource: c?.resource ?? '', amount: c ? c.amount - c.paid : 0 };
     }
+    case 'freeform':
+      return { kind: 'freeform', optionId: option.id, cooldownRounds: game.def.settings.adjudication.freeformCooldownRounds };
     case 'tradeAnswer': {
       const negotiation = negotiationView(redacted, viewer, names);
       if (!negotiation) throw new Error('trade answer without a negotiation');

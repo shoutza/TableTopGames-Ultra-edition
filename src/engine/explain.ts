@@ -41,7 +41,7 @@ export interface NameSource {
 
 export function makeNames(source: NameSource, entityNames: (id: string) => string | undefined): Names {
   const names: Names = {
-    entity: (id) => entityNames(id) ?? id,
+    entity: (id) => entityNames(id) ?? (id === 'gm' ? 'the GM' : id),
     space: (id) => source.spaces.get(id)?.name ?? id,
     resource: (id) => source.resources.get(id)?.name ?? id,
     tag: (id) => source.tags.get(id)?.name ?? id,
@@ -337,6 +337,10 @@ export function describeEffect(e: Effect, n: Names, b?: BoundNames): string {
     }
     case 'announce':
       return `announce "${e.text}"`;
+    case 'askGm': {
+      const options = (e.options ?? []).map((o) => `“${o.label}”${o.effects.length ? ` (${describeEffects(o.effects, n, b) || 'nothing'})` : ''}`);
+      return `the GM rules on “${e.question}”${e.about !== undefined ? ` about ${refObj(e.about, n, b)}` : ''}: ${[...options, '“No effect”'].join(' or ')}`;
+    }
     case 'if':
       return `if ${describeCond(e.cond, n, b)}: ${describeEffects(e.then, n, b) || 'nothing'}${e.else ? `; otherwise: ${describeEffects(e.else, n, b) || 'nothing'}` : ''}`;
     case 'forEach':
@@ -398,6 +402,9 @@ export function summarizeEffects(effects: Effect[], n: Names): string {
         break;
       case 'offerChoice':
         parts.push(`choose: ${e.options.map((o) => `${o.label}${o.effects.length === 0 ? '' : ''}`).join(' / ')}`);
+        break;
+      case 'askGm':
+        parts.push(`the GM rules: ${[...(e.options ?? []).map((o) => o.label), 'no effect'].join(' / ')}`);
         break;
       case 'spawn':
         parts.push(`${n.enemy(e.enemy)} appears at ${describeSpaceRef(e.at, n)}`);
@@ -742,6 +749,12 @@ export function describeEvent(e: GameEvent, n: Names): string {
       return `✅ ${n.entity(e.by)} kept a promise to ${n.entity(e.to)} (${e.kind === 'noAttack' ? 'no attack' : 'paid in full'})`;
     case 'promiseBroken':
       return `💔 ${n.entity(e.by)} broke a promise to ${n.entity(e.to)} (${e.kind === 'noAttack' ? 'attacked anyway' : 'never paid'})`;
+    case 'gmAsked':
+      return `⚖ The GM is asked: ${e.question}`;
+    case 'attempted':
+      return `✨ ${n.entity(e.entity)} attempts: “${e.text}” (the GM rules)`;
+    case 'rulesChanged':
+      return `📜 The rules changed (version ${e.version})${e.summary.length > 0 ? `: ${e.summary.join('; ')}` : ''}${e.invalidated ? ` — the waiting decision ${e.invalidated} was withdrawn and asked again` : ''}`;
     case 'announced':
       return `📣 ${e.text}`;
     case 'ruleFault':

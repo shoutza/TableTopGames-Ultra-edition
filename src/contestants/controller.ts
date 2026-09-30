@@ -49,6 +49,8 @@ export interface DecisionResult {
   strategyUpdate: Strategy | null;
   /** Terms when the option is "trade" or a counteroffer. */
   trade: TradeOfferInput | null;
+  /** What the contestant attempts with the freeform option. */
+  attempt?: string | null | undefined;
   reason: string;
   source: DecisionSource;
   attempts: AttemptRecord[];
@@ -88,7 +90,7 @@ export interface DecideInput {
    * Checks an answer against the authoritative state without committing it; returns the engine's
    * (view-safe) reason when it would be refused. Used to give the model one repair attempt.
    */
-  validate?: ((optionId: string, trade: TradeOfferInput | null) => string | null) | undefined;
+  validate?: ((optionId: string, extra: { trade: TradeOfferInput | null; attempt: string | null }) => string | null) | undefined;
 }
 
 /** Options whose answers must carry trade terms. */
@@ -129,9 +131,10 @@ export function withoutTrade(input: OfflineInput, result: DecisionResult): Decis
   const decision = input.view.decision;
   if (!decision) throw new Error('no decision for this contestant');
   if (decision.kind === 'trade') return { ...result, optionId: 'tr:reject', trade: null, reason: 'the terms did not work out' };
-  const view = { ...input.view, decision: { ...decision, options: decision.options.filter((o) => o.kind !== 'trade'), previews: decision.previews.filter((p) => p.kind !== 'trade') } };
+  const plain = (kind: string) => kind !== 'trade' && kind !== 'freeform';
+  const view = { ...input.view, decision: { ...decision, options: decision.options.filter((o) => plain(o.kind)), previews: decision.previews.filter((p) => plain(p.kind)) } };
   const choice = chooseHeuristic(view, input.info, input.persona, input.mind.strategy?.archetype ?? input.mind.candidates[0] ?? null, input.mind);
-  return { ...result, optionId: choice.optionId, trade: null, reason: choice.reason, source: result.source === 'llm' || result.source === 'repaired' ? 'fallback' : result.source };
+  return { ...result, optionId: choice.optionId, trade: null, attempt: null, reason: choice.reason, source: result.source === 'llm' || result.source === 'repaired' ? 'fallback' : result.source };
 }
 
 export async function decide(input: DecideInput): Promise<DecisionResult> {
@@ -171,7 +174,8 @@ export async function decide(input: DecideInput): Promise<DecisionResult> {
     else if (parsed.value.decisionId !== decision.id) problem = `decisionId must be "${decision.id}".`;
     else if (!decision.options.some((o) => o.id === parsed.value.optionId)) problem = `"${parsed.value.optionId}" is not one of the offered option ids.`;
     else if (needsTerms(parsed.value.optionId) && !parsed.value.trade) problem = `"${parsed.value.optionId}" needs trade terms in "trade".`;
-    else problem = input.validate?.(parsed.value.optionId, needsTerms(parsed.value.optionId) ? parsed.value.trade : null) ?? null;
+    else if (parsed.value.optionId === 'freeform' && !parsed.value.attempt?.trim()) problem = '"freeform" needs a short description in "attempt".';
+    else problem = input.validate?.(parsed.value.optionId, { trade: needsTerms(parsed.value.optionId) ? parsed.value.trade : null, attempt: parsed.value.attempt }) ?? null;
     if (problem !== null || !parsed.ok) {
       attempts.push({ ok: false, errorKind: 'invalid', error: problem, usage: res.usage, latencyMs: res.latencyMs });
       input.health.record(true); // the provider works; the answer was just unusable
@@ -193,7 +197,7 @@ export async function decide(input: DecideInput): Promise<DecisionResult> {
       };
     }
     const trade = needsTerms(v.optionId) ? v.trade : null;
-    return { optionId: v.optionId, say: v.say, plan: v.plan, strategyUpdate, trade, reason: v.reason, source: attempt === 0 ? 'llm' : 'repaired', attempts, packetTokens: packet.estimatedTokens, packet };
+    return { optionId: v.optionId, say: v.say, plan: v.plan, strategyUpdate, trade, attempt: v.optionId === 'freeform' ? v.attempt : null, reason: v.reason, source: attempt === 0 ? 'llm' : 'repaired', attempts, packetTokens: packet.estimatedTokens, packet };
   }
   return heuristicResult(input, 'fallback', attempts, packet.estimatedTokens, packet);
 }

@@ -1,4 +1,4 @@
-import { advance, answerDecision, applyGmCommand, createMatch, effectiveValue, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
+import { advance, answerDecision, applyGmCommand, createMatch, effectiveValue, GM, nextStepKind, type CompiledGame, type OpOutcome } from '../engine/index.ts';
 import { resourceBounds } from '../engine/queries.ts';
 import { GmCommandSchema, type GmCommandInput } from '../schema/commands.ts';
 import type { TradeOfferInput } from '../schema/trade.ts';
@@ -70,7 +70,9 @@ export function checkInvariants(game: CompiledGame, state: GameState): string[] 
   const d = state.pendingDecision;
   if (d) {
     const actor = state.entities[d.actor];
-    if (!actor) out.push('decision for a missing actor');
+    if (d.actor === GM) {
+      if (d.kind !== 'ruling') out.push('a GM decision that is not a ruling');
+    } else if (!actor) out.push('decision for a missing actor');
     else if (actor.status !== 'active') out.push(`decision for ${d.actor} who is ${actor.status}`);
     if (new Set(d.options.map((o) => o.id)).size !== d.options.length) out.push('duplicate option ids');
   } else if (state.phase === 'move' || state.phase === 'main') {
@@ -94,7 +96,7 @@ export function checkInvariants(game: CompiledGame, state: GameState): string[] 
   return out;
 }
 
-type Step = { kind: 'auto' } | { kind: 'answer'; optionId: string; trade?: TradeOfferInput } | { kind: 'gm'; cmd: GmCommandInput };
+type Step = { kind: 'auto' } | { kind: 'answer'; optionId: string; trade?: TradeOfferInput; attempt?: string } | { kind: 'gm'; cmd: GmCommandInput };
 
 function randomOffer(rand: () => number, game: CompiledGame, state: GameState, actor: string): TradeOfferInput {
   const pick = <T,>(list: T[]): T | undefined => list[Math.floor(rand() * list.length)];
@@ -175,7 +177,7 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
   const apply = (step: Step, s: GameState): OpOutcome => {
     if (step.kind === 'auto') return advance(game, s);
     if (step.kind === 'gm') return applyGmCommand(game, s, GmCommandSchema.parse(step.cmd));
-    return answerDecision(game, s, { decisionId: s.pendingDecision?.id as string, optionId: step.optionId, ...(step.trade ? { trade: step.trade } : {}) });
+    return answerDecision(game, s, { decisionId: s.pendingDecision?.id as string, optionId: step.optionId, ...(step.trade ? { trade: step.trade } : {}), ...(step.attempt ? { attempt: step.attempt } : {}) });
   };
   for (let i = 0; i < max && nextStepKind(state) !== 'gameOver'; i++) {
     let step: Step;
@@ -185,7 +187,12 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
       const d = state.pendingDecision;
       if (!d) break;
       const option = d.options[Math.floor(rand() * d.options.length)] as { id: string };
-      step = option.id === 'trade' || option.id === 'tr:counter' ? { kind: 'answer', optionId: option.id, trade: randomOffer(rand, game, state, d.actor) } : { kind: 'answer', optionId: option.id };
+      step =
+        option.id === 'trade' || option.id === 'tr:counter'
+          ? { kind: 'answer', optionId: option.id, trade: randomOffer(rand, game, state, d.actor) }
+          : option.id === 'freeform'
+            ? { kind: 'answer', optionId: option.id, attempt: rand() < 0.9 ? 'I try to befriend the nearest slime' : '' }
+            : { kind: 'answer', optionId: option.id };
     }
     let out: OpOutcome;
     try {
@@ -199,7 +206,7 @@ export function fuzzMatch(game: CompiledGame, seed: string, options: { maxOperat
       else result.refused++;
       // A refused answer: fall back to a plain option so the match moves on.
       if (step.kind === 'answer') {
-        const plain = state.pendingDecision?.options.find((o) => o.kind !== 'trade' && o.id !== 'tr:counter');
+        const plain = state.pendingDecision?.options.find((o) => o.kind !== 'trade' && o.kind !== 'freeform' && o.id !== 'tr:counter');
         if (plain) step = { kind: 'answer', optionId: plain.id };
         const retry = apply(step, state);
         if (!retry.ok) {

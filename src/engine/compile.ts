@@ -27,6 +27,8 @@ export interface Diagnostic {
   code: string;
   message: string;
   ref?: string | undefined;
+  /** The definition (resource, space, item, rule, card …) being checked when the problem was found. */
+  at?: string | undefined;
 }
 
 /** The definition an attached rule belongs to; the rule is active only while its owner is held/present. */
@@ -161,7 +163,9 @@ export function compileGame(def: GameDefinition): CompiledGame {
   const objectives = indexById(def.objectives, 'objective', diags);
   const cast = indexById(def.cast, 'cast member', diags);
 
-  const err = (code: string, message: string, ref?: string) => diags.push({ severity: 'error', code, message, ref });
+  /** The definition currently being checked (recorded on its diagnostics, for the editor). */
+  let at: string | undefined;
+  const err = (code: string, message: string, ref?: string) => diags.push({ severity: 'error', code, message, ref, ...(at !== undefined ? { at } : {}) });
   const needResource = (id: string, where: string) => {
     if (!resources.has(id)) err('unknown-resource', `${where}: unknown resource "${id}"`, id);
   };
@@ -198,6 +202,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
 
   // --- resources ----------------------------------------------------------------------------
   for (const r of def.resources) {
+    at = r.id;
     if (r.max !== null && r.min > r.max) err('bad-bounds', `Resource "${r.id}" has min > max`, r.id);
     if (r.default < r.min || (r.max !== null && r.default > r.max)) err('bad-default', `Resource "${r.id}" default is out of bounds`, r.id);
     if (r.maxFrom !== undefined) {
@@ -214,10 +219,12 @@ export function compileGame(def: GameDefinition): CompiledGame {
   // --- board --------------------------------------------------------------------------------
   const adjacency = new Map<string, string[]>();
   for (const space of def.spaces) {
+    at = space.id;
     adjacency.set(space.id, []);
     for (const t of space.tags) needTag(t, `space ${space.id}`);
     if (!def.layout.positions[space.id]) err('missing-layout', `Space "${space.id}" has no layout position`, space.id);
   }
+  at = undefined;
   for (const c of def.connections) {
     needSpace(c.a, 'connection');
     needSpace(c.b, 'connection');
@@ -439,6 +446,19 @@ export function compileGame(def: GameDefinition): CompiledGame {
       case 'offerChoice':
         checkEntityRef(e.to, scope, where);
         return checkChoiceOptions(e.options, e.default, scope, `${where} choice`);
+      case 'askGm': {
+        if (e.about !== undefined) checkEntityRef(e.about, scope, where);
+        // The GM sees everything, so option requirements need not be view-safe.
+        const ids = new Set<string>();
+        for (const o of e.options ?? []) {
+          if (o.id === 'none') err('reserved-id', `${where}: "none" is the built-in "No effect" ruling`);
+          if (ids.has(o.id)) err('duplicate-id', `${where}: duplicate ruling option "${o.id}"`);
+          ids.add(o.id);
+          if (o.requires) checkCond(o.requires, scope, `${where} ruling "${o.id}"`);
+          checkEffects(o.effects, scope, `${where} ruling "${o.id}"`, true);
+        }
+        return;
+      }
       case 'announce':
         return;
       case 'if':
@@ -456,11 +476,13 @@ export function compileGame(def: GameDefinition): CompiledGame {
 
   // --- items, statuses, shops, enemies, fixtures, decks, actions ----------------------------
   for (const item of def.items) {
+    at = item.id;
     for (const t of item.tags) needTag(t, `item ${item.id}`);
     for (const m of item.modifiers) needStat(m.resource, `item ${item.id}`);
     if (item.use) checkEffects(item.use.effects, { entities: new Set(['$actor', '$holder']), space: true, amount: false, it: false }, `item ${item.id} use`);
   }
   for (const st of def.statuses) {
+    at = st.id;
     for (const t of st.grantsTags) needTag(t, `status ${st.id}`);
     for (const m of st.modifiers) needStat(m.resource, `status ${st.id}`);
     if (st.stacking !== 'stack' && st.maxStacks > 1) diags.push({ severity: 'warning', code: 'stacks-unused', message: `Status "${st.name}" has maxStacks ${st.maxStacks} but stacking "${st.stacking}"`, ref: st.id });
@@ -468,6 +490,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
   const shopEntries = new Map<string, { shop: ShopDef; entry: ShopEntry }>();
   for (const shop of def.shops) {
     for (const entry of shop.entries) {
+      at = entry.id;
       if (shopEntries.has(entry.id)) err('duplicate-id', `Duplicate shop entry id "${entry.id}"`, entry.id);
       shopEntries.set(entry.id, { shop, entry });
       needResource(entry.price.resource, `shop entry ${entry.id}`);
@@ -476,11 +499,13 @@ export function compileGame(def: GameDefinition): CompiledGame {
     }
   }
   for (const enemy of def.enemies) {
+    at = enemy.id;
     for (const t of enemy.tags) needTag(t, `enemy ${enemy.id}`);
     for (const sp of enemy.spawns) needSpace(sp, `enemy ${enemy.id} spawn`);
     checkEffects(enemy.rewards, { entities: new Set(['$actor', '$target']), space: false, amount: false, it: false }, `enemy ${enemy.id} rewards`, true);
   }
   for (const f of def.fixtures) {
+    at = f.id;
     for (const t of f.tags) needTag(t, `fixture ${f.id}`);
     if (f.shop !== undefined && !shops.has(f.shop)) err('unknown-shop', `Fixture "${f.id}" uses unknown shop "${f.shop}"`, f.id);
     if ('space' in f.start) needSpace(f.start.space, `fixture ${f.id}`);
@@ -489,12 +514,14 @@ export function compileGame(def: GameDefinition): CompiledGame {
   const cards = new Map<string, { deck: DeckDef; card: CardDef }>();
   for (const deck of def.decks) {
     for (const card of deck.cards) {
+      at = card.id;
       if (cards.has(card.id)) err('duplicate-id', `Duplicate card id "${card.id}"`, card.id);
       cards.set(card.id, { deck, card });
       checkEffects(card.effects, { entities: new Set(['$actor']), space: true, amount: false, it: false }, `card "${card.name}"`);
     }
   }
   for (const action of def.actions) {
+    at = action.id;
     const where = `action "${action.name}"`;
     if (action.where?.space !== undefined) needSpace(action.where.space, where);
     if (action.where?.spaceTag !== undefined) needTag(action.where.spaceTag, where);
@@ -523,6 +550,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
 
   // --- objectives ---------------------------------------------------------------------------
   for (const o of def.objectives) {
+    at = o.id;
     const where = `objective "${o.name}"`;
     if (o.goal.kind === 'count') {
       if (!TRIGGER_BINDINGS[o.goal.trigger.event].entities.includes('$actor')) {
@@ -547,6 +575,7 @@ export function compileGame(def: GameDefinition): CompiledGame {
   let position = 0;
 
   function compileRule(rule: RuleDef, owner: RuleOwner | null): void {
+    at = rule.id;
     const where = `rule "${rule.name}"${owner ? ` (on ${owner.kind} ${owner.defId})` : ''}`;
     if (rules.has(rule.id)) err('duplicate-id', `Duplicate rule id "${rule.id}"`, rule.id);
     const holder: string[] = owner ? ['$holder'] : [];
@@ -780,6 +809,7 @@ function emissionsOf(game: CompiledGame, effects: Effect[], out: Emission[], see
       case 'removeTag':
       case 'remove':
       case 'offerChoice':
+      case 'askGm':
       case 'announce':
         break;
     }

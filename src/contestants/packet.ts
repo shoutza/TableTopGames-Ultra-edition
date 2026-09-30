@@ -166,6 +166,7 @@ export function buildInstructions(info: PublicGameInfo, name: string, persona: P
     '- "say" is an optional short in-character line spoken BEFORE the outcome is known: state intent, never claim results. Use null to stay quiet.',
     '- "plan" is one short sentence about your next steps; null keeps your current plan.',
     '- "strategyUpdate" is null unless you decide to change your strategy (you will be prompted when it is worth reconsidering).',
+    '- "attempt" is null unless you pick "freeform": then say briefly what you try; the GM rules on it.',
     '- "trade" is null unless you pick "trade" or "tr:counter"; then terms from YOUR side: with (partner id, proposals only), give/get (resources [{resource, amount}], item ids), promises [{by: "me"|"them", kind, rounds, resource, amount}] (null resource/amount for noAttack), message.',
     '',
     rulesDigest(info, names),
@@ -288,6 +289,8 @@ function optionLine(info: PublicGameInfo, view: ContestantView, names: Names, p:
       return `[${p.optionId}] Pay ${p.toName} ${p.amount} ${resName(info, p.resource)} as you promised (free action)`;
     case 'tradeAnswer':
       return `[${p.optionId}] ${p.answer === 'accept' ? 'Accept' : p.answer === 'reject' ? 'Reject' : 'Counteroffer (terms in "trade"; only one allowed)'}`;
+    case 'freeform':
+      return `[${p.optionId}] Attempt something the rules do not cover — describe it in "attempt" (≤ 200 characters); the GM decides what happens (uses your action; again in ${p.cooldownRounds} rounds)`;
   }
 }
 

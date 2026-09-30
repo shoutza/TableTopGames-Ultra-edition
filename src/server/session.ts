@@ -3,15 +3,19 @@ import { prepareMind } from '../contestants/memory.ts';
 import { newMind, type ContestantMind } from '../contestants/mind.ts';
 import { namesFromView } from '../contestants/packet.ts';
 import { castCandidates } from '../contestants/strategy.ts';
-import { advance, answerDecision, applyGmCommand, createMatch, nextStepKind, type CompiledGame, type FiringRecord, type OpOutcome } from '../engine/index.ts';
+import { advance, answerDecision, applyGmCommand, createMatch, GM, nextStepKind, type CompiledGame, type FiringRecord, type OpOutcome } from '../engine/index.ts';
+import { applyCosmeticChange, applyDefinitionChange } from '../engine/migrate.ts';
 import { estimateCost, type Price } from '../llm/prices.ts';
 import type { LlmProvider, LlmUsage } from '../llm/port.ts';
 import type { GmCommand } from '../schema/commands.ts';
+import type { DiffEntry, Proposal } from '../schema/proposal.ts';
+import { ENGINE_VERSION } from '../schema/versions.ts';
 import type { Persona } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
 import { publicInfo, type PublicGameInfo } from '../visibility/public-info.ts';
 import { visibleEventsAfter } from '../visibility/redact.ts';
 import { buildContestantView, type ContestantView } from '../visibility/view.ts';
+import { stateHash } from './hash.ts';
 
 /**
  * One authoritative coordinator per match. It owns the state, runs automatic steps, asks
@@ -43,11 +47,31 @@ export interface AiCallRecord {
 
 export interface OperationRecord {
   rev: number;
-  kind: 'setup' | 'auto' | 'decision' | 'gm';
+  /** `rules`: a mechanical definition change (one operation); `cosmetic`: names, looks, personas (no revision). */
+  kind: 'setup' | 'auto' | 'decision' | 'gm' | 'rules' | 'cosmetic';
   input: unknown;
   eventCount: number;
   firstSeq: number | null;
   lastSeq: number | null;
+  /** Hash of the state after the operation; replays (rewind) check they reproduce it. */
+  hash?: string | undefined;
+}
+
+export interface RulesVersion {
+  mechanical: number;
+  cosmetic: number;
+}
+
+/** What a `rules` or `cosmetic` history record holds: enough to replay it and to show the change log. */
+export interface DefinitionChangeRecord {
+  definition: unknown;
+  level: Proposal['level'];
+  answers: Record<string, string>;
+  rulesVersion: RulesVersion;
+  /** The round in which it was applied. */
+  round: number;
+  summary: string[];
+  changes: DiffEntry[];
 }
 
 export interface SessionListener {
@@ -90,8 +114,10 @@ function sumUsage(list: Array<LlmUsage | null>): LlmUsage {
 }
 
 export class MatchSession {
-  readonly game: CompiledGame;
-  readonly info: PublicGameInfo;
+  /** The rules in force (replaced by definition changes). */
+  game: CompiledGame;
+  info: PublicGameInfo;
+  rulesVersion: RulesVersion = { mechanical: 1, cosmetic: 0 };
   readonly deps: SessionDeps;
   state: GameState;
   readonly history: GameEvent[] = [];
@@ -137,7 +163,8 @@ export class MatchSession {
     const created = createMatch(game, setup);
     if (!created.ok) throw new Error(`cannot create match: ${created.message}`);
     const session = new MatchSession(game, created.state, deps);
-    session.commit({ rev: created.state.rev, kind: 'setup', input: setup, eventCount: 0, firstSeq: null, lastSeq: null }, created.events);
+    // The setup record carries the starting definition, so the match can be replayed (rewind).
+    session.commit({ rev: created.state.rev, kind: 'setup', input: { ...setup, definition: game.def, engineVersion: ENGINE_VERSION }, eventCount: 0, firstSeq: null, lastSeq: null }, created.events);
     const contestants = [...created.state.turnOrder].sort((a, b) => a.localeCompare(b)).map((id) => ({ id, persona: session.persona(id) }));
     const candidates = castCandidates(session.info, contestants);
     for (const { id } of contestants) {
@@ -158,8 +185,9 @@ export class MatchSession {
   }
 
   /** Restores a saved match. */
-  static restore(game: CompiledGame, state: GameState, history: GameEvent[], firings: FiringRecord[], minds: ContestantMind[], deps: SessionDeps, activeMs = 0): MatchSession {
+  static restore(game: CompiledGame, state: GameState, history: GameEvent[], firings: FiringRecord[], minds: ContestantMind[], deps: SessionDeps, activeMs = 0, rulesVersion: RulesVersion = { mechanical: 1, cosmetic: 0 }): MatchSession {
     const session = new MatchSession(game, state, deps);
+    session.rulesVersion = { ...rulesVersion };
     session.history.push(...history);
     session.firings.push(...firings);
     for (const m of minds) session.minds.set(m.entityId, m);
@@ -181,7 +209,7 @@ export class MatchSession {
   }
 
   private commit(record: OperationRecord, events: GameEvent[], firings: FiringRecord[] = []): void {
-    const rec = { ...record, eventCount: events.length, firstSeq: events[0]?.seq ?? null, lastSeq: events.at(-1)?.seq ?? null };
+    const rec = { ...record, eventCount: events.length, firstSeq: events[0]?.seq ?? null, lastSeq: events.at(-1)?.seq ?? null, hash: stateHash(this.state) };
     this.history.push(...events);
     this.firings.push(...firings);
     this.operations.push(rec);
@@ -265,7 +293,7 @@ export class MatchSession {
   }
 
   /** Runs exactly one operation (an automatic step or one contestant decision). */
-  async step(): Promise<'progress' | 'obsolete' | 'over' | 'aborted'> {
+  async step(): Promise<'progress' | 'obsolete' | 'over' | 'aborted' | 'waiting'> {
     if (this.over) return 'over';
     if (nextStepKind(this.state) === 'auto') {
       const out = this.apply(advance(this.game, this.state), 'auto', null);
@@ -273,6 +301,7 @@ export class MatchSession {
     }
     const decision = this.state.pendingDecision;
     if (!decision) return 'over';
+    if (decision.actor === GM) return this.awaitRuling(decision.id);
     const mind = this.minds.get(decision.actor);
     if (!mind) throw new Error(`no mind for ${decision.actor}`);
     const revAtRequest = this.state.rev;
@@ -285,9 +314,9 @@ export class MatchSession {
       prepareMind(mind, view, this.info, visibleEventsAfter(this.game, this.history, decision.actor, mind.lastSeenEventSeq), namesFromView(this.info, view));
     }
     // Lets the model repair answers the engine would refuse (e.g. trade terms it cannot deliver).
-    const validate = (optionId: string, trade: DecisionResult['trade']): string | null => {
+    const validate = (optionId: string, extra: { trade: DecisionResult['trade']; attempt: string | null }): string | null => {
       if (this.state.pendingDecision?.id !== decision.id) return null;
-      const out = answerDecision(this.game, this.state, { decisionId: decision.id, optionId, trade: trade ?? undefined });
+      const out = answerDecision(this.game, this.state, { decisionId: decision.id, optionId, trade: extra.trade ?? undefined, attempt: extra.attempt ?? undefined });
       return !out.ok && out.kind === 'invalid' ? out.message : null;
     };
     let result: DecisionResult;
@@ -307,7 +336,14 @@ export class MatchSession {
       this.notifyStatus();
       return 'obsolete';
     }
-    let attempt = answerDecision(this.game, this.state, { decisionId: decision.id, optionId: result.optionId, rev: revAtRequest, say: result.say ?? undefined, trade: result.trade ?? undefined });
+    let attempt = answerDecision(this.game, this.state, {
+      decisionId: decision.id,
+      optionId: result.optionId,
+      rev: revAtRequest,
+      say: result.say ?? undefined,
+      trade: result.trade ?? undefined,
+      attempt: result.attempt ?? undefined,
+    });
     if (!attempt.ok && attempt.kind === 'invalid') {
       // Never stall on an answer the engine refuses: fall back to a safe choice.
       result = withoutTrade({ view, info: this.info, mind, persona }, result);
@@ -319,17 +355,93 @@ export class MatchSession {
       source: result.source,
       say: result.say,
       ...(result.trade ? { trade: result.trade } : {}),
+      ...(result.attempt ? { attempt: result.attempt } : {}),
     });
     if (out.ok) applyToMind(mind, result, this.state.round);
     return out.ok ? 'progress' : 'aborted';
   }
 
+  /** When the current GM ruling started waiting (wall clock), for the timeout. */
+  private rulingSince: { decisionId: string; at: number } | null = null;
+  /** Wakes the play loop early (a ruling was answered, the match was paused). */
+  private wake: (() => void) | null = null;
+  /** Set by runToEnd: nobody is at the table, so rulings resolve to "No effect" at once. */
+  private unattended = false;
+
+  /** Milliseconds left before the waiting ruling times out (null when none is waiting). */
+  rulingTimeLeft(): number | null {
+    const d = this.state.pendingDecision;
+    if (!d || d.actor !== GM || !this.rulingSince || this.rulingSince.decisionId !== d.id) return null;
+    return Math.max(0, this.rulingSince.at + this.game.def.settings.adjudication.timeoutSeconds * 1000 - this.now());
+  }
+
+  /** A GM ruling is waiting: nothing happens until the GM answers, unless the time runs out while playing. */
+  private awaitRuling(decisionId: string): 'waiting' | 'progress' | 'aborted' {
+    if (!this.rulingSince || this.rulingSince.decisionId !== decisionId) {
+      this.rulingSince = { decisionId, at: this.now() };
+      this.notifyStatus();
+    }
+    const left = this.rulingTimeLeft() ?? 0;
+    if (!this.unattended && (this.paused || left > 0)) return 'waiting';
+    return this.answerRuling('ch:none', this.unattended ? 'unattended' : 'timeout');
+  }
+
+  /** The GM's ruling (or the automatic "No effect" after a timeout). */
+  answerRuling(optionId: string, source: 'gm' | 'timeout' | 'unattended' = 'gm'): 'progress' | 'aborted' {
+    const d = this.state.pendingDecision;
+    if (!d || d.actor !== GM) throw new Error('no ruling is waiting');
+    const out = this.apply(answerDecision(this.game, this.state, { decisionId: d.id, optionId }), 'decision', { decisionId: d.id, optionId, source });
+    if (!out.ok && out.kind === 'invalid') throw new Error(out.message);
+    this.rulingSince = null;
+    this.wake?.();
+    return out.ok ? 'progress' : 'aborted';
+  }
+
   /** GM intervention between operations; invalidates any in-flight decision. */
   gm(command: GmCommand): OpOutcome {
+    const ruling = this.state.pendingDecision?.actor === GM ? this.rulingSince : null;
     const out = this.apply(applyGmCommand(this.game, this.state, command), 'gm', command);
     if (out.ok && this.inFlight) this.inFlight.controller.abort();
+    // Applying a ruling's result with the GM tools re-issues the ruling; its clock keeps running.
+    if (ruling && this.state.pendingDecision?.actor === GM) this.rulingSince = { decisionId: this.state.pendingDecision.id, at: ruling.at };
     this.notifyStatus();
     return out;
+  }
+
+  /**
+   * Applies a mechanical definition change as one operation: the waiting decision is withdrawn and
+   * asked again under the new rules. Only while paused and idle (the caller checks). Contestants
+   * are told what changed (hidden rules left out) and reconsider their strategy.
+   */
+  changeRules(newGame: CompiledGame, change: Omit<DefinitionChangeRecord, 'rulesVersion' | 'level' | 'round'>): OpOutcome & { invalidated?: string | null } {
+    if (this.running) throw new Error('pause the match before changing its rules');
+    const version = { mechanical: this.rulesVersion.mechanical + 1, cosmetic: this.rulesVersion.cosmetic };
+    const out = applyDefinitionChange(this.game, newGame, this.state, { answers: change.answers, version: version.mechanical, summary: change.summary });
+    if (!out.ok) return out;
+    this.game = newGame;
+    this.info = publicInfo(newGame);
+    this.rulesVersion = version;
+    this.rulingSince = null;
+    const record: DefinitionChangeRecord = { ...change, level: 'mechanical', rulesVersion: version, round: this.state.round };
+    this.apply(out, 'rules', record);
+    const changed = out.events.find((e) => e.type === 'rulesChanged');
+    const invalidated = changed?.type === 'rulesChanged' ? changed.invalidated : null;
+    for (const mind of this.minds.values()) {
+      if (!mind.reconsider && change.summary.length > 0) mind.reconsider = `The rules changed (version ${version.mechanical}): ${change.summary.slice(0, 3).join('; ')}`;
+    }
+    this.notifyStatus();
+    return { ...out, invalidated };
+  }
+
+  /** Names, descriptions, icons, layout or personas: applied at once, no revision, no decision withdrawn. */
+  changeCosmetic(newGame: CompiledGame, change: Omit<DefinitionChangeRecord, 'rulesVersion' | 'answers' | 'round'>): void {
+    this.game = newGame;
+    this.info = publicInfo(newGame);
+    this.state = applyCosmeticChange(newGame, this.state);
+    this.rulesVersion = { mechanical: this.rulesVersion.mechanical, cosmetic: this.rulesVersion.cosmetic + 1 };
+    const record: DefinitionChangeRecord = { ...change, answers: {}, rulesVersion: this.rulesVersion, round: this.state.round };
+    this.commit({ rev: this.state.rev, kind: 'cosmetic', input: record, eventCount: 0, firstSeq: null, lastSeq: null }, []);
+    this.notifyStatus();
   }
 
   /** Starts (or resumes) the play loop. */
@@ -361,6 +473,20 @@ export class MatchSession {
             this.activeMs += this.now() - t0;
             break;
           }
+          if (r === 'waiting') {
+            // A GM ruling: sleep until it is answered, the match is paused, or its time runs out.
+            const left = this.rulingTimeLeft() ?? 1000;
+            await new Promise<void>((res) => {
+              const timer = setTimeout(res, Math.max(50, left));
+              this.wake = () => {
+                clearTimeout(timer);
+                res();
+              };
+            });
+            this.wake = null;
+            this.activeMs += this.now() - t0;
+            continue;
+          }
           if (r === 'progress' && this.stepDelayMs > 0) await new Promise((res) => setTimeout(res, this.stepDelayMs));
           this.activeMs += this.now() - t0;
         }
@@ -379,6 +505,7 @@ export class MatchSession {
 
   pause(): void {
     this.paused = true;
+    this.wake?.();
     this.notifyStatus();
   }
 
@@ -389,6 +516,7 @@ export class MatchSession {
 
   /** Runs to the end (headless use). */
   async runToEnd(maxSteps = 50_000): Promise<void> {
+    this.unattended = true;
     for (let i = 0; i < maxSteps && !this.over; i++) {
       const t0 = this.now();
       const r = await this.step();

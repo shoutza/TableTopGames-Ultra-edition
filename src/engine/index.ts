@@ -11,6 +11,7 @@ export { createMatch, advance, answerDecision, nextStepKind, checkVictory, rankC
 export type { DecisionAnswer, MatchSetup, StepKind } from './turn.ts';
 export { moveOptions, mainOptions, choiceOptions, buyPrice, actionAvailable, actionTargets, attackTargets, CheckEnv } from './decisions.ts';
 export { applyGmCommand } from './gm.ts';
+export { GM } from './effects.ts';
 export { dealObjectives, assignObjective } from './objectives.ts';
 export {
   canProposeTrade,

@@ -2,14 +2,16 @@ import type { DecisionOption, Entity, EventCause, GameState, PendingChoice } fro
 import { SAVE_FORMAT_VERSION } from '../schema/versions.ts';
 import type { CompiledGame } from './compile.ts';
 import type { OpContext } from './context.ts';
-import { actionAvailable, actionTargets, attackTargets, buyPrice } from './decisions.ts';
+import { actionAvailable, actionTargets, attackTargets, buyPrice, canAttemptFreeform } from './decisions.ts';
 import {
   applyEffects,
   changeResource,
   countDownStatuses,
   fight,
   grantItem,
+  GM,
   modify,
+  queueGmRuling,
   removeItem,
   setUpDecks,
   walk,
@@ -36,6 +38,8 @@ export interface DecisionAnswer {
   say?: string | undefined;
   /** Terms for "Propose a trade" and for a counteroffer, from the answering contestant's side. */
   trade?: TradeOfferInput | undefined;
+  /** What a contestant attempts with the freeform option (≤ 200 characters). */
+  attempt?: string | undefined;
 }
 
 export interface MatchSetup {
@@ -148,14 +152,17 @@ function resolveChoice(ctx: OpContext, choice: PendingChoice, optionId: string, 
   ctx.state.queue = ctx.state.queue.filter((c) => c.id !== choice.id);
   if (!option) return;
   const cause: EventCause = { kind: 'choice', entity: choice.chooser, parent: choice.offeredSeq, ...(choice.rule !== undefined ? { rule: choice.rule } : {}) };
+  const ruling = choice.chooser === GM;
   runRoot(ctx, () => {
     const made = ctx.emit({ type: 'choiceMade', entity: choice.chooser, choice: choice.id, option: option.id, label: option.label, automatic }, cause);
-    const chooserActive = ctx.state.entities[choice.chooser]?.status === 'active';
+    // A GM ruling keeps the bindings of the rule that asked; a contestant's choice acts as the chooser.
+    const chooserActive = ruling || ctx.state.entities[choice.chooser]?.status === 'active';
     if (!chooserActive) return;
     const effectCause: EventCause = { ...cause, parent: made.seq };
     const sp = ctx.savepoint();
     try {
-      applyEffects(ctx, option.effects, { ...choice.bindings, $actor: choice.chooser }, effectCause);
+      const { $actor: asker, ...rest } = choice.bindings;
+      applyEffects(ctx, option.effects, ruling ? { ...rest, ...(asker !== undefined ? { $actor: asker } : {}) } : { ...rest, $actor: choice.chooser }, effectCause);
     } catch (err) {
       if (!(err instanceof RuleFault)) throw err;
       ctx.restore(sp);
@@ -307,7 +314,7 @@ export function answerDecision(game: CompiledGame, state: GameState, answer: Dec
       });
       return;
     }
-    if (pending.kind === 'choice') {
+    if (pending.kind === 'choice' || pending.kind === 'ruling') {
       const choice = ctx.state.queue.find((c) => c.id === pending.choice);
       if (!choice || option.kind !== 'choose') throw new InvalidInput('that choice is no longer open');
       runRoot(ctx, () => ctx.emit({ type: 'decided', entity: actorId, decision: pending.id, option: option.id, label: option.label, say: answer.say }, cause));
@@ -388,6 +395,15 @@ function performOption(ctx: OpContext, actorId: string, option: DecisionOption, 
     case 'pay':
       payCommitment(ctx, actorId, option.commitment, cause);
       return;
+    case 'freeform': {
+      const text = (answer.attempt ?? '').trim().slice(0, 200);
+      if (text.length === 0) throw new InvalidInput('describe what you attempt');
+      if (!canAttemptFreeform(ctx.game, ctx.state, actor)) throw new InvalidInput('you cannot attempt that now');
+      ctx.state.cooldowns[`freeform:${actorId}`] = ctx.state.round + Math.max(1, ctx.game.def.settings.adjudication.freeformCooldownRounds);
+      const choice = queueGmRuling(ctx, `${actor.name} attempts: “${text}”`, actorId, [{ id: 'success', label: 'It works (apply the result with the GM tools first)', effects: [] }], { $actor: actorId, ...(actor.spaceId !== null ? { $space: actor.spaceId } : {}) }, cause);
+      ctx.emit({ type: 'attempted', entity: actorId, text, choice }, cause);
+      return;
+    }
     case 'choose':
       throw new InvalidInput('choices are answered through their own decision');
     case 'tradeAnswer':

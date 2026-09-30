@@ -344,6 +344,9 @@ export function effectHints(scope: HintScope, effects: Effect[], b: Bindings, su
       case 'spawn':
         out.push({ text: tag(describeEffect(e, names, b)), certain: false, p });
         break;
+      case 'askGm':
+        out.push({ text: tag(`the GM decides: “${e.question}”`), certain: false, p });
+        break;
       case 'if': {
         const c = tryEval(() => evalCond(env, e.cond, b));
         if (c !== false) effectHints(scope, e.then, b, sure && c === true, p, source, out, depth);

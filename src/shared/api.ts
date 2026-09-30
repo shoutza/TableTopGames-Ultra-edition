@@ -1,4 +1,5 @@
 import type { GameDefinition } from '../schema/definition.ts';
+import type { CheckResult, DiffEntry, Proposal, ProposalAnswers } from '../schema/proposal.ts';
 import type { Strategy } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
 
@@ -91,6 +92,15 @@ export interface StatusDto {
   speed: Speed;
   stateHash: string;
   savedAt: string | null;
+  /** A GM ruling is waiting (the match does not go on until it is answered or times out). */
+  ruling: { decisionId: string; timeLeftMs: number | null } | null;
+  /** Ruleset versions: mechanical changes (shown to contestants) and cosmetic ones. */
+  rulesVersion: RulesVersion;
+}
+
+export interface RulesVersion {
+  mechanical: number;
+  cosmetic: number;
 }
 
 /** Values the engine derives per entity (the web app never runs engine code). */
@@ -167,4 +177,97 @@ export interface ContestantViewResponse {
   view: unknown;
   /** The most recent packet sent to its model, if any. */
   lastPacket: { instructions: string; input: string } | null;
+}
+
+// --- scenario library and editing ------------------------------------------------------------
+
+export interface ScenarioListItem {
+  id: string;
+  name: string;
+  description: string;
+  builtIn: boolean;
+  valid: boolean;
+  spaces: number;
+  rules: number;
+  updatedAt: string | null;
+}
+
+export interface ScenarioDto {
+  id: string;
+  builtIn: boolean;
+  /** The definition JSON as saved. */
+  definition: unknown;
+  check: CheckResult;
+}
+
+export interface CheckRequest {
+  definition: unknown;
+}
+
+/** Review a scenario edit: against the saved scenario `base` (null for a new one). */
+export interface ScenarioProposalRequest {
+  definition: unknown;
+  base: string | null;
+}
+
+export interface SaveScenarioRequest {
+  definition: unknown;
+  answers: Pick<ProposalAnswers, 'questions'>;
+}
+
+/** Review a change to a running match's rules. */
+export interface MatchProposalRequest {
+  definition: unknown;
+}
+
+export interface MatchProposalResponse {
+  proposal: Proposal;
+  /** The ruleset version the proposal was made against; applying checks it is still current. */
+  baseVersion: RulesVersion;
+  /** Mechanical changes are applied only while the match is paused. */
+  needsPause: boolean;
+}
+
+export interface ApplyChangeRequest {
+  definition: unknown;
+  answers: ProposalAnswers;
+  baseVersion: RulesVersion;
+}
+
+export interface ApplyChangeResponse {
+  ok: true;
+  level: Proposal['level'];
+  rulesVersion: RulesVersion;
+  /** The decision that was withdrawn and asked again, if any. */
+  invalidated: string | null;
+}
+
+export interface MatchDefinitionResponse {
+  definition: GameDefinition;
+  rulesVersion: RulesVersion;
+  changes: ChangeLogEntry[];
+}
+
+/** One applied change to a match's rules (the GM's change log). */
+export interface ChangeLogEntry {
+  rev: number;
+  round: number;
+  level: Proposal['level'];
+  rulesVersion: RulesVersion;
+  summary: string[];
+  changes: DiffEntry[];
+}
+
+export interface RulingRequest {
+  optionId: string;
+}
+
+/** Points the match can be rewound to (the start of each round). */
+export interface CheckpointDto {
+  round: number;
+  rev: number;
+}
+
+export interface RewindRequest {
+  rev: number;
 }

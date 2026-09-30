@@ -329,6 +329,9 @@ function scoreMain(c: Ctx, p: OptionPreview): number {
     case 'tradeAnswer':
       // Free actions and trade answers are decided separately (see chooseHeuristic).
       return -1;
+    case 'freeform':
+      // The offline player never improvises: that is for model-driven contestants.
+      return -5;
     case 'choose':
       return p.unknown ? 0 : hintsValue(c, p.hints);
     case 'rest':
@@ -701,5 +704,7 @@ function explainChoice(p: OptionPreview | undefined): string {
       return `paying ${p.toName} as promised`;
     case 'tradeAnswer':
       return p.answer === 'accept' ? 'a fair deal' : p.answer === 'counter' ? 'asking for better terms' : 'not worth it';
+    case 'freeform':
+      return 'trying something unusual';
   }
 }

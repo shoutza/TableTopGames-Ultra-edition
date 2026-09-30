@@ -18,6 +18,7 @@ const RULES: Record<string, { internal: string[]; packages: string[] }> = {
     internal: ['contestants/', 'visibility/', 'schema/', 'llm/port.ts', 'engine/combat.ts', 'engine/explain.ts'],
     packages: ['zod'],
   },
+  authoring: { internal: ['authoring/', 'engine/', 'schema/'], packages: [] },
   shared: { internal: ['shared/', 'schema/'], packages: [] },
   web: { internal: ['web/', 'shared/', 'schema/'], packages: ['react', 'react-dom', 'zod'] },
 };

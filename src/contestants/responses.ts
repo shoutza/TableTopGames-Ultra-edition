@@ -58,7 +58,7 @@ const TradeJsonSchema = {
 export const DecisionJsonSchema: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['decisionId', 'optionId', 'say', 'plan', 'strategyUpdate', 'trade', 'reason'],
+  required: ['decisionId', 'optionId', 'say', 'plan', 'strategyUpdate', 'trade', 'attempt', 'reason'],
   properties: {
     decisionId: { type: 'string', description: 'The decision id you are answering.' },
     optionId: { type: 'string', description: 'Exactly one option id from the list.' },
@@ -81,6 +81,7 @@ export const DecisionJsonSchema: Record<string, unknown> = {
       ],
     },
     trade: TradeJsonSchema,
+    attempt: { type: ['string', 'null'], description: 'For the "freeform" option only: what you attempt (max 200 characters).' },
     reason: { type: 'string', description: 'One short sentence explaining the choice (max 25 words).' },
   },
 };
@@ -141,6 +142,7 @@ export const DecisionResponseSchema = z.object({
     .nullable(),
   /** Older scripted answers may omit it. */
   trade: TradeResponseSchema.nullable().default(null),
+  attempt: clip(200).nullable().default(null),
   reason: clip(200),
 });
 export type DecisionResponse = z.infer<typeof DecisionResponseSchema>;
