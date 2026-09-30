@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { EventDto } from '../../shared/api.ts';
+import { Icon } from './Ui.tsx';
 
 /**
  * Replays recorded combat. The engine already decided every spin; this component only animates
@@ -22,12 +23,23 @@ export interface FightAnimation {
   attackerDamage: number;
   defenderDamage: number;
   maxSpins: number;
-  spins: Array<{ index: number; total: number; roll: number; winner: string; damage: number; loserHpAfter: number }>;
+  spins: Array<{
+    index: number;
+    total: number;
+    roll: number;
+    winner: string;
+    damage: number;
+    loserHpAfter: number;
+  }>;
   outcome: 'attackerWon' | 'defenderWon' | 'bothStanding' | null;
 }
 
 /** Groups freshly arrived events into fight animations. */
-export function fightsFrom(events: EventDto[], nameOf: (id: string) => string, colorOf: (id: string) => string): FightAnimation[] {
+export function fightsFrom(
+  events: EventDto[],
+  nameOf: (id: string) => string,
+  colorOf: (id: string) => string,
+): FightAnimation[] {
   const fights = new Map<number, FightAnimation>();
   for (const e of events) {
     if (e.type === 'fightStarted') {
@@ -50,7 +62,14 @@ export function fightsFrom(events: EventDto[], nameOf: (id: string) => string, c
         outcome: null,
       });
     } else if (e.type === 'spin') {
-      fights.get(e.fight)?.spins.push({ index: e.index, total: e.total, roll: e.roll, winner: e.winner, damage: e.damage, loserHpAfter: e.loserHpAfter });
+      fights.get(e.fight)?.spins.push({
+        index: e.index,
+        total: e.total,
+        roll: e.roll,
+        winner: e.winner,
+        damage: e.damage,
+        loserHpAfter: e.loserHpAfter,
+      });
     } else if (e.type === 'fightEnded') {
       const f = fights.get(e.fight);
       if (f) f.outcome = e.outcome;
@@ -117,11 +136,20 @@ export function CombatWheel({ fight, spinMs, onDone }: Props) {
   return (
     <div className="wheel-card" role="dialog" aria-label="Combat">
       <div className="wheel-title">
-        ⚔ <span style={{ color: fight.attackerColor }}>{fight.attackerName}</span> vs <span style={{ color: fight.defenderColor }}>{fight.defenderName}</span>
+        <p className="eyebrow">COMBAT REPLAY</p>
+        <div>
+          <Icon name="activity" size={17} /> <span>{fight.attackerName}</span> vs <span>{fight.defenderName}</span>
+        </div>
       </div>
       <div className="wheel-body">
         <svg viewBox="0 0 200 200" className="wheel">
-          <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: '100px 100px', transition: `transform ${Math.max(100, spinMs - 80)}ms cubic-bezier(0.15, 0.7, 0.2, 1)` }}>
+          <g
+            style={{
+              transform: `rotate(${rotation}deg)`,
+              transformOrigin: '100px 100px',
+              transition: `transform ${Math.max(100, spinMs - 80)}ms cubic-bezier(0.15, 0.7, 0.2, 1)`,
+            }}
+          >
             <path d={arc(100, 100, 90, 0, Math.max(0.5, shareDeg))} fill={fight.attackerColor} />
             <path d={arc(100, 100, 90, shareDeg, 359.99)} fill={fight.defenderColor} />
           </g>
@@ -130,11 +158,13 @@ export function CombatWheel({ fight, spinMs, onDone }: Props) {
         </svg>
         <div className="wheel-stats">
           <div>
-            <b style={{ color: fight.attackerColor }}>{fight.attackerName}</b> · {fight.attackerPower} Power · {pct.toFixed(1)}% · hits {fight.attackerDamage}
+            <b style={{ color: `color-mix(in srgb, ${fight.attackerColor} 75%, #263a24)` }}>{fight.attackerName}</b> ·{' '}
+            {fight.attackerPower} Power · {pct.toFixed(1)}% · hits {fight.attackerDamage}
             <Hp value={aHp} max={fight.attackerHp} />
           </div>
           <div>
-            <b style={{ color: fight.defenderColor }}>{fight.defenderName}</b> · {fight.defenderPower} Power · {(100 - pct).toFixed(1)}% · hits {fight.defenderDamage}
+            <b style={{ color: `color-mix(in srgb, ${fight.defenderColor} 75%, #263a24)` }}>{fight.defenderName}</b> ·{' '}
+            {fight.defenderPower} Power · {(100 - pct).toFixed(1)}% · hits {fight.defenderDamage}
             <Hp value={dHp} max={fight.defenderHp} />
           </div>
           <div className="wheel-result">
@@ -144,7 +174,9 @@ export function CombatWheel({ fight, spinMs, onDone }: Props) {
           </div>
           {done && (
             <div className="wheel-outcome">
-              {fight.outcome === 'bothStanding' ? 'Both fighters still standing.' : `${fight.outcome === 'attackerWon' ? fight.attackerName : fight.defenderName} wins the fight!`}
+              {fight.outcome === 'bothStanding'
+                ? 'Both fighters still standing.'
+                : `${fight.outcome === 'attackerWon' ? fight.attackerName : fight.defenderName} wins the fight!`}
             </div>
           )}
         </div>
@@ -163,9 +195,7 @@ function Hp({ value, max }: { value: number; max: number }) {
       <div className="hp-track">
         <div className="hp-fill" style={{ width: `${frac * 100}%` }} />
       </div>
-      <span>
-        {value} HP
-      </span>
+      <span>{value} HP</span>
     </div>
   );
 }

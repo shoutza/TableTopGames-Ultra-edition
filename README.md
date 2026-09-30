@@ -33,8 +33,8 @@ npm run sim -- --controllers llm             # one match with gpt-6-luna (needs 
 
 ### Using the GM app
 
-1. Create a match (Star Chase), press **Start**. Contestants pick strategies, then play.
-2. Click a token or standings row to inspect it: stats (base vs. effective Power), items,
+1. Create a match (Star Chase), press **Start match**. Contestants pick strategies, then play.
+2. Click a token or player card to inspect it: stats (base vs. effective Power), items,
    personality, strategy, plan, and **View as contestant** (the exact packet its model sees).
 3. **GM tools** act on the selected entity: adjust or set resources, add/remove tags, teleport
    (tick *counts as landing* to trigger landing rules), give items, announce. Tick *silent
@@ -43,3 +43,26 @@ npm run sim -- --controllers llm             # one match with gpt-6-luna (needs 
    see why it happened (rule, triggering event, conditions checked).
 5. **Save** writes a snapshot; matches also autosave at every round end and on pause. After a
    restart, open the match from the list and resume — the state hash in the top bar matches.
+
+### The tabletop studio
+
+The studio uses warm ivory panels, a forest-green board, local SVG artwork and animated pieces.
+The lobby includes searchable saved tables, and the live console puts player cards, match controls,
+GM interventions and event explanations beside the board.
+
+- Use **+ / −** on the board to zoom, scroll to explore, and click the percentage to reset.
+- Select **GM tools** and choose an entity directly, or inspect a board piece first. Selecting a
+  board space also sets the teleport destination.
+- **Combat replay** controls the animated wheel; switching it off clears queued replays immediately.
+- The event feed follows new events within its own panel. Selecting an event stops following so
+  its explanation stays readable; re-enable **Follow** to catch up.
+- Keyboard users can select spaces and pieces with **Enter** or **Space**. The interface honors
+  reduced-motion preferences and adapts to smaller screens.
+- Saves show a confirmation, controls wait for in-flight requests, and missing match links show
+  an actionable error.
+- Reading a snapshot or opening another viewer preserves pending live events for existing tabs.
+
+![Tabletop studio lobby](docs/screenshots/lobby-desktop.png)
+![Live Game Master console](docs/screenshots/match-desktop.png)
+
+Mobile previews: [lobby](docs/screenshots/lobby-mobile.png) · [match](docs/screenshots/match-mobile.png).

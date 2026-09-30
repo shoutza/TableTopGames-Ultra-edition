@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventDto } from '../../shared/api.ts';
 import type { MatchData } from '../api.ts';
+import { Icon } from './Ui.tsx';
 
 /** The readable history, plus a "why did this happen?" trace for any event. */
 
@@ -45,7 +46,13 @@ export function WhyPanel({ data, seq, onPick }: { data: MatchData; seq: number; 
             <button className="link" onClick={() => onPick(e.seq)}>
               {e.text}
             </button>
-            <span className="muted"> — {i === chain.length - 1 && e.cause.parent === undefined ? `caused by ${causeLabel(data, e)}` : `via ${causeLabel(data, e)}`}</span>
+            <span className="muted">
+              {' '}
+              —{' '}
+              {i === chain.length - 1 && e.cause.parent === undefined
+                ? `caused by ${causeLabel(data, e)}`
+                : `via ${causeLabel(data, e)}`}
+            </span>
           </li>
         ))}
       </ol>
@@ -64,29 +71,50 @@ export function WhyPanel({ data, seq, onPick }: { data: MatchData; seq: number; 
       )}
       {first.cause.rule && (
         <p className="muted">
-          Rule text: {data.definition.rules.find((r) => r.id === first.cause.rule)?.provenance?.sourceText ?? data.definition.rules.find((r) => r.id === first.cause.rule)?.description ?? '(see definition)'}
+          Rule text:{' '}
+          {data.definition.rules.find((r) => r.id === first.cause.rule)?.provenance?.sourceText ??
+            data.definition.rules.find((r) => r.id === first.cause.rule)?.description ??
+            '(see definition)'}
         </p>
       )}
     </div>
   );
 }
 
-export function EventLog({ data, selected, onSelect, holdAfter }: { data: MatchData; selected: number | null; onSelect: (seq: number) => void; holdAfter: number | null }) {
+export function EventLog({
+  data,
+  selected,
+  onSelect,
+  holdAfter,
+}: {
+  data: MatchData;
+  selected: number | null;
+  onSelect: (seq: number) => void;
+  holdAfter: number | null;
+}) {
   const [all, setAll] = useState(false);
   const [follow, setFollow] = useState(true);
-  const bottom = useRef<HTMLDivElement>(null);
+  const lines = useRef<HTMLDivElement>(null);
   // While the wheel replays a fight, later lines wait so the log does not spoil the result.
   const events = useMemo(
-    () => (all ? data.events : data.events.filter((e) => !NOISE.has(e.type))).filter((e) => holdAfter === null || e.seq <= holdAfter).slice(-600),
+    () =>
+      (all ? data.events : data.events.filter((e) => !NOISE.has(e.type)))
+        .filter((e) => holdAfter === null || e.seq <= holdAfter)
+        .slice(-600),
     [data.events, all, holdAfter],
   );
   useEffect(() => {
-    if (follow) bottom.current?.scrollIntoView({ block: 'end' });
-  }, [events.length, follow]);
+    if (follow && lines.current) lines.current.scrollTop = lines.current.scrollHeight;
+  }, [events.at(-1)?.seq, follow]);
   let lastRound = -1;
   return (
     <div className="log">
       <div className="log-toolbar">
+        <div className="log-title">
+          <Icon name="activity" size={17} />
+          <h2>Event history</h2>
+          <span className="count">{data.events.length}</span>
+        </div>
         <label className="check">
           <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Show every event
         </label>
@@ -94,15 +122,35 @@ export function EventLog({ data, selected, onSelect, holdAfter }: { data: MatchD
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> Follow
         </label>
       </div>
-      <div className="log-lines">
+      <div
+        className="log-lines"
+        ref={lines}
+        role="log"
+        aria-live="off"
+        aria-label="Match events"
+        onScroll={() => {
+          const el = lines.current;
+          if (follow && el && el.scrollHeight - el.clientHeight - el.scrollTop > 48) setFollow(false);
+        }}
+      >
+        {events.length === 0 && <p className="log-empty">The story unfolds here, one turn at a time.</p>}
         {events.map((e) => {
           const header = e.round !== lastRound ? <div className="round-sep">Round {e.round}</div> : null;
           lastRound = e.round;
-          const hidden = e.cause.rule !== undefined && data.definition.rules.find((r) => r.id === e.cause.rule)?.visibility === 'hidden';
+          const hidden =
+            e.cause.rule !== undefined &&
+            data.definition.rules.find((r) => r.id === e.cause.rule)?.visibility === 'hidden';
           return (
-            <div key={e.seq}>
+            <div key={e.seq} className="log-entry">
               {header}
-              <button className={`log-line ${e.type} ${selected === e.seq ? 'selected' : ''}`} onClick={() => onSelect(e.seq)}>
+              <button
+                className={`log-line ${e.type} ${selected === e.seq ? 'selected' : ''}`}
+                aria-pressed={selected === e.seq}
+                onClick={() => {
+                  setFollow(false);
+                  onSelect(e.seq);
+                }}
+              >
                 {hidden ? '🔒 ' : ''}
                 {e.text}
               </button>
@@ -110,7 +158,6 @@ export function EventLog({ data, selected, onSelect, holdAfter }: { data: MatchD
           );
         })}
         {holdAfter !== null && <div className="muted">⚔ the wheel is spinning…</div>}
-        <div ref={bottom} />
       </div>
     </div>
   );
