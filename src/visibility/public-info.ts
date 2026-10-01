@@ -133,7 +133,42 @@ export interface PublicGameInfo {
   actions: Array<{ id: string; name: string; text: string }>;
   /** The pool secret objectives are dealt from (public, like a deck list; who holds which is secret). */
   objectives: Array<{ id: string; name: string; text: string; reward: string }>;
-  rules: Array<{ id: string; name: string; kind: 'reaction' | 'modifier' | 'continuous'; text: string; trigger: string | null; spaceTag: string | undefined }>;
+  rules: PublicRule[];
+}
+
+export interface PublicRule {
+  id: string;
+  name: string;
+  kind: 'reaction' | 'modifier' | 'continuous';
+  text: string;
+  trigger: string | null;
+  spaceTag: string | undefined;
+  /** Everything the rule mentions, by kind (for judging which rules matter to a decision). */
+  refs: { spaces: string[]; spaceTags: string[]; entityTags: string[]; items: string[]; statuses: string[]; other: string[] };
+  /** Tied to particular spaces (it mentions spaces or space tags). */
+  local: boolean;
+}
+
+const SKIP_KEYS = new Set(['id', 'name', 'description', 'provenance', 'text', 'label', 'prompt']);
+
+/** Ids a rule mentions, sorted into spaces, space tags, entity tags, items, statuses and the rest. */
+function ruleRefs(game: CompiledGame, def: unknown): PublicRule['refs'] {
+  const refs: PublicRule['refs'] = { spaces: [], spaceTags: [], entityTags: [], items: [], statuses: [], other: [] };
+  const add = (list: string[], v: string) => {
+    if (!list.includes(v)) list.push(v);
+  };
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (game.spaces.has(v)) add(refs.spaces, v);
+      else if (game.tags.has(v)) add(game.tags.get(v)?.appliesTo === 'space' ? refs.spaceTags : refs.entityTags, v);
+      else if (game.items.has(v)) add(refs.items, v);
+      else if (game.statuses.has(v)) add(refs.statuses, v);
+      else if (game.shopEntries.has(v) || game.decks.has(v) || game.enemies.has(v) || game.actions.has(v)) add(refs.other, v);
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) if (!SKIP_KEYS.has(k)) walk(x);
+  };
+  walk(def);
+  return refs;
 }
 
 function describeRuleText(rule: Parameters<typeof attachedRuleText>[0], names: ReturnType<typeof makeNames>): string {
@@ -238,6 +273,10 @@ export function publicInfo(game: CompiledGame): PublicGameInfo {
         text: describeRuleText(r.def, names),
         trigger: r.def.kind === 'reaction' ? r.def.trigger.event : null,
         spaceTag: r.def.kind === 'reaction' ? r.def.trigger.where?.spaceTag : undefined,
+        ...(() => {
+          const refs = ruleRefs(game, r.def);
+          return { refs, local: refs.spaces.length > 0 || refs.spaceTags.length > 0 };
+        })(),
       })),
   };
 }

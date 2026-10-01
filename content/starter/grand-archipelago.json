@@ -1,0 +1,8944 @@
+{
+  "id": "grand-archipelago",
+  "name": "Grand Archipelago",
+  "description": "Eight contestants race across eight islands: 200 spaces joined by bridges and ferries, each island with its own climate, tolls, traps, springs and festivals. Two star vendors wander the lookouts; the Demon guards the Volcano.",
+  "rulesLanguageVersion": 3,
+  "settings": {
+    "core": {
+      "hp": "res.hp",
+      "maxHp": "res.max_hp",
+      "power": "res.power",
+      "gold": "res.gold"
+    },
+    "startSpace": "space.harbor.0",
+    "movement": {
+      "die": 6,
+      "bonus": "res.move"
+    },
+    "inventoryCapacity": 3,
+    "equipment": [
+      {
+        "id": "slot.weapon",
+        "name": "Weapon",
+        "count": 1
+      },
+      {
+        "id": "slot.armor",
+        "name": "Armor",
+        "count": 1
+      }
+    ],
+    "rest": {
+      "heal": 40
+    },
+    "combat": {
+      "damage": {
+        "base": 25,
+        "ratioExponent": 1,
+        "min": 1,
+        "max": 100
+      },
+      "maxSpinsPerFight": 8,
+      "pvp": true
+    },
+    "ko": {
+      "goldLossPercent": 50,
+      "skipTurns": 1,
+      "lootToVictor": true,
+      "mode": "respawn"
+    },
+    "victory": {
+      "resource": "res.stars",
+      "threshold": 8,
+      "roundLimit": 40,
+      "ranking": [
+        "res.stars",
+        "res.gold",
+        "res.stash"
+      ]
+    },
+    "objectives": {
+      "perContestant": 1
+    },
+    "trading": {
+      "enabled": true,
+      "maxPromiseRounds": 5
+    }
+  },
+  "resources": [
+    {
+      "id": "res.hp",
+      "name": "HP",
+      "role": "pool",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 100,
+      "min": 0,
+      "max": null,
+      "maxFrom": "res.max_hp",
+      "icon": "❤️"
+    },
+    {
+      "id": "res.max_hp",
+      "name": "Max HP",
+      "role": "stat",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 100,
+      "min": 1,
+      "max": 100000
+    },
+    {
+      "id": "res.power",
+      "name": "Power",
+      "role": "stat",
+      "appliesTo": [
+        "contestant",
+        "enemy"
+      ],
+      "default": 80,
+      "min": 1,
+      "max": 1000000,
+      "icon": "⚡"
+    },
+    {
+      "id": "res.move",
+      "name": "Move",
+      "role": "stat",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": -3,
+      "max": 3,
+      "icon": "👣"
+    },
+    {
+      "id": "res.gold",
+      "name": "Gold",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 10,
+      "min": 0,
+      "max": 9999,
+      "icon": "🪙",
+      "tradeable": true
+    },
+    {
+      "id": "res.stars",
+      "name": "Stars",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 99,
+      "icon": "⭐"
+    },
+    {
+      "id": "res.bananas",
+      "name": "Bananas",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 99,
+      "icon": "🍌",
+      "tradeable": true
+    },
+    {
+      "id": "res.stash",
+      "name": "Stash",
+      "role": "pool",
+      "appliesTo": [
+        "contestant"
+      ],
+      "default": 0,
+      "min": 0,
+      "max": 999,
+      "visibility": "owner",
+      "icon": "💰"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag.start",
+      "name": "Start",
+      "appliesTo": "space",
+      "color": "#95a5a6",
+      "icon": "🚩"
+    },
+    {
+      "id": "tag.coin",
+      "name": "Coin",
+      "appliesTo": "space",
+      "color": "#f1c40f",
+      "icon": "🪙"
+    },
+    {
+      "id": "tag.rich_coin",
+      "name": "Rich Coin",
+      "appliesTo": "space",
+      "color": "#f39c12",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.blue",
+      "name": "Blue",
+      "appliesTo": "space",
+      "color": "#3498db",
+      "icon": "🌊"
+    },
+    {
+      "id": "tag.dojo",
+      "name": "Dojo",
+      "appliesTo": "space",
+      "color": "#e67e22",
+      "icon": "🥋"
+    },
+    {
+      "id": "tag.shrine",
+      "name": "Shrine",
+      "appliesTo": "space",
+      "color": "#c0392b",
+      "icon": "⛩️"
+    },
+    {
+      "id": "tag.hazard",
+      "name": "Hazard",
+      "appliesTo": "space",
+      "color": "#7f8c8d",
+      "icon": "⚠️"
+    },
+    {
+      "id": "tag.den",
+      "name": "Den",
+      "appliesTo": "space",
+      "color": "#2ecc71",
+      "icon": "🕳️"
+    },
+    {
+      "id": "tag.lair",
+      "name": "Lair",
+      "appliesTo": "space",
+      "color": "#8e1b1b",
+      "icon": "👹"
+    },
+    {
+      "id": "tag.shop",
+      "name": "Shop",
+      "appliesTo": "space",
+      "color": "#9b59b6",
+      "icon": "🛒"
+    },
+    {
+      "id": "tag.well",
+      "name": "Well",
+      "appliesTo": "space",
+      "color": "#16a085",
+      "icon": "🪣"
+    },
+    {
+      "id": "tag.idol",
+      "name": "Idol",
+      "appliesTo": "space",
+      "color": "#d4ac0d",
+      "icon": "🗿"
+    },
+    {
+      "id": "tag.star_spot",
+      "name": "Star Spot",
+      "appliesTo": "space",
+      "color": "#fdfd96"
+    },
+    {
+      "id": "tag.fish",
+      "name": "Fish",
+      "appliesTo": "entity",
+      "color": "#5dade2",
+      "description": "Cosmetic unless rules say otherwise."
+    },
+    {
+      "id": "tag.cursed",
+      "name": "Cursed",
+      "appliesTo": "entity",
+      "color": "#6c3483"
+    },
+    {
+      "id": "tag.demon",
+      "name": "Demon",
+      "appliesTo": "entity",
+      "color": "#922b21"
+    },
+    {
+      "id": "tag.slime",
+      "name": "Slime",
+      "appliesTo": "entity",
+      "color": "#58d68d"
+    },
+    {
+      "id": "tag.star_vendor",
+      "name": "Star Vendor",
+      "appliesTo": "entity",
+      "color": "#f7dc6f"
+    },
+    {
+      "id": "tag.event",
+      "name": "Mystery",
+      "appliesTo": "space",
+      "color": "#e84393",
+      "icon": "❓"
+    },
+    {
+      "id": "tag.kraken",
+      "name": "Kraken",
+      "appliesTo": "entity",
+      "color": "#1abc9c"
+    },
+    {
+      "id": "tag.ferry",
+      "name": "Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.isle_harbor",
+      "name": "Harbor Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Harbor island."
+    },
+    {
+      "id": "tag.harbor_toll",
+      "name": "Harbor Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.harbor_trap",
+      "name": "Harbor Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.harbor_spring",
+      "name": "Harbor Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.harbor_altar",
+      "name": "Harbor Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.harbor_market",
+      "name": "Harbor Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.harbor_thieves",
+      "name": "Harbor Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.harbor_training",
+      "name": "Harbor Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.harbor_ferry",
+      "name": "Harbor Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.harbor_sanctuary",
+      "name": "Harbor Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_jungle",
+      "name": "Jungle Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Jungle island."
+    },
+    {
+      "id": "tag.jungle_toll",
+      "name": "Jungle Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.jungle_trap",
+      "name": "Jungle Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.jungle_spring",
+      "name": "Jungle Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.jungle_altar",
+      "name": "Jungle Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.jungle_market",
+      "name": "Jungle Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.jungle_thieves",
+      "name": "Jungle Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.jungle_training",
+      "name": "Jungle Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.jungle_ferry",
+      "name": "Jungle Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.jungle_sanctuary",
+      "name": "Jungle Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_volcano",
+      "name": "Volcano Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Volcano island."
+    },
+    {
+      "id": "tag.volcano_toll",
+      "name": "Volcano Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.volcano_trap",
+      "name": "Volcano Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.volcano_spring",
+      "name": "Volcano Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.volcano_altar",
+      "name": "Volcano Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.volcano_market",
+      "name": "Volcano Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.volcano_thieves",
+      "name": "Volcano Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.volcano_training",
+      "name": "Volcano Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.volcano_ferry",
+      "name": "Volcano Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.volcano_sanctuary",
+      "name": "Volcano Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_glacier",
+      "name": "Glacier Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Glacier island."
+    },
+    {
+      "id": "tag.glacier_toll",
+      "name": "Glacier Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.glacier_trap",
+      "name": "Glacier Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.glacier_spring",
+      "name": "Glacier Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.glacier_altar",
+      "name": "Glacier Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.glacier_market",
+      "name": "Glacier Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.glacier_thieves",
+      "name": "Glacier Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.glacier_training",
+      "name": "Glacier Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.glacier_ferry",
+      "name": "Glacier Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.glacier_sanctuary",
+      "name": "Glacier Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_dunes",
+      "name": "Dunes Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Dunes island."
+    },
+    {
+      "id": "tag.dunes_toll",
+      "name": "Dunes Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.dunes_trap",
+      "name": "Dunes Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.dunes_spring",
+      "name": "Dunes Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.dunes_altar",
+      "name": "Dunes Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.dunes_market",
+      "name": "Dunes Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.dunes_thieves",
+      "name": "Dunes Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.dunes_training",
+      "name": "Dunes Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.dunes_ferry",
+      "name": "Dunes Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.dunes_sanctuary",
+      "name": "Dunes Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_reef",
+      "name": "Reef Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Reef island."
+    },
+    {
+      "id": "tag.reef_toll",
+      "name": "Reef Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.reef_trap",
+      "name": "Reef Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.reef_spring",
+      "name": "Reef Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.reef_altar",
+      "name": "Reef Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.reef_market",
+      "name": "Reef Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.reef_thieves",
+      "name": "Reef Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.reef_training",
+      "name": "Reef Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.reef_ferry",
+      "name": "Reef Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.reef_sanctuary",
+      "name": "Reef Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_ruins",
+      "name": "Ruins Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Ruins island."
+    },
+    {
+      "id": "tag.ruins_toll",
+      "name": "Ruins Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.ruins_trap",
+      "name": "Ruins Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.ruins_spring",
+      "name": "Ruins Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.ruins_altar",
+      "name": "Ruins Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.ruins_market",
+      "name": "Ruins Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.ruins_thieves",
+      "name": "Ruins Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.ruins_training",
+      "name": "Ruins Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.ruins_ferry",
+      "name": "Ruins Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.ruins_sanctuary",
+      "name": "Ruins Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    },
+    {
+      "id": "tag.isle_sky",
+      "name": "Sky Isle",
+      "appliesTo": "space",
+      "description": "Every space on the Sky island."
+    },
+    {
+      "id": "tag.sky_toll",
+      "name": "Sky Toll",
+      "appliesTo": "space",
+      "color": "#f5b041",
+      "icon": "💰"
+    },
+    {
+      "id": "tag.sky_trap",
+      "name": "Sky Snare",
+      "appliesTo": "space",
+      "color": "#7b7d7d",
+      "icon": "🪤"
+    },
+    {
+      "id": "tag.sky_spring",
+      "name": "Sky Spring",
+      "appliesTo": "space",
+      "color": "#48c9b0",
+      "icon": "💧"
+    },
+    {
+      "id": "tag.sky_altar",
+      "name": "Sky Altar",
+      "appliesTo": "space",
+      "color": "#bb8fce",
+      "icon": "🕯️"
+    },
+    {
+      "id": "tag.sky_market",
+      "name": "Sky Market",
+      "appliesTo": "space",
+      "color": "#dc7633",
+      "icon": "🛍️"
+    },
+    {
+      "id": "tag.sky_thieves",
+      "name": "Sky Thieves",
+      "appliesTo": "space",
+      "color": "#566573",
+      "icon": "🦝"
+    },
+    {
+      "id": "tag.sky_training",
+      "name": "Sky Training",
+      "appliesTo": "space",
+      "color": "#e59866",
+      "icon": "🏋️"
+    },
+    {
+      "id": "tag.sky_ferry",
+      "name": "Sky Ferry",
+      "appliesTo": "space",
+      "color": "#5d6d7e",
+      "icon": "⛴️"
+    },
+    {
+      "id": "tag.sky_sanctuary",
+      "name": "Sky Sanctuary",
+      "appliesTo": "space",
+      "color": "#d5f5e3",
+      "icon": "🛡️"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space.harbor.0",
+      "name": "Harbor Gate",
+      "tags": [
+        "tag.start",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.1",
+      "name": "Harbor Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.2",
+      "name": "Harbor Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.3",
+      "name": "Harbor Toll Post",
+      "tags": [
+        "tag.harbor_toll",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.4",
+      "name": "Harbor Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.5",
+      "name": "Harbor Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.6",
+      "name": "Harbor Snare",
+      "tags": [
+        "tag.harbor_trap",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.7",
+      "name": "Harbor Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.8",
+      "name": "Harbor Spring",
+      "tags": [
+        "tag.harbor_spring",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.9",
+      "name": "Harbor Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.10",
+      "name": "Harbor Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.11",
+      "name": "Harbor Altar",
+      "tags": [
+        "tag.harbor_altar",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.12",
+      "name": "Harbor Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.13",
+      "name": "Harbor Market",
+      "tags": [
+        "tag.harbor_market",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.14",
+      "name": "Harbor Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.15",
+      "name": "Harbor Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.16",
+      "name": "Harbor Thieves Alley",
+      "tags": [
+        "tag.harbor_thieves",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.17",
+      "name": "Harbor Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.18",
+      "name": "Harbor Training Yard",
+      "tags": [
+        "tag.harbor_training",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.19",
+      "name": "Harbor Ferry Dock",
+      "tags": [
+        "tag.harbor_ferry",
+        "tag.ferry",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.20",
+      "name": "Harbor Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.21",
+      "name": "Harbor Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.22",
+      "name": "Harbor Sanctuary",
+      "tags": [
+        "tag.harbor_sanctuary",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.23",
+      "name": "Gear Bazaar",
+      "tags": [
+        "tag.shop",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.harbor.24",
+      "name": "Harbor Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_harbor"
+      ]
+    },
+    {
+      "id": "space.jungle.0",
+      "name": "Jungle Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.1",
+      "name": "Jungle Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.2",
+      "name": "Jungle Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.3",
+      "name": "Jungle Toll Post",
+      "tags": [
+        "tag.jungle_toll",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.4",
+      "name": "Jungle Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.5",
+      "name": "Jungle Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.6",
+      "name": "Jungle Snare",
+      "tags": [
+        "tag.jungle_trap",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.7",
+      "name": "Jungle Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.8",
+      "name": "Jungle Spring",
+      "tags": [
+        "tag.jungle_spring",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.9",
+      "name": "Jungle Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.10",
+      "name": "Jungle Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.11",
+      "name": "Jungle Altar",
+      "tags": [
+        "tag.jungle_altar",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.12",
+      "name": "Jungle Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.13",
+      "name": "Jungle Market",
+      "tags": [
+        "tag.jungle_market",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.14",
+      "name": "Jungle Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.15",
+      "name": "Jungle Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.16",
+      "name": "Jungle Thieves Alley",
+      "tags": [
+        "tag.jungle_thieves",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.17",
+      "name": "Jungle Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.18",
+      "name": "Jungle Training Yard",
+      "tags": [
+        "tag.jungle_training",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.19",
+      "name": "Jungle Ferry Dock",
+      "tags": [
+        "tag.jungle_ferry",
+        "tag.ferry",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.20",
+      "name": "Jungle Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.21",
+      "name": "Jungle Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.22",
+      "name": "Jungle Sanctuary",
+      "tags": [
+        "tag.jungle_sanctuary",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.23",
+      "name": "Jungle Bazaar",
+      "tags": [
+        "tag.coin",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.jungle.24",
+      "name": "Jungle Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_jungle"
+      ]
+    },
+    {
+      "id": "space.volcano.0",
+      "name": "Volcano Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.1",
+      "name": "Volcano Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.2",
+      "name": "Volcano Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.3",
+      "name": "Volcano Toll Post",
+      "tags": [
+        "tag.volcano_toll",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.4",
+      "name": "Volcano Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.5",
+      "name": "Ash Shrine",
+      "tags": [
+        "tag.shrine",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.6",
+      "name": "Volcano Snare",
+      "tags": [
+        "tag.volcano_trap",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.7",
+      "name": "Volcano Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.8",
+      "name": "Volcano Spring",
+      "tags": [
+        "tag.volcano_spring",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.9",
+      "name": "Volcano Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.10",
+      "name": "Volcano Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.11",
+      "name": "Volcano Altar",
+      "tags": [
+        "tag.volcano_altar",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.12",
+      "name": "Demon's Lair",
+      "tags": [
+        "tag.lair",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.13",
+      "name": "Volcano Market",
+      "tags": [
+        "tag.volcano_market",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.14",
+      "name": "Volcano Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.15",
+      "name": "Volcano Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.16",
+      "name": "Volcano Thieves Alley",
+      "tags": [
+        "tag.volcano_thieves",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.17",
+      "name": "Volcano Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.18",
+      "name": "Volcano Training Yard",
+      "tags": [
+        "tag.volcano_training",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.19",
+      "name": "Volcano Ferry Dock",
+      "tags": [
+        "tag.volcano_ferry",
+        "tag.ferry",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.20",
+      "name": "Volcano Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.21",
+      "name": "Volcano Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.22",
+      "name": "Volcano Sanctuary",
+      "tags": [
+        "tag.volcano_sanctuary",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.23",
+      "name": "Ember Forge",
+      "tags": [
+        "tag.shop",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.volcano.24",
+      "name": "Volcano Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_volcano"
+      ]
+    },
+    {
+      "id": "space.glacier.0",
+      "name": "Glacier Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.1",
+      "name": "Glacier Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.2",
+      "name": "Glacier Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.3",
+      "name": "Glacier Toll Post",
+      "tags": [
+        "tag.glacier_toll",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.4",
+      "name": "Glacier Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.5",
+      "name": "Glacier Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.6",
+      "name": "Glacier Snare",
+      "tags": [
+        "tag.glacier_trap",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.7",
+      "name": "Glacier Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.8",
+      "name": "Glacier Spring",
+      "tags": [
+        "tag.glacier_spring",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.9",
+      "name": "Glacier Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.10",
+      "name": "Glacier Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.11",
+      "name": "Glacier Altar",
+      "tags": [
+        "tag.glacier_altar",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.12",
+      "name": "Glacier Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.13",
+      "name": "Glacier Market",
+      "tags": [
+        "tag.glacier_market",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.14",
+      "name": "Glacier Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.15",
+      "name": "Glacier Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.16",
+      "name": "Glacier Thieves Alley",
+      "tags": [
+        "tag.glacier_thieves",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.17",
+      "name": "Glacier Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.18",
+      "name": "Glacier Training Yard",
+      "tags": [
+        "tag.glacier_training",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.19",
+      "name": "Glacier Ferry Dock",
+      "tags": [
+        "tag.glacier_ferry",
+        "tag.ferry",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.20",
+      "name": "Glacier Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.21",
+      "name": "Glacier Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.22",
+      "name": "Glacier Sanctuary",
+      "tags": [
+        "tag.glacier_sanctuary",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.23",
+      "name": "Ice Outpost",
+      "tags": [
+        "tag.shop",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.glacier.24",
+      "name": "Glacier Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_glacier"
+      ]
+    },
+    {
+      "id": "space.dunes.0",
+      "name": "Dunes Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.1",
+      "name": "Dunes Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.2",
+      "name": "Dunes Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.3",
+      "name": "Dunes Toll Post",
+      "tags": [
+        "tag.dunes_toll",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.4",
+      "name": "Dunes Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.5",
+      "name": "Dunes Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.6",
+      "name": "Dunes Snare",
+      "tags": [
+        "tag.dunes_trap",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.7",
+      "name": "Dunes Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.8",
+      "name": "Dunes Spring",
+      "tags": [
+        "tag.dunes_spring",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.9",
+      "name": "Dunes Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.10",
+      "name": "Dunes Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.11",
+      "name": "Dunes Altar",
+      "tags": [
+        "tag.dunes_altar",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.12",
+      "name": "Dunes Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.13",
+      "name": "Old Well",
+      "tags": [
+        "tag.well",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.14",
+      "name": "Dunes Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.15",
+      "name": "Dunes Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.16",
+      "name": "Dunes Thieves Alley",
+      "tags": [
+        "tag.dunes_thieves",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.17",
+      "name": "Dunes Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.18",
+      "name": "Dunes Training Yard",
+      "tags": [
+        "tag.dunes_training",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.19",
+      "name": "Dunes Ferry Dock",
+      "tags": [
+        "tag.dunes_ferry",
+        "tag.ferry",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.20",
+      "name": "Dunes Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.21",
+      "name": "Dunes Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.22",
+      "name": "Dunes Sanctuary",
+      "tags": [
+        "tag.dunes_sanctuary",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.23",
+      "name": "Dunes Bazaar",
+      "tags": [
+        "tag.coin",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.dunes.24",
+      "name": "Dunes Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_dunes"
+      ]
+    },
+    {
+      "id": "space.reef.0",
+      "name": "Reef Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.1",
+      "name": "Reef Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.2",
+      "name": "Reef Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.3",
+      "name": "Reef Toll Post",
+      "tags": [
+        "tag.reef_toll",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.4",
+      "name": "Reef Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.5",
+      "name": "Reef Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.6",
+      "name": "Reef Snare",
+      "tags": [
+        "tag.reef_trap",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.7",
+      "name": "Reef Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.8",
+      "name": "Reef Spring",
+      "tags": [
+        "tag.reef_spring",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.9",
+      "name": "Reef Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.10",
+      "name": "Reef Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.11",
+      "name": "Reef Altar",
+      "tags": [
+        "tag.reef_altar",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.12",
+      "name": "Reef Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.13",
+      "name": "Reef Market",
+      "tags": [
+        "tag.reef_market",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.14",
+      "name": "Reef Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.15",
+      "name": "Reef Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.16",
+      "name": "Reef Thieves Alley",
+      "tags": [
+        "tag.reef_thieves",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.17",
+      "name": "Reef Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.18",
+      "name": "Reef Training Yard",
+      "tags": [
+        "tag.reef_training",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.19",
+      "name": "Reef Ferry Dock",
+      "tags": [
+        "tag.reef_ferry",
+        "tag.ferry",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.20",
+      "name": "Reef Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.21",
+      "name": "Reef Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.22",
+      "name": "Reef Sanctuary",
+      "tags": [
+        "tag.reef_sanctuary",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.23",
+      "name": "Banana Stand",
+      "tags": [
+        "tag.shop",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.reef.24",
+      "name": "Reef Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_reef"
+      ]
+    },
+    {
+      "id": "space.ruins.0",
+      "name": "Ruins Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.1",
+      "name": "Ruins Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.2",
+      "name": "Ruins Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.3",
+      "name": "Ruins Toll Post",
+      "tags": [
+        "tag.ruins_toll",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.4",
+      "name": "Ruins Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.5",
+      "name": "Ruins Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.6",
+      "name": "Ruins Snare",
+      "tags": [
+        "tag.ruins_trap",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.7",
+      "name": "Ruins Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.8",
+      "name": "Ruins Spring",
+      "tags": [
+        "tag.ruins_spring",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.9",
+      "name": "Ruins Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.10",
+      "name": "Ruins Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.11",
+      "name": "Ruins Altar",
+      "tags": [
+        "tag.ruins_altar",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.12",
+      "name": "Ruins Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.13",
+      "name": "Gilded Idol",
+      "tags": [
+        "tag.idol",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.14",
+      "name": "Ruins Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.15",
+      "name": "Ruins Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.16",
+      "name": "Ruins Thieves Alley",
+      "tags": [
+        "tag.ruins_thieves",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.17",
+      "name": "Ruins Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.18",
+      "name": "Ruins Training Yard",
+      "tags": [
+        "tag.ruins_training",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.19",
+      "name": "Ruins Ferry Dock",
+      "tags": [
+        "tag.ruins_ferry",
+        "tag.ferry",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.20",
+      "name": "Ruins Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.21",
+      "name": "Ruins Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.22",
+      "name": "Ruins Sanctuary",
+      "tags": [
+        "tag.ruins_sanctuary",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.23",
+      "name": "Ruins Bazaar",
+      "tags": [
+        "tag.coin",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.ruins.24",
+      "name": "Ruins Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_ruins"
+      ]
+    },
+    {
+      "id": "space.sky.0",
+      "name": "Sky Gate",
+      "tags": [
+        "tag.coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.1",
+      "name": "Sky Coin Path",
+      "tags": [
+        "tag.coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.2",
+      "name": "Sky Shallows",
+      "tags": [
+        "tag.blue",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.3",
+      "name": "Sky Toll Post",
+      "tags": [
+        "tag.sky_toll",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.4",
+      "name": "Sky Crossroads",
+      "tags": [
+        "tag.event",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.5",
+      "name": "Sky Dojo",
+      "tags": [
+        "tag.dojo",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.6",
+      "name": "Sky Snare",
+      "tags": [
+        "tag.sky_trap",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.7",
+      "name": "Sky Lookout",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.8",
+      "name": "Sky Spring",
+      "tags": [
+        "tag.sky_spring",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.9",
+      "name": "Sky Lagoon",
+      "tags": [
+        "tag.blue",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.10",
+      "name": "Sky Den",
+      "tags": [
+        "tag.den",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.11",
+      "name": "Sky Altar",
+      "tags": [
+        "tag.sky_altar",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.12",
+      "name": "Sky Coin Steps",
+      "tags": [
+        "tag.coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.13",
+      "name": "Sky Market",
+      "tags": [
+        "tag.sky_market",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.14",
+      "name": "Sky Mystery Cove",
+      "tags": [
+        "tag.star_spot",
+        "tag.event",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.15",
+      "name": "Sky Hazard Pass",
+      "tags": [
+        "tag.hazard",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.16",
+      "name": "Sky Thieves Alley",
+      "tags": [
+        "tag.sky_thieves",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.17",
+      "name": "Sky Tide Pool",
+      "tags": [
+        "tag.blue",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.18",
+      "name": "Sky Training Yard",
+      "tags": [
+        "tag.sky_training",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.19",
+      "name": "Sky Ferry Dock",
+      "tags": [
+        "tag.sky_ferry",
+        "tag.ferry",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.20",
+      "name": "Sky Treasure Road",
+      "tags": [
+        "tag.rich_coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.21",
+      "name": "Sky Summit",
+      "tags": [
+        "tag.star_spot",
+        "tag.coin",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.22",
+      "name": "Sky Sanctuary",
+      "tags": [
+        "tag.sky_sanctuary",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.23",
+      "name": "Cloud Market",
+      "tags": [
+        "tag.shop",
+        "tag.isle_sky"
+      ]
+    },
+    {
+      "id": "space.sky.24",
+      "name": "Sky Blue Bay",
+      "tags": [
+        "tag.blue",
+        "tag.isle_sky"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "a": "space.harbor.0",
+      "b": "space.harbor.1"
+    },
+    {
+      "a": "space.harbor.1",
+      "b": "space.harbor.2"
+    },
+    {
+      "a": "space.harbor.2",
+      "b": "space.harbor.3"
+    },
+    {
+      "a": "space.harbor.3",
+      "b": "space.harbor.4"
+    },
+    {
+      "a": "space.harbor.4",
+      "b": "space.harbor.5"
+    },
+    {
+      "a": "space.harbor.5",
+      "b": "space.harbor.6"
+    },
+    {
+      "a": "space.harbor.6",
+      "b": "space.harbor.7"
+    },
+    {
+      "a": "space.harbor.7",
+      "b": "space.harbor.8"
+    },
+    {
+      "a": "space.harbor.8",
+      "b": "space.harbor.9"
+    },
+    {
+      "a": "space.harbor.9",
+      "b": "space.harbor.10"
+    },
+    {
+      "a": "space.harbor.10",
+      "b": "space.harbor.11"
+    },
+    {
+      "a": "space.harbor.11",
+      "b": "space.harbor.12"
+    },
+    {
+      "a": "space.harbor.12",
+      "b": "space.harbor.13"
+    },
+    {
+      "a": "space.harbor.13",
+      "b": "space.harbor.14"
+    },
+    {
+      "a": "space.harbor.14",
+      "b": "space.harbor.15"
+    },
+    {
+      "a": "space.harbor.15",
+      "b": "space.harbor.16"
+    },
+    {
+      "a": "space.harbor.16",
+      "b": "space.harbor.17"
+    },
+    {
+      "a": "space.harbor.17",
+      "b": "space.harbor.18"
+    },
+    {
+      "a": "space.harbor.18",
+      "b": "space.harbor.19"
+    },
+    {
+      "a": "space.harbor.19",
+      "b": "space.harbor.20"
+    },
+    {
+      "a": "space.harbor.20",
+      "b": "space.harbor.21"
+    },
+    {
+      "a": "space.harbor.21",
+      "b": "space.harbor.22"
+    },
+    {
+      "a": "space.harbor.22",
+      "b": "space.harbor.23"
+    },
+    {
+      "a": "space.harbor.23",
+      "b": "space.harbor.24"
+    },
+    {
+      "a": "space.harbor.24",
+      "b": "space.harbor.0"
+    },
+    {
+      "a": "space.jungle.0",
+      "b": "space.jungle.1"
+    },
+    {
+      "a": "space.jungle.1",
+      "b": "space.jungle.2"
+    },
+    {
+      "a": "space.jungle.2",
+      "b": "space.jungle.3"
+    },
+    {
+      "a": "space.jungle.3",
+      "b": "space.jungle.4"
+    },
+    {
+      "a": "space.jungle.4",
+      "b": "space.jungle.5"
+    },
+    {
+      "a": "space.jungle.5",
+      "b": "space.jungle.6"
+    },
+    {
+      "a": "space.jungle.6",
+      "b": "space.jungle.7"
+    },
+    {
+      "a": "space.jungle.7",
+      "b": "space.jungle.8"
+    },
+    {
+      "a": "space.jungle.8",
+      "b": "space.jungle.9"
+    },
+    {
+      "a": "space.jungle.9",
+      "b": "space.jungle.10"
+    },
+    {
+      "a": "space.jungle.10",
+      "b": "space.jungle.11"
+    },
+    {
+      "a": "space.jungle.11",
+      "b": "space.jungle.12"
+    },
+    {
+      "a": "space.jungle.12",
+      "b": "space.jungle.13"
+    },
+    {
+      "a": "space.jungle.13",
+      "b": "space.jungle.14"
+    },
+    {
+      "a": "space.jungle.14",
+      "b": "space.jungle.15"
+    },
+    {
+      "a": "space.jungle.15",
+      "b": "space.jungle.16"
+    },
+    {
+      "a": "space.jungle.16",
+      "b": "space.jungle.17"
+    },
+    {
+      "a": "space.jungle.17",
+      "b": "space.jungle.18"
+    },
+    {
+      "a": "space.jungle.18",
+      "b": "space.jungle.19"
+    },
+    {
+      "a": "space.jungle.19",
+      "b": "space.jungle.20"
+    },
+    {
+      "a": "space.jungle.20",
+      "b": "space.jungle.21"
+    },
+    {
+      "a": "space.jungle.21",
+      "b": "space.jungle.22"
+    },
+    {
+      "a": "space.jungle.22",
+      "b": "space.jungle.23"
+    },
+    {
+      "a": "space.jungle.23",
+      "b": "space.jungle.24"
+    },
+    {
+      "a": "space.jungle.24",
+      "b": "space.jungle.0"
+    },
+    {
+      "a": "space.volcano.0",
+      "b": "space.volcano.1"
+    },
+    {
+      "a": "space.volcano.1",
+      "b": "space.volcano.2"
+    },
+    {
+      "a": "space.volcano.2",
+      "b": "space.volcano.3"
+    },
+    {
+      "a": "space.volcano.3",
+      "b": "space.volcano.4"
+    },
+    {
+      "a": "space.volcano.4",
+      "b": "space.volcano.5"
+    },
+    {
+      "a": "space.volcano.5",
+      "b": "space.volcano.6"
+    },
+    {
+      "a": "space.volcano.6",
+      "b": "space.volcano.7"
+    },
+    {
+      "a": "space.volcano.7",
+      "b": "space.volcano.8"
+    },
+    {
+      "a": "space.volcano.8",
+      "b": "space.volcano.9"
+    },
+    {
+      "a": "space.volcano.9",
+      "b": "space.volcano.10"
+    },
+    {
+      "a": "space.volcano.10",
+      "b": "space.volcano.11"
+    },
+    {
+      "a": "space.volcano.11",
+      "b": "space.volcano.12"
+    },
+    {
+      "a": "space.volcano.12",
+      "b": "space.volcano.13"
+    },
+    {
+      "a": "space.volcano.13",
+      "b": "space.volcano.14"
+    },
+    {
+      "a": "space.volcano.14",
+      "b": "space.volcano.15"
+    },
+    {
+      "a": "space.volcano.15",
+      "b": "space.volcano.16"
+    },
+    {
+      "a": "space.volcano.16",
+      "b": "space.volcano.17"
+    },
+    {
+      "a": "space.volcano.17",
+      "b": "space.volcano.18"
+    },
+    {
+      "a": "space.volcano.18",
+      "b": "space.volcano.19"
+    },
+    {
+      "a": "space.volcano.19",
+      "b": "space.volcano.20"
+    },
+    {
+      "a": "space.volcano.20",
+      "b": "space.volcano.21"
+    },
+    {
+      "a": "space.volcano.21",
+      "b": "space.volcano.22"
+    },
+    {
+      "a": "space.volcano.22",
+      "b": "space.volcano.23"
+    },
+    {
+      "a": "space.volcano.23",
+      "b": "space.volcano.24"
+    },
+    {
+      "a": "space.volcano.24",
+      "b": "space.volcano.0"
+    },
+    {
+      "a": "space.glacier.0",
+      "b": "space.glacier.1"
+    },
+    {
+      "a": "space.glacier.1",
+      "b": "space.glacier.2"
+    },
+    {
+      "a": "space.glacier.2",
+      "b": "space.glacier.3"
+    },
+    {
+      "a": "space.glacier.3",
+      "b": "space.glacier.4"
+    },
+    {
+      "a": "space.glacier.4",
+      "b": "space.glacier.5"
+    },
+    {
+      "a": "space.glacier.5",
+      "b": "space.glacier.6"
+    },
+    {
+      "a": "space.glacier.6",
+      "b": "space.glacier.7"
+    },
+    {
+      "a": "space.glacier.7",
+      "b": "space.glacier.8"
+    },
+    {
+      "a": "space.glacier.8",
+      "b": "space.glacier.9"
+    },
+    {
+      "a": "space.glacier.9",
+      "b": "space.glacier.10"
+    },
+    {
+      "a": "space.glacier.10",
+      "b": "space.glacier.11"
+    },
+    {
+      "a": "space.glacier.11",
+      "b": "space.glacier.12"
+    },
+    {
+      "a": "space.glacier.12",
+      "b": "space.glacier.13"
+    },
+    {
+      "a": "space.glacier.13",
+      "b": "space.glacier.14"
+    },
+    {
+      "a": "space.glacier.14",
+      "b": "space.glacier.15"
+    },
+    {
+      "a": "space.glacier.15",
+      "b": "space.glacier.16"
+    },
+    {
+      "a": "space.glacier.16",
+      "b": "space.glacier.17"
+    },
+    {
+      "a": "space.glacier.17",
+      "b": "space.glacier.18"
+    },
+    {
+      "a": "space.glacier.18",
+      "b": "space.glacier.19"
+    },
+    {
+      "a": "space.glacier.19",
+      "b": "space.glacier.20"
+    },
+    {
+      "a": "space.glacier.20",
+      "b": "space.glacier.21"
+    },
+    {
+      "a": "space.glacier.21",
+      "b": "space.glacier.22"
+    },
+    {
+      "a": "space.glacier.22",
+      "b": "space.glacier.23"
+    },
+    {
+      "a": "space.glacier.23",
+      "b": "space.glacier.24"
+    },
+    {
+      "a": "space.glacier.24",
+      "b": "space.glacier.0"
+    },
+    {
+      "a": "space.dunes.0",
+      "b": "space.dunes.1"
+    },
+    {
+      "a": "space.dunes.1",
+      "b": "space.dunes.2"
+    },
+    {
+      "a": "space.dunes.2",
+      "b": "space.dunes.3"
+    },
+    {
+      "a": "space.dunes.3",
+      "b": "space.dunes.4"
+    },
+    {
+      "a": "space.dunes.4",
+      "b": "space.dunes.5"
+    },
+    {
+      "a": "space.dunes.5",
+      "b": "space.dunes.6"
+    },
+    {
+      "a": "space.dunes.6",
+      "b": "space.dunes.7"
+    },
+    {
+      "a": "space.dunes.7",
+      "b": "space.dunes.8"
+    },
+    {
+      "a": "space.dunes.8",
+      "b": "space.dunes.9"
+    },
+    {
+      "a": "space.dunes.9",
+      "b": "space.dunes.10"
+    },
+    {
+      "a": "space.dunes.10",
+      "b": "space.dunes.11"
+    },
+    {
+      "a": "space.dunes.11",
+      "b": "space.dunes.12"
+    },
+    {
+      "a": "space.dunes.12",
+      "b": "space.dunes.13"
+    },
+    {
+      "a": "space.dunes.13",
+      "b": "space.dunes.14"
+    },
+    {
+      "a": "space.dunes.14",
+      "b": "space.dunes.15"
+    },
+    {
+      "a": "space.dunes.15",
+      "b": "space.dunes.16"
+    },
+    {
+      "a": "space.dunes.16",
+      "b": "space.dunes.17"
+    },
+    {
+      "a": "space.dunes.17",
+      "b": "space.dunes.18"
+    },
+    {
+      "a": "space.dunes.18",
+      "b": "space.dunes.19"
+    },
+    {
+      "a": "space.dunes.19",
+      "b": "space.dunes.20"
+    },
+    {
+      "a": "space.dunes.20",
+      "b": "space.dunes.21"
+    },
+    {
+      "a": "space.dunes.21",
+      "b": "space.dunes.22"
+    },
+    {
+      "a": "space.dunes.22",
+      "b": "space.dunes.23"
+    },
+    {
+      "a": "space.dunes.23",
+      "b": "space.dunes.24"
+    },
+    {
+      "a": "space.dunes.24",
+      "b": "space.dunes.0"
+    },
+    {
+      "a": "space.reef.0",
+      "b": "space.reef.1"
+    },
+    {
+      "a": "space.reef.1",
+      "b": "space.reef.2"
+    },
+    {
+      "a": "space.reef.2",
+      "b": "space.reef.3"
+    },
+    {
+      "a": "space.reef.3",
+      "b": "space.reef.4"
+    },
+    {
+      "a": "space.reef.4",
+      "b": "space.reef.5"
+    },
+    {
+      "a": "space.reef.5",
+      "b": "space.reef.6"
+    },
+    {
+      "a": "space.reef.6",
+      "b": "space.reef.7"
+    },
+    {
+      "a": "space.reef.7",
+      "b": "space.reef.8"
+    },
+    {
+      "a": "space.reef.8",
+      "b": "space.reef.9"
+    },
+    {
+      "a": "space.reef.9",
+      "b": "space.reef.10"
+    },
+    {
+      "a": "space.reef.10",
+      "b": "space.reef.11"
+    },
+    {
+      "a": "space.reef.11",
+      "b": "space.reef.12"
+    },
+    {
+      "a": "space.reef.12",
+      "b": "space.reef.13"
+    },
+    {
+      "a": "space.reef.13",
+      "b": "space.reef.14"
+    },
+    {
+      "a": "space.reef.14",
+      "b": "space.reef.15"
+    },
+    {
+      "a": "space.reef.15",
+      "b": "space.reef.16"
+    },
+    {
+      "a": "space.reef.16",
+      "b": "space.reef.17"
+    },
+    {
+      "a": "space.reef.17",
+      "b": "space.reef.18"
+    },
+    {
+      "a": "space.reef.18",
+      "b": "space.reef.19"
+    },
+    {
+      "a": "space.reef.19",
+      "b": "space.reef.20"
+    },
+    {
+      "a": "space.reef.20",
+      "b": "space.reef.21"
+    },
+    {
+      "a": "space.reef.21",
+      "b": "space.reef.22"
+    },
+    {
+      "a": "space.reef.22",
+      "b": "space.reef.23"
+    },
+    {
+      "a": "space.reef.23",
+      "b": "space.reef.24"
+    },
+    {
+      "a": "space.reef.24",
+      "b": "space.reef.0"
+    },
+    {
+      "a": "space.ruins.0",
+      "b": "space.ruins.1"
+    },
+    {
+      "a": "space.ruins.1",
+      "b": "space.ruins.2"
+    },
+    {
+      "a": "space.ruins.2",
+      "b": "space.ruins.3"
+    },
+    {
+      "a": "space.ruins.3",
+      "b": "space.ruins.4"
+    },
+    {
+      "a": "space.ruins.4",
+      "b": "space.ruins.5"
+    },
+    {
+      "a": "space.ruins.5",
+      "b": "space.ruins.6"
+    },
+    {
+      "a": "space.ruins.6",
+      "b": "space.ruins.7"
+    },
+    {
+      "a": "space.ruins.7",
+      "b": "space.ruins.8"
+    },
+    {
+      "a": "space.ruins.8",
+      "b": "space.ruins.9"
+    },
+    {
+      "a": "space.ruins.9",
+      "b": "space.ruins.10"
+    },
+    {
+      "a": "space.ruins.10",
+      "b": "space.ruins.11"
+    },
+    {
+      "a": "space.ruins.11",
+      "b": "space.ruins.12"
+    },
+    {
+      "a": "space.ruins.12",
+      "b": "space.ruins.13"
+    },
+    {
+      "a": "space.ruins.13",
+      "b": "space.ruins.14"
+    },
+    {
+      "a": "space.ruins.14",
+      "b": "space.ruins.15"
+    },
+    {
+      "a": "space.ruins.15",
+      "b": "space.ruins.16"
+    },
+    {
+      "a": "space.ruins.16",
+      "b": "space.ruins.17"
+    },
+    {
+      "a": "space.ruins.17",
+      "b": "space.ruins.18"
+    },
+    {
+      "a": "space.ruins.18",
+      "b": "space.ruins.19"
+    },
+    {
+      "a": "space.ruins.19",
+      "b": "space.ruins.20"
+    },
+    {
+      "a": "space.ruins.20",
+      "b": "space.ruins.21"
+    },
+    {
+      "a": "space.ruins.21",
+      "b": "space.ruins.22"
+    },
+    {
+      "a": "space.ruins.22",
+      "b": "space.ruins.23"
+    },
+    {
+      "a": "space.ruins.23",
+      "b": "space.ruins.24"
+    },
+    {
+      "a": "space.ruins.24",
+      "b": "space.ruins.0"
+    },
+    {
+      "a": "space.sky.0",
+      "b": "space.sky.1"
+    },
+    {
+      "a": "space.sky.1",
+      "b": "space.sky.2"
+    },
+    {
+      "a": "space.sky.2",
+      "b": "space.sky.3"
+    },
+    {
+      "a": "space.sky.3",
+      "b": "space.sky.4"
+    },
+    {
+      "a": "space.sky.4",
+      "b": "space.sky.5"
+    },
+    {
+      "a": "space.sky.5",
+      "b": "space.sky.6"
+    },
+    {
+      "a": "space.sky.6",
+      "b": "space.sky.7"
+    },
+    {
+      "a": "space.sky.7",
+      "b": "space.sky.8"
+    },
+    {
+      "a": "space.sky.8",
+      "b": "space.sky.9"
+    },
+    {
+      "a": "space.sky.9",
+      "b": "space.sky.10"
+    },
+    {
+      "a": "space.sky.10",
+      "b": "space.sky.11"
+    },
+    {
+      "a": "space.sky.11",
+      "b": "space.sky.12"
+    },
+    {
+      "a": "space.sky.12",
+      "b": "space.sky.13"
+    },
+    {
+      "a": "space.sky.13",
+      "b": "space.sky.14"
+    },
+    {
+      "a": "space.sky.14",
+      "b": "space.sky.15"
+    },
+    {
+      "a": "space.sky.15",
+      "b": "space.sky.16"
+    },
+    {
+      "a": "space.sky.16",
+      "b": "space.sky.17"
+    },
+    {
+      "a": "space.sky.17",
+      "b": "space.sky.18"
+    },
+    {
+      "a": "space.sky.18",
+      "b": "space.sky.19"
+    },
+    {
+      "a": "space.sky.19",
+      "b": "space.sky.20"
+    },
+    {
+      "a": "space.sky.20",
+      "b": "space.sky.21"
+    },
+    {
+      "a": "space.sky.21",
+      "b": "space.sky.22"
+    },
+    {
+      "a": "space.sky.22",
+      "b": "space.sky.23"
+    },
+    {
+      "a": "space.sky.23",
+      "b": "space.sky.24"
+    },
+    {
+      "a": "space.sky.24",
+      "b": "space.sky.0"
+    },
+    {
+      "a": "space.harbor.6",
+      "b": "space.jungle.19"
+    },
+    {
+      "a": "space.harbor.12",
+      "b": "space.dunes.0"
+    },
+    {
+      "a": "space.jungle.6",
+      "b": "space.volcano.19"
+    },
+    {
+      "a": "space.jungle.12",
+      "b": "space.reef.0"
+    },
+    {
+      "a": "space.volcano.6",
+      "b": "space.glacier.19"
+    },
+    {
+      "a": "space.volcano.12",
+      "b": "space.ruins.0"
+    },
+    {
+      "a": "space.glacier.12",
+      "b": "space.sky.0"
+    },
+    {
+      "a": "space.dunes.6",
+      "b": "space.reef.19"
+    },
+    {
+      "a": "space.reef.6",
+      "b": "space.ruins.19"
+    },
+    {
+      "a": "space.ruins.6",
+      "b": "space.sky.19"
+    }
+  ],
+  "layout": {
+    "width": 3040,
+    "height": 1520,
+    "positions": {
+      "space.harbor.0": {
+        "x": 380,
+        "y": 80
+      },
+      "space.harbor.1": {
+        "x": 455,
+        "y": 89
+      },
+      "space.harbor.2": {
+        "x": 525,
+        "y": 117
+      },
+      "space.harbor.3": {
+        "x": 585,
+        "y": 161
+      },
+      "space.harbor.4": {
+        "x": 633,
+        "y": 219
+      },
+      "space.harbor.5": {
+        "x": 665,
+        "y": 287
+      },
+      "space.harbor.6": {
+        "x": 679,
+        "y": 361
+      },
+      "space.harbor.7": {
+        "x": 675,
+        "y": 436
+      },
+      "space.harbor.8": {
+        "x": 651,
+        "y": 508
+      },
+      "space.harbor.9": {
+        "x": 611,
+        "y": 571
+      },
+      "space.harbor.10": {
+        "x": 556,
+        "y": 623
+      },
+      "space.harbor.11": {
+        "x": 490,
+        "y": 659
+      },
+      "space.harbor.12": {
+        "x": 418,
+        "y": 678
+      },
+      "space.harbor.13": {
+        "x": 342,
+        "y": 678
+      },
+      "space.harbor.14": {
+        "x": 270,
+        "y": 659
+      },
+      "space.harbor.15": {
+        "x": 204,
+        "y": 623
+      },
+      "space.harbor.16": {
+        "x": 149,
+        "y": 571
+      },
+      "space.harbor.17": {
+        "x": 109,
+        "y": 508
+      },
+      "space.harbor.18": {
+        "x": 85,
+        "y": 436
+      },
+      "space.harbor.19": {
+        "x": 81,
+        "y": 361
+      },
+      "space.harbor.20": {
+        "x": 95,
+        "y": 287
+      },
+      "space.harbor.21": {
+        "x": 127,
+        "y": 219
+      },
+      "space.harbor.22": {
+        "x": 175,
+        "y": 161
+      },
+      "space.harbor.23": {
+        "x": 235,
+        "y": 117
+      },
+      "space.harbor.24": {
+        "x": 305,
+        "y": 89
+      },
+      "space.jungle.0": {
+        "x": 1140,
+        "y": 80
+      },
+      "space.jungle.1": {
+        "x": 1215,
+        "y": 89
+      },
+      "space.jungle.2": {
+        "x": 1285,
+        "y": 117
+      },
+      "space.jungle.3": {
+        "x": 1345,
+        "y": 161
+      },
+      "space.jungle.4": {
+        "x": 1393,
+        "y": 219
+      },
+      "space.jungle.5": {
+        "x": 1425,
+        "y": 287
+      },
+      "space.jungle.6": {
+        "x": 1439,
+        "y": 361
+      },
+      "space.jungle.7": {
+        "x": 1435,
+        "y": 436
+      },
+      "space.jungle.8": {
+        "x": 1411,
+        "y": 508
+      },
+      "space.jungle.9": {
+        "x": 1371,
+        "y": 571
+      },
+      "space.jungle.10": {
+        "x": 1316,
+        "y": 623
+      },
+      "space.jungle.11": {
+        "x": 1250,
+        "y": 659
+      },
+      "space.jungle.12": {
+        "x": 1178,
+        "y": 678
+      },
+      "space.jungle.13": {
+        "x": 1102,
+        "y": 678
+      },
+      "space.jungle.14": {
+        "x": 1030,
+        "y": 659
+      },
+      "space.jungle.15": {
+        "x": 964,
+        "y": 623
+      },
+      "space.jungle.16": {
+        "x": 909,
+        "y": 571
+      },
+      "space.jungle.17": {
+        "x": 869,
+        "y": 508
+      },
+      "space.jungle.18": {
+        "x": 845,
+        "y": 436
+      },
+      "space.jungle.19": {
+        "x": 841,
+        "y": 361
+      },
+      "space.jungle.20": {
+        "x": 855,
+        "y": 287
+      },
+      "space.jungle.21": {
+        "x": 887,
+        "y": 219
+      },
+      "space.jungle.22": {
+        "x": 935,
+        "y": 161
+      },
+      "space.jungle.23": {
+        "x": 995,
+        "y": 117
+      },
+      "space.jungle.24": {
+        "x": 1065,
+        "y": 89
+      },
+      "space.volcano.0": {
+        "x": 1900,
+        "y": 80
+      },
+      "space.volcano.1": {
+        "x": 1975,
+        "y": 89
+      },
+      "space.volcano.2": {
+        "x": 2045,
+        "y": 117
+      },
+      "space.volcano.3": {
+        "x": 2105,
+        "y": 161
+      },
+      "space.volcano.4": {
+        "x": 2153,
+        "y": 219
+      },
+      "space.volcano.5": {
+        "x": 2185,
+        "y": 287
+      },
+      "space.volcano.6": {
+        "x": 2199,
+        "y": 361
+      },
+      "space.volcano.7": {
+        "x": 2195,
+        "y": 436
+      },
+      "space.volcano.8": {
+        "x": 2171,
+        "y": 508
+      },
+      "space.volcano.9": {
+        "x": 2131,
+        "y": 571
+      },
+      "space.volcano.10": {
+        "x": 2076,
+        "y": 623
+      },
+      "space.volcano.11": {
+        "x": 2010,
+        "y": 659
+      },
+      "space.volcano.12": {
+        "x": 1938,
+        "y": 678
+      },
+      "space.volcano.13": {
+        "x": 1862,
+        "y": 678
+      },
+      "space.volcano.14": {
+        "x": 1790,
+        "y": 659
+      },
+      "space.volcano.15": {
+        "x": 1724,
+        "y": 623
+      },
+      "space.volcano.16": {
+        "x": 1669,
+        "y": 571
+      },
+      "space.volcano.17": {
+        "x": 1629,
+        "y": 508
+      },
+      "space.volcano.18": {
+        "x": 1605,
+        "y": 436
+      },
+      "space.volcano.19": {
+        "x": 1601,
+        "y": 361
+      },
+      "space.volcano.20": {
+        "x": 1615,
+        "y": 287
+      },
+      "space.volcano.21": {
+        "x": 1647,
+        "y": 219
+      },
+      "space.volcano.22": {
+        "x": 1695,
+        "y": 161
+      },
+      "space.volcano.23": {
+        "x": 1755,
+        "y": 117
+      },
+      "space.volcano.24": {
+        "x": 1825,
+        "y": 89
+      },
+      "space.glacier.0": {
+        "x": 2660,
+        "y": 80
+      },
+      "space.glacier.1": {
+        "x": 2735,
+        "y": 89
+      },
+      "space.glacier.2": {
+        "x": 2805,
+        "y": 117
+      },
+      "space.glacier.3": {
+        "x": 2865,
+        "y": 161
+      },
+      "space.glacier.4": {
+        "x": 2913,
+        "y": 219
+      },
+      "space.glacier.5": {
+        "x": 2945,
+        "y": 287
+      },
+      "space.glacier.6": {
+        "x": 2959,
+        "y": 361
+      },
+      "space.glacier.7": {
+        "x": 2955,
+        "y": 436
+      },
+      "space.glacier.8": {
+        "x": 2931,
+        "y": 508
+      },
+      "space.glacier.9": {
+        "x": 2891,
+        "y": 571
+      },
+      "space.glacier.10": {
+        "x": 2836,
+        "y": 623
+      },
+      "space.glacier.11": {
+        "x": 2770,
+        "y": 659
+      },
+      "space.glacier.12": {
+        "x": 2698,
+        "y": 678
+      },
+      "space.glacier.13": {
+        "x": 2622,
+        "y": 678
+      },
+      "space.glacier.14": {
+        "x": 2550,
+        "y": 659
+      },
+      "space.glacier.15": {
+        "x": 2484,
+        "y": 623
+      },
+      "space.glacier.16": {
+        "x": 2429,
+        "y": 571
+      },
+      "space.glacier.17": {
+        "x": 2389,
+        "y": 508
+      },
+      "space.glacier.18": {
+        "x": 2365,
+        "y": 436
+      },
+      "space.glacier.19": {
+        "x": 2361,
+        "y": 361
+      },
+      "space.glacier.20": {
+        "x": 2375,
+        "y": 287
+      },
+      "space.glacier.21": {
+        "x": 2407,
+        "y": 219
+      },
+      "space.glacier.22": {
+        "x": 2455,
+        "y": 161
+      },
+      "space.glacier.23": {
+        "x": 2515,
+        "y": 117
+      },
+      "space.glacier.24": {
+        "x": 2585,
+        "y": 89
+      },
+      "space.dunes.0": {
+        "x": 380,
+        "y": 840
+      },
+      "space.dunes.1": {
+        "x": 455,
+        "y": 849
+      },
+      "space.dunes.2": {
+        "x": 525,
+        "y": 877
+      },
+      "space.dunes.3": {
+        "x": 585,
+        "y": 921
+      },
+      "space.dunes.4": {
+        "x": 633,
+        "y": 979
+      },
+      "space.dunes.5": {
+        "x": 665,
+        "y": 1047
+      },
+      "space.dunes.6": {
+        "x": 679,
+        "y": 1121
+      },
+      "space.dunes.7": {
+        "x": 675,
+        "y": 1196
+      },
+      "space.dunes.8": {
+        "x": 651,
+        "y": 1268
+      },
+      "space.dunes.9": {
+        "x": 611,
+        "y": 1331
+      },
+      "space.dunes.10": {
+        "x": 556,
+        "y": 1383
+      },
+      "space.dunes.11": {
+        "x": 490,
+        "y": 1419
+      },
+      "space.dunes.12": {
+        "x": 418,
+        "y": 1438
+      },
+      "space.dunes.13": {
+        "x": 342,
+        "y": 1438
+      },
+      "space.dunes.14": {
+        "x": 270,
+        "y": 1419
+      },
+      "space.dunes.15": {
+        "x": 204,
+        "y": 1383
+      },
+      "space.dunes.16": {
+        "x": 149,
+        "y": 1331
+      },
+      "space.dunes.17": {
+        "x": 109,
+        "y": 1268
+      },
+      "space.dunes.18": {
+        "x": 85,
+        "y": 1196
+      },
+      "space.dunes.19": {
+        "x": 81,
+        "y": 1121
+      },
+      "space.dunes.20": {
+        "x": 95,
+        "y": 1047
+      },
+      "space.dunes.21": {
+        "x": 127,
+        "y": 979
+      },
+      "space.dunes.22": {
+        "x": 175,
+        "y": 921
+      },
+      "space.dunes.23": {
+        "x": 235,
+        "y": 877
+      },
+      "space.dunes.24": {
+        "x": 305,
+        "y": 849
+      },
+      "space.reef.0": {
+        "x": 1140,
+        "y": 840
+      },
+      "space.reef.1": {
+        "x": 1215,
+        "y": 849
+      },
+      "space.reef.2": {
+        "x": 1285,
+        "y": 877
+      },
+      "space.reef.3": {
+        "x": 1345,
+        "y": 921
+      },
+      "space.reef.4": {
+        "x": 1393,
+        "y": 979
+      },
+      "space.reef.5": {
+        "x": 1425,
+        "y": 1047
+      },
+      "space.reef.6": {
+        "x": 1439,
+        "y": 1121
+      },
+      "space.reef.7": {
+        "x": 1435,
+        "y": 1196
+      },
+      "space.reef.8": {
+        "x": 1411,
+        "y": 1268
+      },
+      "space.reef.9": {
+        "x": 1371,
+        "y": 1331
+      },
+      "space.reef.10": {
+        "x": 1316,
+        "y": 1383
+      },
+      "space.reef.11": {
+        "x": 1250,
+        "y": 1419
+      },
+      "space.reef.12": {
+        "x": 1178,
+        "y": 1438
+      },
+      "space.reef.13": {
+        "x": 1102,
+        "y": 1438
+      },
+      "space.reef.14": {
+        "x": 1030,
+        "y": 1419
+      },
+      "space.reef.15": {
+        "x": 964,
+        "y": 1383
+      },
+      "space.reef.16": {
+        "x": 909,
+        "y": 1331
+      },
+      "space.reef.17": {
+        "x": 869,
+        "y": 1268
+      },
+      "space.reef.18": {
+        "x": 845,
+        "y": 1196
+      },
+      "space.reef.19": {
+        "x": 841,
+        "y": 1121
+      },
+      "space.reef.20": {
+        "x": 855,
+        "y": 1047
+      },
+      "space.reef.21": {
+        "x": 887,
+        "y": 979
+      },
+      "space.reef.22": {
+        "x": 935,
+        "y": 921
+      },
+      "space.reef.23": {
+        "x": 995,
+        "y": 877
+      },
+      "space.reef.24": {
+        "x": 1065,
+        "y": 849
+      },
+      "space.ruins.0": {
+        "x": 1900,
+        "y": 840
+      },
+      "space.ruins.1": {
+        "x": 1975,
+        "y": 849
+      },
+      "space.ruins.2": {
+        "x": 2045,
+        "y": 877
+      },
+      "space.ruins.3": {
+        "x": 2105,
+        "y": 921
+      },
+      "space.ruins.4": {
+        "x": 2153,
+        "y": 979
+      },
+      "space.ruins.5": {
+        "x": 2185,
+        "y": 1047
+      },
+      "space.ruins.6": {
+        "x": 2199,
+        "y": 1121
+      },
+      "space.ruins.7": {
+        "x": 2195,
+        "y": 1196
+      },
+      "space.ruins.8": {
+        "x": 2171,
+        "y": 1268
+      },
+      "space.ruins.9": {
+        "x": 2131,
+        "y": 1331
+      },
+      "space.ruins.10": {
+        "x": 2076,
+        "y": 1383
+      },
+      "space.ruins.11": {
+        "x": 2010,
+        "y": 1419
+      },
+      "space.ruins.12": {
+        "x": 1938,
+        "y": 1438
+      },
+      "space.ruins.13": {
+        "x": 1862,
+        "y": 1438
+      },
+      "space.ruins.14": {
+        "x": 1790,
+        "y": 1419
+      },
+      "space.ruins.15": {
+        "x": 1724,
+        "y": 1383
+      },
+      "space.ruins.16": {
+        "x": 1669,
+        "y": 1331
+      },
+      "space.ruins.17": {
+        "x": 1629,
+        "y": 1268
+      },
+      "space.ruins.18": {
+        "x": 1605,
+        "y": 1196
+      },
+      "space.ruins.19": {
+        "x": 1601,
+        "y": 1121
+      },
+      "space.ruins.20": {
+        "x": 1615,
+        "y": 1047
+      },
+      "space.ruins.21": {
+        "x": 1647,
+        "y": 979
+      },
+      "space.ruins.22": {
+        "x": 1695,
+        "y": 921
+      },
+      "space.ruins.23": {
+        "x": 1755,
+        "y": 877
+      },
+      "space.ruins.24": {
+        "x": 1825,
+        "y": 849
+      },
+      "space.sky.0": {
+        "x": 2660,
+        "y": 840
+      },
+      "space.sky.1": {
+        "x": 2735,
+        "y": 849
+      },
+      "space.sky.2": {
+        "x": 2805,
+        "y": 877
+      },
+      "space.sky.3": {
+        "x": 2865,
+        "y": 921
+      },
+      "space.sky.4": {
+        "x": 2913,
+        "y": 979
+      },
+      "space.sky.5": {
+        "x": 2945,
+        "y": 1047
+      },
+      "space.sky.6": {
+        "x": 2959,
+        "y": 1121
+      },
+      "space.sky.7": {
+        "x": 2955,
+        "y": 1196
+      },
+      "space.sky.8": {
+        "x": 2931,
+        "y": 1268
+      },
+      "space.sky.9": {
+        "x": 2891,
+        "y": 1331
+      },
+      "space.sky.10": {
+        "x": 2836,
+        "y": 1383
+      },
+      "space.sky.11": {
+        "x": 2770,
+        "y": 1419
+      },
+      "space.sky.12": {
+        "x": 2698,
+        "y": 1438
+      },
+      "space.sky.13": {
+        "x": 2622,
+        "y": 1438
+      },
+      "space.sky.14": {
+        "x": 2550,
+        "y": 1419
+      },
+      "space.sky.15": {
+        "x": 2484,
+        "y": 1383
+      },
+      "space.sky.16": {
+        "x": 2429,
+        "y": 1331
+      },
+      "space.sky.17": {
+        "x": 2389,
+        "y": 1268
+      },
+      "space.sky.18": {
+        "x": 2365,
+        "y": 1196
+      },
+      "space.sky.19": {
+        "x": 2361,
+        "y": 1121
+      },
+      "space.sky.20": {
+        "x": 2375,
+        "y": 1047
+      },
+      "space.sky.21": {
+        "x": 2407,
+        "y": 979
+      },
+      "space.sky.22": {
+        "x": 2455,
+        "y": 921
+      },
+      "space.sky.23": {
+        "x": 2515,
+        "y": 877
+      },
+      "space.sky.24": {
+        "x": 2585,
+        "y": 849
+      }
+    },
+    "theme": "island",
+    "roads": "road",
+    "curved": false,
+    "spaceStyle": "circle",
+    "decor": [
+      {
+        "icon": "🪨",
+        "x": 413,
+        "y": 20,
+        "size": 27
+      },
+      {
+        "icon": "🐬",
+        "x": 673,
+        "y": 68,
+        "size": 27
+      },
+      {
+        "icon": "🐚",
+        "x": 887,
+        "y": 87,
+        "size": 26
+      },
+      {
+        "icon": "🌊",
+        "x": 1599,
+        "y": 32,
+        "size": 34
+      },
+      {
+        "icon": "⛵",
+        "x": 1715,
+        "y": 27,
+        "size": 27
+      },
+      {
+        "icon": "🐬",
+        "x": 2189,
+        "y": 42,
+        "size": 32
+      },
+      {
+        "icon": "🐬",
+        "x": 2257,
+        "y": 98,
+        "size": 41
+      },
+      {
+        "icon": "🐬",
+        "x": 2376,
+        "y": 67,
+        "size": 34
+      },
+      {
+        "icon": "🐚",
+        "x": 52,
+        "y": 195,
+        "size": 37
+      },
+      {
+        "icon": "🐬",
+        "x": 764,
+        "y": 140,
+        "size": 35
+      },
+      {
+        "icon": "🌴",
+        "x": 1118,
+        "y": 164,
+        "size": 36
+      },
+      {
+        "icon": "🌊",
+        "x": 1448,
+        "y": 144,
+        "size": 31
+      },
+      {
+        "icon": "🌴",
+        "x": 1929,
+        "y": 158,
+        "size": 29
+      },
+      {
+        "icon": "🐠",
+        "x": 2630,
+        "y": 210,
+        "size": 41
+      },
+      {
+        "icon": "🪨",
+        "x": 2717,
+        "y": 151,
+        "size": 37
+      },
+      {
+        "icon": "🪨",
+        "x": 181,
+        "y": 295,
+        "size": 34
+      },
+      {
+        "icon": "⛵",
+        "x": 397,
+        "y": 266,
+        "size": 39
+      },
+      {
+        "icon": "🌊",
+        "x": 990,
+        "y": 306,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 1143,
+        "y": 252,
+        "size": 32
+      },
+      {
+        "icon": "🐬",
+        "x": 1233,
+        "y": 302,
+        "size": 30
+      },
+      {
+        "icon": "🏝️",
+        "x": 1312,
+        "y": 322,
+        "size": 40
+      },
+      {
+        "icon": "🦀",
+        "x": 1691,
+        "y": 324,
+        "size": 23
+      },
+      {
+        "icon": "🏝️",
+        "x": 1833,
+        "y": 282,
+        "size": 29
+      },
+      {
+        "icon": "🏝️",
+        "x": 1935,
+        "y": 296,
+        "size": 34
+      },
+      {
+        "icon": "🏝️",
+        "x": 2049,
+        "y": 256,
+        "size": 31
+      },
+      {
+        "icon": "🐚",
+        "x": 2292,
+        "y": 321,
+        "size": 30
+      },
+      {
+        "icon": "🌊",
+        "x": 2517,
+        "y": 323,
+        "size": 30
+      },
+      {
+        "icon": "🐬",
+        "x": 2620,
+        "y": 289,
+        "size": 37
+      },
+      {
+        "icon": "🐬",
+        "x": 2698,
+        "y": 300,
+        "size": 27
+      },
+      {
+        "icon": "🌊",
+        "x": 2840,
+        "y": 292,
+        "size": 39
+      },
+      {
+        "icon": "🐠",
+        "x": 387,
+        "y": 368,
+        "size": 32
+      },
+      {
+        "icon": "⛵",
+        "x": 549,
+        "y": 426,
+        "size": 42
+      },
+      {
+        "icon": "🦀",
+        "x": 781,
+        "y": 445,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 947,
+        "y": 415,
+        "size": 26
+      },
+      {
+        "icon": "🐙",
+        "x": 1296,
+        "y": 435,
+        "size": 28
+      },
+      {
+        "icon": "🐠",
+        "x": 1932,
+        "y": 403,
+        "size": 27
+      },
+      {
+        "icon": "🐠",
+        "x": 2040,
+        "y": 435,
+        "size": 32
+      },
+      {
+        "icon": "🪨",
+        "x": 2293,
+        "y": 422,
+        "size": 29
+      },
+      {
+        "icon": "🐙",
+        "x": 2482,
+        "y": 437,
+        "size": 29
+      },
+      {
+        "icon": "🏝️",
+        "x": 2626,
+        "y": 372,
+        "size": 38
+      },
+      {
+        "icon": "🐬",
+        "x": 2748,
+        "y": 412,
+        "size": 39
+      },
+      {
+        "icon": "🐬",
+        "x": 515,
+        "y": 525,
+        "size": 32
+      },
+      {
+        "icon": "🌺",
+        "x": 785,
+        "y": 531,
+        "size": 31
+      },
+      {
+        "icon": "🐠",
+        "x": 992,
+        "y": 510,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 1089,
+        "y": 523,
+        "size": 38
+      },
+      {
+        "icon": "🐙",
+        "x": 1297,
+        "y": 496,
+        "size": 26
+      },
+      {
+        "icon": "🌊",
+        "x": 1762,
+        "y": 520,
+        "size": 32
+      },
+      {
+        "icon": "🐙",
+        "x": 1954,
+        "y": 553,
+        "size": 40
+      },
+      {
+        "icon": "🌊",
+        "x": 1993,
+        "y": 514,
+        "size": 40
+      },
+      {
+        "icon": "🌊",
+        "x": 2497,
+        "y": 483,
+        "size": 40
+      },
+      {
+        "icon": "🐙",
+        "x": 2806,
+        "y": 499,
+        "size": 27
+      },
+      {
+        "icon": "🌺",
+        "x": 2996,
+        "y": 495,
+        "size": 23
+      },
+      {
+        "icon": "⛵",
+        "x": 69,
+        "y": 659,
+        "size": 27
+      },
+      {
+        "icon": "🌊",
+        "x": 667,
+        "y": 670,
+        "size": 31
+      },
+      {
+        "icon": "🐠",
+        "x": 834,
+        "y": 675,
+        "size": 37
+      },
+      {
+        "icon": "🐬",
+        "x": 1535,
+        "y": 637,
+        "size": 34
+      },
+      {
+        "icon": "🐙",
+        "x": 181,
+        "y": 722,
+        "size": 35
+      },
+      {
+        "icon": "⛵",
+        "x": 837,
+        "y": 718,
+        "size": 37
+      },
+      {
+        "icon": "🏝️",
+        "x": 1427,
+        "y": 769,
+        "size": 33
+      },
+      {
+        "icon": "🌴",
+        "x": 1801,
+        "y": 746,
+        "size": 23
+      },
+      {
+        "icon": "🌴",
+        "x": 1877,
+        "y": 748,
+        "size": 28
+      },
+      {
+        "icon": "🐙",
+        "x": 2119,
+        "y": 735,
+        "size": 40
+      },
+      {
+        "icon": "🌊",
+        "x": 2293,
+        "y": 739,
+        "size": 35
+      },
+      {
+        "icon": "🏝️",
+        "x": 2420,
+        "y": 725,
+        "size": 33
+      },
+      {
+        "icon": "🏝️",
+        "x": 2498,
+        "y": 779,
+        "size": 27
+      },
+      {
+        "icon": "🌺",
+        "x": 2595,
+        "y": 775,
+        "size": 38
+      },
+      {
+        "icon": "⛵",
+        "x": 2867,
+        "y": 778,
+        "size": 30
+      },
+      {
+        "icon": "🐠",
+        "x": 49,
+        "y": 879,
+        "size": 26
+      },
+      {
+        "icon": "🌊",
+        "x": 779,
+        "y": 855,
+        "size": 35
+      },
+      {
+        "icon": "🌴",
+        "x": 841,
+        "y": 912,
+        "size": 33
+      },
+      {
+        "icon": "🌊",
+        "x": 1459,
+        "y": 855,
+        "size": 31
+      },
+      {
+        "icon": "🐠",
+        "x": 2169,
+        "y": 850,
+        "size": 27
+      },
+      {
+        "icon": "🌴",
+        "x": 2401,
+        "y": 851,
+        "size": 27
+      },
+      {
+        "icon": "🐙",
+        "x": 2951,
+        "y": 876,
+        "size": 37
+      },
+      {
+        "icon": "🌊",
+        "x": 285,
+        "y": 1010,
+        "size": 28
+      },
+      {
+        "icon": "🌴",
+        "x": 734,
+        "y": 1002,
+        "size": 26
+      },
+      {
+        "icon": "⛵",
+        "x": 1007,
+        "y": 1008,
+        "size": 38
+      },
+      {
+        "icon": "🐠",
+        "x": 1182,
+        "y": 1001,
+        "size": 30
+      },
+      {
+        "icon": "🦀",
+        "x": 1578,
+        "y": 964,
+        "size": 32
+      },
+      {
+        "icon": "🦀",
+        "x": 1795,
+        "y": 950,
+        "size": 32
+      },
+      {
+        "icon": "🐙",
+        "x": 1923,
+        "y": 992,
+        "size": 36
+      },
+      {
+        "icon": "🏝️",
+        "x": 2297,
+        "y": 965,
+        "size": 41
+      },
+      {
+        "icon": "🐬",
+        "x": 2534,
+        "y": 968,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 184,
+        "y": 1080,
+        "size": 42
+      },
+      {
+        "icon": "🐙",
+        "x": 497,
+        "y": 1092,
+        "size": 33
+      },
+      {
+        "icon": "🐙",
+        "x": 1233,
+        "y": 1108,
+        "size": 34
+      },
+      {
+        "icon": "🐬",
+        "x": 1915,
+        "y": 1085,
+        "size": 27
+      },
+      {
+        "icon": "🌊",
+        "x": 2013,
+        "y": 1101,
+        "size": 39
+      },
+      {
+        "icon": "🐚",
+        "x": 2269,
+        "y": 1067,
+        "size": 26
+      },
+      {
+        "icon": "🐙",
+        "x": 2531,
+        "y": 1074,
+        "size": 32
+      },
+      {
+        "icon": "🐬",
+        "x": 2586,
+        "y": 1079,
+        "size": 35
+      },
+      {
+        "icon": "🐙",
+        "x": 2692,
+        "y": 1117,
+        "size": 40
+      },
+      {
+        "icon": "🌴",
+        "x": 2263,
+        "y": 1200,
+        "size": 25
+      },
+      {
+        "icon": "🪨",
+        "x": 2458,
+        "y": 1243,
+        "size": 32
+      },
+      {
+        "icon": "⛵",
+        "x": 2580,
+        "y": 1229,
+        "size": 35
+      },
+      {
+        "icon": "🐬",
+        "x": 2725,
+        "y": 1208,
+        "size": 31
+      },
+      {
+        "icon": "🌴",
+        "x": 2855,
+        "y": 1254,
+        "size": 26
+      },
+      {
+        "icon": "🐚",
+        "x": 388,
+        "y": 1370,
+        "size": 34
+      },
+      {
+        "icon": "🌴",
+        "x": 531,
+        "y": 1320,
+        "size": 26
+      },
+      {
+        "icon": "🌴",
+        "x": 1028,
+        "y": 1324,
+        "size": 30
+      },
+      {
+        "icon": "🐬",
+        "x": 1226,
+        "y": 1322,
+        "size": 41
+      },
+      {
+        "icon": "🐬",
+        "x": 1824,
+        "y": 1315,
+        "size": 34
+      },
+      {
+        "icon": "🐚",
+        "x": 2358,
+        "y": 1356,
+        "size": 30
+      },
+      {
+        "icon": "🌺",
+        "x": 2530,
+        "y": 1336,
+        "size": 24
+      },
+      {
+        "icon": "🦀",
+        "x": 2991,
+        "y": 1297,
+        "size": 30
+      },
+      {
+        "icon": "🐠",
+        "x": 43,
+        "y": 1427,
+        "size": 36
+      },
+      {
+        "icon": "🌊",
+        "x": 772,
+        "y": 1473,
+        "size": 32
+      },
+      {
+        "icon": "🌊",
+        "x": 954,
+        "y": 1479,
+        "size": 26
+      },
+      {
+        "icon": "🐬",
+        "x": 1460,
+        "y": 1484,
+        "size": 37
+      },
+      {
+        "icon": "🐚",
+        "x": 1681,
+        "y": 1455,
+        "size": 24
+      },
+      {
+        "icon": "⛵",
+        "x": 2288,
+        "y": 1424,
+        "size": 35
+      },
+      {
+        "icon": "🌊",
+        "x": 2380,
+        "y": 1492,
+        "size": 31
+      },
+      {
+        "icon": "🐙",
+        "x": 2942,
+        "y": 1452,
+        "size": 42
+      }
+    ]
+  },
+  "items": [
+    {
+      "id": "item.wooden_sword",
+      "name": "Wooden Sword",
+      "icon": "🗡️",
+      "description": "+60 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 60
+        }
+      ],
+      "slot": "slot.weapon",
+      "value": 6
+    },
+    {
+      "id": "item.guardian_mail",
+      "name": "Guardian Mail",
+      "icon": "🛡️",
+      "description": "+100 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 100
+        }
+      ],
+      "slot": "slot.armor",
+      "value": 12
+    },
+    {
+      "id": "item.iron_sword",
+      "name": "Iron Sword",
+      "icon": "⚔️",
+      "description": "+150 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 150
+        }
+      ],
+      "slot": "slot.weapon",
+      "value": 15
+    },
+    {
+      "id": "item.demon_blade",
+      "name": "Demon Blade",
+      "icon": "🔥",
+      "description": "+300 Power",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 300
+        }
+      ],
+      "slot": "slot.weapon",
+      "value": 32
+    },
+    {
+      "id": "item.healing_potion",
+      "name": "Healing Potion",
+      "icon": "🧪",
+      "description": "Drink to restore 50 HP.",
+      "use": {
+        "label": "Drink Healing Potion",
+        "effects": [
+          {
+            "op": "changeResource",
+            "target": "$actor",
+            "resource": "res.hp",
+            "amount": 50
+          }
+        ],
+        "consumed": true
+      },
+      "stackSize": 3,
+      "value": 5,
+      "aiHint": "Drink it when your HP is low, especially before a fight you must win."
+    },
+    {
+      "id": "item.smoke_bomb",
+      "name": "Smoke Bomb",
+      "icon": "💣",
+      "description": "Vanish in smoke: nobody can attack you until your next turn ends.",
+      "use": {
+        "label": "Throw Smoke Bomb",
+        "effects": [
+          {
+            "op": "applyStatus",
+            "target": "$actor",
+            "status": "status.smoke"
+          }
+        ],
+        "consumed": true
+      },
+      "value": 6,
+      "aiHint": "Throw it when a much stronger rival could reach you next turn."
+    },
+    {
+      "id": "item.shield_charm",
+      "name": "Shield Charm",
+      "icon": "🧿",
+      "description": "Break it to become Shielded ×2.",
+      "use": {
+        "label": "Break Shield Charm",
+        "effects": [
+          {
+            "op": "applyStatus",
+            "target": "$actor",
+            "status": "status.shielded",
+            "stacks": 2
+          }
+        ],
+        "consumed": true
+      },
+      "value": 8,
+      "aiHint": "Break it before a risky fight: two hits are blocked."
+    },
+    {
+      "id": "item.lucky_coin",
+      "name": "Lucky Coin",
+      "icon": "🪙",
+      "concealed": true,
+      "description": "Whoever holds it gains 1 extra gold whenever they gain gold. Others cannot see it.",
+      "rules": [
+        {
+          "id": "rule.lucky_coin",
+          "name": "Lucky Coin",
+          "kind": "modifier",
+          "on": "resourceChange",
+          "where": {
+            "resource": "res.gold",
+            "direction": "gain"
+          },
+          "conditions": {
+            "op": "same",
+            "a": "$target",
+            "b": "$holder"
+          },
+          "modify": {
+            "op": "add",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "item.firecracker",
+      "name": "Firecracker",
+      "icon": "🧨",
+      "description": "Throw it at a rival on your space: 2d10 damage.",
+      "stackSize": 2,
+      "value": 7,
+      "aiHint": "Throw it at a rival on your space to soften them up before you attack, or to finish them off.",
+      "use": {
+        "label": "Throw Firecracker",
+        "target": {
+          "kind": "contestant",
+          "range": "here"
+        },
+        "effects": [
+          {
+            "op": "damage",
+            "target": "$target",
+            "amount": {
+              "op": "roll",
+              "count": 2,
+              "sides": 10
+            }
+          }
+        ],
+        "consumed": true
+      }
+    },
+    {
+      "id": "item.spark_wand",
+      "name": "Spark Wand",
+      "icon": "🪄",
+      "description": "Three charges: zap anyone on your space for 15 damage (once per round).",
+      "value": 14,
+      "aiHint": "Zap a rival or monster on your space; it recharges each round, three uses in all.",
+      "use": {
+        "label": "Zap",
+        "target": {
+          "kind": "contestant",
+          "range": "here"
+        },
+        "effects": [
+          {
+            "op": "damage",
+            "target": "$target",
+            "amount": 15
+          }
+        ],
+        "consumed": true,
+        "charges": 3,
+        "cooldownRounds": 1
+      }
+    },
+    {
+      "id": "item.trail_mix",
+      "name": "Trail Mix",
+      "icon": "🥜",
+      "description": "A quick snack (free action): +10 HP.",
+      "stackSize": 5,
+      "value": 2,
+      "aiHint": "Eat it any time you are hurt; it does not use up your action.",
+      "use": {
+        "label": "Eat Trail Mix",
+        "effects": [
+          {
+            "op": "changeResource",
+            "target": "$actor",
+            "resource": "res.hp",
+            "amount": 10
+          }
+        ],
+        "consumed": true,
+        "free": true
+      }
+    }
+  ],
+  "statuses": [
+    {
+      "id": "status.fish_form",
+      "name": "Fish Form",
+      "icon": "🐟",
+      "transformation": true,
+      "description": "Turned into a fish: tagged Fish, −1 Move, cannot shop.",
+      "duration": 3,
+      "stacking": "refresh",
+      "grantsTags": [
+        "tag.fish"
+      ],
+      "modifiers": [
+        {
+          "resource": "res.move",
+          "add": -1
+        }
+      ],
+      "suppress": [
+        "shops"
+      ]
+    },
+    {
+      "id": "status.blessed",
+      "name": "Blessed",
+      "icon": "✨",
+      "duration": 3,
+      "stacking": "refresh",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 100
+        }
+      ]
+    },
+    {
+      "id": "status.cursed",
+      "name": "Cursed",
+      "icon": "💀",
+      "duration": 3,
+      "stacking": "extend",
+      "grantsTags": [
+        "tag.cursed"
+      ],
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -50
+        }
+      ]
+    },
+    {
+      "id": "status.shielded",
+      "name": "Shielded",
+      "icon": "🛡️",
+      "duration": 4,
+      "stacking": "stack",
+      "maxStacks": 3,
+      "description": "Each stack absorbs one hit completely.",
+      "rules": [
+        {
+          "id": "rule.shield_absorbs",
+          "name": "Shield",
+          "kind": "modifier",
+          "on": "damage",
+          "conditions": {
+            "op": "same",
+            "a": "$target",
+            "b": "$holder"
+          },
+          "modify": {
+            "op": "prevent"
+          },
+          "consume": {
+            "status": "status.shielded"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status.poisoned",
+      "name": "Poisoned",
+      "icon": "🤢",
+      "duration": 3,
+      "stacking": "stack",
+      "maxStacks": 3,
+      "rules": [
+        {
+          "id": "rule.poison_ticks",
+          "name": "Poison",
+          "trigger": {
+            "event": "turnEnded"
+          },
+          "conditions": {
+            "op": "same",
+            "a": "$actor",
+            "b": "$holder"
+          },
+          "effects": [
+            {
+              "op": "damage",
+              "target": "$holder",
+              "amount": {
+                "op": "mul",
+                "args": [
+                  5,
+                  {
+                    "op": "stacks",
+                    "of": "$holder",
+                    "status": "status.poisoned"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "status.smoke",
+      "name": "Smoke Cloud",
+      "icon": "💨",
+      "duration": 1,
+      "stacking": "refresh",
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "status.stunned",
+      "name": "Stunned",
+      "icon": "😵",
+      "duration": 1,
+      "stacking": "ignore",
+      "suppress": [
+        "takesTurns"
+      ]
+    },
+    {
+      "id": "status.enraged",
+      "name": "Enraged",
+      "icon": "😡",
+      "duration": null,
+      "stacking": "ignore",
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 300
+        }
+      ]
+    }
+  ],
+  "shops": [
+    {
+      "id": "shop.bazaar",
+      "name": "Gear Bazaar",
+      "entries": [
+        {
+          "id": "entry.wooden_sword",
+          "grants": {
+            "item": "item.wooden_sword"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 6
+          }
+        },
+        {
+          "id": "entry.guardian_mail",
+          "grants": {
+            "item": "item.guardian_mail"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 12
+          }
+        },
+        {
+          "id": "entry.iron_sword",
+          "grants": {
+            "item": "item.iron_sword"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 15
+          }
+        },
+        {
+          "id": "entry.demon_blade",
+          "grants": {
+            "item": "item.demon_blade"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 32
+          }
+        },
+        {
+          "id": "entry.healing_potion",
+          "grants": {
+            "item": "item.healing_potion"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 5
+          }
+        },
+        {
+          "id": "entry.smoke_bomb",
+          "grants": {
+            "item": "item.smoke_bomb"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 6
+          }
+        },
+        {
+          "id": "entry.shield_charm",
+          "grants": {
+            "item": "item.shield_charm"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 8
+          }
+        },
+        {
+          "id": "entry.firecracker",
+          "grants": {
+            "item": "item.firecracker"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 7
+          }
+        },
+        {
+          "id": "entry.spark_wand",
+          "grants": {
+            "item": "item.spark_wand"
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "shop.stars",
+      "name": "Star Stall",
+      "entries": [
+        {
+          "id": "entry.star",
+          "grants": {
+            "resource": "res.stars",
+            "amount": 1
+          },
+          "price": {
+            "resource": "res.gold",
+            "amount": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "shop.banana_stand",
+      "name": "Banana Stand",
+      "entries": [
+        {
+          "id": "entry.banana_potion",
+          "grants": {
+            "item": "item.healing_potion"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 2
+          }
+        },
+        {
+          "id": "entry.banana_charm",
+          "grants": {
+            "item": "item.shield_charm"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 3
+          }
+        },
+        {
+          "id": "entry.banana_gold",
+          "grants": {
+            "resource": "res.gold",
+            "amount": 6
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 2
+          }
+        },
+        {
+          "id": "entry.trail_mix",
+          "grants": {
+            "item": "item.trail_mix"
+          },
+          "price": {
+            "resource": "res.bananas",
+            "amount": 1
+          }
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "id": "enemy.slime",
+      "name": "Slime",
+      "icon": "🟢",
+      "tags": [
+        "tag.slime"
+      ],
+      "power": 60,
+      "maxHp": 30,
+      "regenPerRound": 0,
+      "respawnAfterRounds": 1,
+      "description": "Weak but worth training on.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 50
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ],
+      "spawns": [
+        "space.harbor.10",
+        "space.jungle.10",
+        "space.volcano.10",
+        "space.glacier.10",
+        "space.dunes.10",
+        "space.reef.10",
+        "space.ruins.10",
+        "space.sky.10"
+      ]
+    },
+    {
+      "id": "enemy.demon",
+      "name": "Demon",
+      "icon": "👹",
+      "tags": [
+        "tag.demon"
+      ],
+      "power": 500,
+      "maxHp": 300,
+      "regenPerRound": 20,
+      "respawnAfterRounds": 4,
+      "description": "Guards the center of the island. Worth two stars to whoever slays it.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 20
+        },
+        {
+          "op": "announce",
+          "text": "{actor} has slain the Demon!"
+        }
+      ],
+      "spawns": [
+        "space.volcano.12"
+      ]
+    },
+    {
+      "id": "enemy.kraken",
+      "name": "Kraken",
+      "icon": "🦑",
+      "boss": true,
+      "tags": [
+        "tag.kraken"
+      ],
+      "power": 900,
+      "maxHp": 600,
+      "regenPerRound": 30,
+      "respawnAfterRounds": null,
+      "description": "A boss from the deep. Attacks anyone who lands next to it; enraged below half HP.",
+      "rewards": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 30
+        },
+        {
+          "op": "announce",
+          "text": "{actor} has defeated the Kraken!"
+        }
+      ],
+      "spawns": [],
+      "rules": [
+        {
+          "id": "rule.kraken_grab",
+          "name": "Tentacle Grab",
+          "trigger": {
+            "event": "landed",
+            "where": {
+              "actorKind": "contestant"
+            }
+          },
+          "conditions": {
+            "op": "sameSpace",
+            "a": "$actor",
+            "b": "$holder"
+          },
+          "effects": [
+            {
+              "op": "fight",
+              "attacker": "$holder",
+              "defender": "$actor"
+            }
+          ]
+        },
+        {
+          "id": "rule.kraken_rage",
+          "name": "Kraken Rage",
+          "trigger": {
+            "event": "damaged"
+          },
+          "conditions": {
+            "op": "all",
+            "conds": [
+              {
+                "op": "same",
+                "a": "$target",
+                "b": "$holder"
+              },
+              {
+                "op": "compare",
+                "left": {
+                  "op": "res",
+                  "of": "$holder",
+                  "resource": "res.hp"
+                },
+                "cmp": "<=",
+                "right": 300
+              },
+              {
+                "op": "not",
+                "cond": {
+                  "op": "hasStatus",
+                  "entity": "$holder",
+                  "status": "status.enraged"
+                }
+              }
+            ]
+          },
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$holder",
+              "status": "status.enraged"
+            },
+            {
+              "op": "announce",
+              "text": "The Kraken is enraged! (+300 Power)"
+            }
+          ],
+          "limits": {
+            "maxPerGame": 1
+          }
+        }
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "fixture.bazaar",
+      "name": "Gear Bazaar",
+      "icon": "🏪",
+      "shop": "shop.bazaar",
+      "start": {
+        "space": "space.harbor.23"
+      }
+    },
+    {
+      "id": "fixture.forge",
+      "name": "Ember Forge",
+      "icon": "⚒️",
+      "shop": "shop.bazaar",
+      "start": {
+        "space": "space.volcano.23"
+      }
+    },
+    {
+      "id": "fixture.cloud_market",
+      "name": "Cloud Market",
+      "icon": "🎈",
+      "shop": "shop.bazaar",
+      "start": {
+        "space": "space.sky.23"
+      }
+    },
+    {
+      "id": "fixture.banana_stand",
+      "name": "Banana Stand",
+      "icon": "🍌",
+      "shop": "shop.banana_stand",
+      "start": {
+        "space": "space.reef.23"
+      }
+    },
+    {
+      "id": "fixture.ice_outpost",
+      "name": "Ice Outpost",
+      "icon": "🏕️",
+      "shop": "shop.banana_stand",
+      "start": {
+        "space": "space.glacier.23"
+      }
+    },
+    {
+      "id": "fixture.star_vendor",
+      "name": "Star Vendor",
+      "icon": "🌟",
+      "tags": [
+        "tag.star_vendor"
+      ],
+      "shop": "shop.stars",
+      "start": {
+        "randomSpaceTag": "tag.star_spot"
+      }
+    },
+    {
+      "id": "fixture.star_vendor_2",
+      "name": "Star Peddler",
+      "icon": "💫",
+      "tags": [
+        "tag.star_vendor"
+      ],
+      "shop": "shop.stars",
+      "start": {
+        "randomSpaceTag": "tag.star_spot"
+      }
+    }
+  ],
+  "decks": [
+    {
+      "id": "deck.island",
+      "name": "Island Events",
+      "description": "drawn on Mystery spaces",
+      "cards": [
+        {
+          "id": "card.treasure",
+          "name": "Buried Treasure",
+          "count": 3,
+          "effects": [
+            {
+              "op": "changeResource",
+              "target": "$actor",
+              "resource": "res.gold",
+              "amount": {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "roll",
+                    "count": 1,
+                    "sides": 6
+                  },
+                  2
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "card.blessing",
+          "name": "Tide's Blessing",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.blessed"
+            }
+          ]
+        },
+        {
+          "id": "card.witch",
+          "name": "Witch's Joke",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.fish_form"
+            },
+            {
+              "op": "announce",
+              "text": "A witch cackles. {actor} is now a fish!"
+            }
+          ]
+        },
+        {
+          "id": "card.whisper",
+          "name": "Idol's Whisper",
+          "count": 2,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.cursed"
+            }
+          ]
+        },
+        {
+          "id": "card.merchant",
+          "name": "Wandering Merchant",
+          "count": 2,
+          "effects": [
+            {
+              "op": "offerChoice",
+              "to": "$actor",
+              "prompt": "A merchant offers you a deal.",
+              "options": [
+                {
+                  "id": "charm",
+                  "label": "Buy a Shield Charm for 6 gold",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": -6
+                    },
+                    {
+                      "op": "grantItem",
+                      "target": "$actor",
+                      "item": "item.shield_charm"
+                    }
+                  ],
+                  "requires": {
+                    "op": "compare",
+                    "left": {
+                      "op": "res",
+                      "of": "$actor",
+                      "resource": "res.gold"
+                    },
+                    "cmp": ">=",
+                    "right": 6
+                  }
+                },
+                {
+                  "id": "potion",
+                  "label": "Buy a Healing Potion for 3 gold",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": -3
+                    },
+                    {
+                      "op": "grantItem",
+                      "target": "$actor",
+                      "item": "item.healing_potion"
+                    }
+                  ],
+                  "requires": {
+                    "op": "compare",
+                    "left": {
+                      "op": "res",
+                      "of": "$actor",
+                      "resource": "res.gold"
+                    },
+                    "cmp": ">=",
+                    "right": 3
+                  }
+                },
+                {
+                  "id": "decline",
+                  "label": "Decline",
+                  "effects": []
+                }
+              ],
+              "default": "decline"
+            }
+          ]
+        },
+        {
+          "id": "card.crossroads",
+          "name": "Crossroads Deal",
+          "count": 2,
+          "effects": [
+            {
+              "op": "offerChoice",
+              "to": "$actor",
+              "prompt": "A stranger offers power for blood.",
+              "options": [
+                {
+                  "id": "power",
+                  "label": "Take 20 damage for +80 Power",
+                  "effects": [
+                    {
+                      "op": "damage",
+                      "target": "$actor",
+                      "amount": 20
+                    },
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.power",
+                      "amount": 80
+                    }
+                  ]
+                },
+                {
+                  "id": "gold",
+                  "label": "Take 4 gold instead",
+                  "effects": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": 4
+                    }
+                  ]
+                }
+              ],
+              "default": "gold"
+            }
+          ]
+        },
+        {
+          "id": "card.storm",
+          "name": "Storm",
+          "count": 1,
+          "effects": [
+            {
+              "op": "forEach",
+              "of": {
+                "op": "all",
+                "kind": "contestant"
+              },
+              "do": [
+                {
+                  "op": "damage",
+                  "target": "$it",
+                  "amount": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "roll",
+                        "count": 1,
+                        "sides": 6
+                      },
+                      2
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "announce",
+              "text": "A storm lashes the whole island."
+            }
+          ]
+        },
+        {
+          "id": "card.lucky_find",
+          "name": "Lucky Find",
+          "count": 1,
+          "effects": [
+            {
+              "op": "grantItem",
+              "target": "$actor",
+              "item": "item.lucky_coin"
+            }
+          ]
+        },
+        {
+          "id": "card.snake",
+          "name": "Snake Bite",
+          "count": 1,
+          "effects": [
+            {
+              "op": "applyStatus",
+              "target": "$actor",
+              "status": "status.poisoned",
+              "stacks": 2
+            }
+          ]
+        },
+        {
+          "id": "card.kraken",
+          "name": "Kraken Rises",
+          "count": 1,
+          "effects": [
+            {
+              "op": "if",
+              "cond": {
+                "op": "exists",
+                "of": {
+                  "op": "withTag",
+                  "tag": "tag.kraken",
+                  "kind": "enemy"
+                }
+              },
+              "then": [
+                {
+                  "op": "changeResource",
+                  "target": "$actor",
+                  "resource": "res.gold",
+                  "amount": 3
+                }
+              ],
+              "else": [
+                {
+                  "op": "spawn",
+                  "enemy": "enemy.kraken",
+                  "at": {
+                    "op": "randomSpace",
+                    "tag": "tag.blue"
+                  }
+                },
+                {
+                  "op": "announce",
+                  "text": "The sea boils: the Kraken rises!"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "action.pickpocket",
+      "name": "Pickpocket",
+      "icon": "🫳",
+      "description": "Try to lift some gold from a contestant on your space.",
+      "target": {
+        "kind": "contestant",
+        "range": "here"
+      },
+      "cooldownRounds": 3,
+      "effects": [
+        {
+          "op": "randomBranch",
+          "branches": [
+            {
+              "weight": 1,
+              "do": [
+                {
+                  "op": "transfer",
+                  "from": "$target",
+                  "to": "$actor",
+                  "resource": "res.gold",
+                  "amount": {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "roll",
+                        "count": 1,
+                        "sides": 4
+                      },
+                      1
+                    ]
+                  }
+                },
+                {
+                  "op": "announce",
+                  "text": "{actor} picks {target}'s pocket!"
+                }
+              ]
+            },
+            {
+              "weight": 1,
+              "do": [
+                {
+                  "op": "damage",
+                  "target": "$actor",
+                  "amount": 10
+                },
+                {
+                  "op": "announce",
+                  "text": "{target} catches {actor} red-handed."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "action.pray",
+      "name": "Pray at the Shrine",
+      "icon": "🙏",
+      "description": "Offer gold for protection.",
+      "where": {
+        "spaceTag": "tag.shrine"
+      },
+      "cost": {
+        "resource": "res.gold",
+        "amount": 4
+      },
+      "cooldownRounds": 2,
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded",
+          "stacks": 2
+        }
+      ]
+    },
+    {
+      "id": "action.fish",
+      "name": "Go Fishing",
+      "icon": "🎣",
+      "description": "Cast a line from a blue space.",
+      "where": {
+        "spaceTag": "tag.blue"
+      },
+      "cooldownRounds": 1,
+      "effects": [
+        {
+          "op": "if",
+          "cond": {
+            "op": "hasTag",
+            "entity": "$actor",
+            "tag": "tag.fish"
+          },
+          "then": [
+            {
+              "op": "changeResource",
+              "target": "$actor",
+              "resource": "res.bananas",
+              "amount": 2
+            }
+          ],
+          "else": [
+            {
+              "op": "randomBranch",
+              "branches": [
+                {
+                  "weight": 3,
+                  "do": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.gold",
+                      "amount": 3
+                    }
+                  ]
+                },
+                {
+                  "weight": 1,
+                  "do": [
+                    {
+                      "op": "changeResource",
+                      "target": "$actor",
+                      "resource": "res.bananas",
+                      "amount": 1
+                    }
+                  ]
+                },
+                {
+                  "weight": 2,
+                  "do": [
+                    {
+                      "op": "announce",
+                      "text": "Nothing bites."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "cast": [
+    {
+      "id": "cast.brine",
+      "name": "Captain Brine",
+      "icon": "🏴‍☠️",
+      "color": "#d35400",
+      "persona": {
+        "voice": "Theatrical pirate who brags in nautical metaphors and never apologizes.",
+        "traits": {
+          "risk": 8,
+          "aggression": 7,
+          "greed": 7,
+          "loyalty": 3,
+          "vindictiveness": 8,
+          "sociability": 7
+        },
+        "behaviors": [
+          "Picks fights when the odds favor you, then brags about it.",
+          "Saves gold for big purchases rather than small ones."
+        ]
+      }
+    },
+    {
+      "id": "cast.mira",
+      "name": "Mira the Meticulous",
+      "icon": "📚",
+      "color": "#2980b9",
+      "persona": {
+        "voice": "Precise scholar who calculates everything aloud and distrusts luck.",
+        "traits": {
+          "risk": 2,
+          "aggression": 3,
+          "greed": 5,
+          "loyalty": 7,
+          "vindictiveness": 2,
+          "sociability": 4
+        },
+        "behaviors": [
+          "Only fights when the numbers say you will almost surely win.",
+          "Buys equipment before taking risks."
+        ]
+      }
+    },
+    {
+      "id": "cast.gorp",
+      "name": "Gorp the Hungry",
+      "icon": "🐸",
+      "color": "#27ae60",
+      "persona": {
+        "voice": "Cheerful swamp creature obsessed with snacks and shiny things.",
+        "traits": {
+          "risk": 6,
+          "aggression": 4,
+          "greed": 9,
+          "loyalty": 5,
+          "vindictiveness": 3,
+          "sociability": 8
+        },
+        "behaviors": [
+          "Goes wherever the most gold is.",
+          "Cannot resist a Blue space."
+        ]
+      }
+    },
+    {
+      "id": "cast.vex",
+      "name": "Lady Vex",
+      "icon": "🗡️",
+      "color": "#8e44ad",
+      "persona": {
+        "voice": "Cold, ambitious duelist who speaks in short, cutting sentences.",
+        "traits": {
+          "risk": 7,
+          "aggression": 9,
+          "greed": 4,
+          "loyalty": 2,
+          "vindictiveness": 9,
+          "sociability": 3
+        },
+        "behaviors": [
+          "Trains relentlessly to grow stronger.",
+          "Hunts the strongest enemy she can beat."
+        ]
+      }
+    },
+    {
+      "id": "cast.ember",
+      "name": "Sister Ember",
+      "icon": "🔥",
+      "color": "#c0392b",
+      "persona": {
+        "voice": "Fiery monk who speaks in proverbs about patience and flame.",
+        "traits": {
+          "risk": 5,
+          "aggression": 6,
+          "greed": 4,
+          "loyalty": 8,
+          "vindictiveness": 4,
+          "sociability": 5
+        },
+        "behaviors": [
+          "Trains at every dojo and shrine she passes.",
+          "Keeps her promises, and expects the same."
+        ]
+      }
+    },
+    {
+      "id": "cast.tock",
+      "name": "Tock the Clockwork",
+      "icon": "🤖",
+      "color": "#7f8c8d",
+      "persona": {
+        "voice": "Polite clockwork automaton that reports probabilities to two decimals.",
+        "traits": {
+          "risk": 3,
+          "aggression": 4,
+          "greed": 6,
+          "loyalty": 6,
+          "vindictiveness": 2,
+          "sociability": 3
+        },
+        "behaviors": [
+          "Takes the option with the best expected value.",
+          "Never wastes a turn."
+        ]
+      }
+    },
+    {
+      "id": "cast.marlo",
+      "name": "Old Salt Marlo",
+      "icon": "🎣",
+      "color": "#16a085",
+      "persona": {
+        "voice": "Weathered fisherman, slow to anger, full of sea stories.",
+        "traits": {
+          "risk": 2,
+          "aggression": 2,
+          "greed": 6,
+          "loyalty": 7,
+          "vindictiveness": 3,
+          "sociability": 6
+        },
+        "behaviors": [
+          "Prefers Blue spaces and quiet coves.",
+          "Trades generously with friends."
+        ]
+      }
+    },
+    {
+      "id": "cast.nyx",
+      "name": "Nyx the Shade",
+      "icon": "🦇",
+      "color": "#2c3e50",
+      "persona": {
+        "voice": "Whispering thief who never says more than she must.",
+        "traits": {
+          "risk": 8,
+          "aggression": 6,
+          "greed": 9,
+          "loyalty": 2,
+          "vindictiveness": 6,
+          "sociability": 2
+        },
+        "behaviors": [
+          "Pickpockets anyone who stands still.",
+          "Disappears when a fight turns against her."
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule.coin",
+      "name": "Coin Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.coin",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "rule.rich_coin",
+      "name": "Rich Coin Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.rich_coin",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "rule.blue_gold",
+      "name": "Blue Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.blue",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "rule.fish_blue_bananas",
+      "name": "Fishy Blue Bonus",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.blue"
+        }
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "hasTag",
+            "entity": "$actor",
+            "tag": "tag.fish"
+          },
+          {
+            "op": "not",
+            "cond": {
+              "op": "hasTag",
+              "entity": "$actor",
+              "tag": "tag.cursed"
+            }
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.bananas",
+          "amount": 2
+        }
+      ],
+      "limits": {
+        "maxPerTurn": 1
+      },
+      "provenance": {
+        "sourceText": "Whenever an uncursed contestant tagged as a fish lands on a blue space, give them two bananas."
+      }
+    },
+    {
+      "id": "rule.dojo",
+      "name": "Dojo Training",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dojo",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 40
+        }
+      ]
+    },
+    {
+      "id": "rule.shrine",
+      "name": "Ash Shrine",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.shrine",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 60
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": -15
+        }
+      ]
+    },
+    {
+      "id": "rule.hazard",
+      "name": "Hazard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.hazard",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "roll",
+            "count": 2,
+            "sides": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.old_well",
+      "name": "Old Well",
+      "description": "Finds a secret amount for your stash.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.well",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": {
+            "op": "roll",
+            "count": 1,
+            "sides": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.idol_curse",
+      "name": "Idol Curse",
+      "visibility": "hidden",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.idol",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": {
+            "op": "sub",
+            "a": 0,
+            "b": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "roll",
+                  "count": 1,
+                  "sides": 4
+                },
+                2
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.demon_ambush",
+      "name": "Demon Ambush",
+      "description": "The Demon attacks anyone who lands on its lair.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.lair",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "fight",
+          "attacker": {
+            "op": "filter",
+            "from": {
+              "op": "at",
+              "space": "$space",
+              "kind": "enemy"
+            },
+            "where": {
+              "op": "hasTag",
+              "entity": "$it",
+              "tag": "tag.demon"
+            }
+          },
+          "defender": "$actor"
+        }
+      ]
+    },
+    {
+      "id": "rule.star_vendor_moves",
+      "name": "Star Vendor Moves",
+      "description": "After selling a star, the vendor relocates to another star spot.",
+      "trigger": {
+        "event": "purchased",
+        "where": {
+          "shopEntry": "entry.star"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$target",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.star_spot",
+            "excludeSpaceOf": "$target"
+          }
+        },
+        {
+          "op": "announce",
+          "text": "The Star Vendor packs up and moves on."
+        }
+      ]
+    },
+    {
+      "id": "rule.mystery",
+      "name": "Mystery Space",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.event",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "drawCard",
+          "deck": "deck.island",
+          "for": "$actor"
+        }
+      ]
+    },
+    {
+      "id": "rule.fish_out_of_water",
+      "name": "Fish Out of Water",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.fish",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "not",
+        "cond": {
+          "op": "spaceHasTag",
+          "space": {
+            "op": "spaceOf",
+            "entity": "$it"
+          },
+          "tag": "tag.blue"
+        }
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -40
+        }
+      ]
+    },
+    {
+      "id": "rule.sanctuary",
+      "name": "Harbor Sanctuary",
+      "kind": "continuous",
+      "description": "Nobody can be attacked at Harbor Gate.",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.start"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.harbor.toll",
+      "name": "Harbor Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.trap",
+      "name": "Harbor Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              3
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.spring",
+      "name": "Harbor Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 15
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.altar",
+      "name": "Harbor Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded"
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.market",
+      "name": "Harbor Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 1
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.thieves",
+      "name": "Harbor Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -2
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.training",
+      "name": "Harbor Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 20
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.ferry",
+      "name": "Harbor Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.harbor_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.sanctuary",
+      "name": "Harbor Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.harbor_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.harbor.climate",
+      "name": "Harbor Breeze",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_harbor"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "rule.harbor.guardian",
+      "name": "Harbor Watch",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.isle_harbor",
+          "actorKind": "contestant"
+        }
+      },
+      "conditions": {
+        "op": "compare",
+        "left": {
+          "op": "res",
+          "of": "$actor",
+          "resource": "res.hp"
+        },
+        "cmp": "<",
+        "right": 30
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 10
+        }
+      ],
+      "limits": {
+        "maxPerTurn": 1
+      }
+    },
+    {
+      "id": "rule.harbor.festival",
+      "name": "Harbor Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_harbor"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.toll",
+      "name": "Jungle Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.trap",
+      "name": "Jungle Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              5
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.spring",
+      "name": "Jungle Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 20
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.altar",
+      "name": "Jungle Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.blessed"
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.market",
+      "name": "Jungle Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.thieves",
+      "name": "Jungle Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -3
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.training",
+      "name": "Jungle Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 30
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.ferry",
+      "name": "Jungle Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.jungle_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.sanctuary",
+      "name": "Jungle Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.jungle_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.jungle.climate",
+      "name": "Jungle Climate",
+      "description": "Everyone on the Jungle island feels the thick vines.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_jungle"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -20
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.guardian",
+      "name": "Jungle Guardians",
+      "description": "Slimes on the Jungle island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_jungle"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 20
+        }
+      ]
+    },
+    {
+      "id": "rule.jungle.festival",
+      "name": "Jungle Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_jungle"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.toll",
+      "name": "Volcano Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.trap",
+      "name": "Volcano Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.spring",
+      "name": "Volcano Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 10
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.altar",
+      "name": "Volcano Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.blessed"
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.market",
+      "name": "Volcano Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 1
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.thieves",
+      "name": "Volcano Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -4
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.training",
+      "name": "Volcano Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 50
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.ferry",
+      "name": "Volcano Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.volcano_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.sanctuary",
+      "name": "Volcano Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.volcano_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.volcano.climate",
+      "name": "Volcano Climate",
+      "description": "Everyone on the Volcano island feels the burning heat.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_volcano"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 30
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.guardian",
+      "name": "Volcano Guardians",
+      "description": "Slimes on the Volcano island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_volcano"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 60
+        }
+      ]
+    },
+    {
+      "id": "rule.volcano.festival",
+      "name": "Volcano Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_volcano"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.toll",
+      "name": "Glacier Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.trap",
+      "name": "Glacier Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              6
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.spring",
+      "name": "Glacier Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.altar",
+      "name": "Glacier Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded"
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.market",
+      "name": "Glacier Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 3
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.thieves",
+      "name": "Glacier Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -2
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.training",
+      "name": "Glacier Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 35
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.ferry",
+      "name": "Glacier Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.glacier_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.sanctuary",
+      "name": "Glacier Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.glacier_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.glacier.climate",
+      "name": "Glacier Climate",
+      "description": "Everyone on the Glacier island feels the slippery ice.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_glacier"
+      },
+      "modifiers": [
+        {
+          "resource": "res.move",
+          "add": -1
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.guardian",
+      "name": "Glacier Guardians",
+      "description": "Slimes on the Glacier island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_glacier"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 30
+        }
+      ]
+    },
+    {
+      "id": "rule.glacier.festival",
+      "name": "Glacier Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_glacier"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.toll",
+      "name": "Dunes Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 5
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.trap",
+      "name": "Dunes Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              4
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.spring",
+      "name": "Dunes Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 30
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.altar",
+      "name": "Dunes Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.blessed"
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.market",
+      "name": "Dunes Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.thieves",
+      "name": "Dunes Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -5
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.training",
+      "name": "Dunes Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.ferry",
+      "name": "Dunes Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.dunes_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.sanctuary",
+      "name": "Dunes Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.dunes_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.dunes.climate",
+      "name": "Dunes Climate",
+      "description": "Everyone on the Dunes island feels the hard-packed sand.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_dunes"
+      },
+      "modifiers": [
+        {
+          "resource": "res.move",
+          "add": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.guardian",
+      "name": "Dunes Guardians",
+      "description": "Slimes on the Dunes island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_dunes"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 25
+        }
+      ]
+    },
+    {
+      "id": "rule.dunes.festival",
+      "name": "Dunes Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_dunes"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.toll",
+      "name": "Reef Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.trap",
+      "name": "Reef Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              5
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.spring",
+      "name": "Reef Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 20
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.altar",
+      "name": "Reef Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded"
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.market",
+      "name": "Reef Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 2
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.thieves",
+      "name": "Reef Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -3
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.training",
+      "name": "Reef Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 30
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.ferry",
+      "name": "Reef Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.reef_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.sanctuary",
+      "name": "Reef Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.reef_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.reef.climate",
+      "name": "Reef Climate",
+      "description": "Everyone on the Reef island feels the sea spray.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_reef"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 10
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.guardian",
+      "name": "Reef Guardians",
+      "description": "Slimes on the Reef island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_reef"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 15
+        }
+      ]
+    },
+    {
+      "id": "rule.reef.festival",
+      "name": "Reef Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_reef"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.toll",
+      "name": "Ruins Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 6
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.trap",
+      "name": "Ruins Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              7
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.spring",
+      "name": "Ruins Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 15
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.altar",
+      "name": "Ruins Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.blessed"
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.market",
+      "name": "Ruins Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 3
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.thieves",
+      "name": "Ruins Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -6
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.training",
+      "name": "Ruins Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 40
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.ferry",
+      "name": "Ruins Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.ruins_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.sanctuary",
+      "name": "Ruins Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.ruins_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.ruins.climate",
+      "name": "Ruins Climate",
+      "description": "Everyone on the Ruins island feels the ancient curses.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_ruins"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": -30
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.guardian",
+      "name": "Ruins Guardians",
+      "description": "Slimes on the Ruins island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_ruins"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 40
+        }
+      ]
+    },
+    {
+      "id": "rule.ruins.festival",
+      "name": "Ruins Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_ruins"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.toll",
+      "name": "Sky Toll",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_toll",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.trap",
+      "name": "Sky Snare",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_trap",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "target": "$actor",
+          "amount": {
+            "op": "add",
+            "args": [
+              {
+                "op": "roll",
+                "count": 1,
+                "sides": 6
+              },
+              9
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.spring",
+      "name": "Sky Spring",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_spring",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.hp",
+          "amount": 35
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.altar",
+      "name": "Sky Altar",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_altar",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "applyStatus",
+          "target": "$actor",
+          "status": "status.shielded"
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.market",
+      "name": "Sky Market",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_market",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stash",
+          "amount": 4
+        },
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.thieves",
+      "name": "Sky Thieves",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_thieves",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": -4
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.training",
+      "name": "Sky Training Yard",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_training",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.power",
+          "amount": 45
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.ferry",
+      "name": "Sky Ferry",
+      "description": "The ferry carries you to another island’s dock.",
+      "trigger": {
+        "event": "landed",
+        "where": {
+          "spaceTag": "tag.sky_ferry",
+          "actorKind": "contestant"
+        }
+      },
+      "effects": [
+        {
+          "op": "teleport",
+          "target": "$actor",
+          "to": {
+            "op": "randomSpace",
+            "tag": "tag.ferry",
+            "excludeSpaceOf": "$actor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.sanctuary",
+      "name": "Sky Sanctuary",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.sky_sanctuary"
+      },
+      "suppress": [
+        "attackable"
+      ]
+    },
+    {
+      "id": "rule.sky.climate",
+      "name": "Sky Climate",
+      "description": "Everyone on the Sky island feels the tailwinds.",
+      "kind": "continuous",
+      "applies": {
+        "op": "all",
+        "kind": "contestant"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_sky"
+      },
+      "modifiers": [
+        {
+          "resource": "res.move",
+          "add": 1
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.guardian",
+      "name": "Sky Guardians",
+      "description": "Slimes on the Sky island are tougher.",
+      "kind": "continuous",
+      "applies": {
+        "op": "withTag",
+        "tag": "tag.slime",
+        "kind": "enemy"
+      },
+      "when": {
+        "op": "spaceHasTag",
+        "space": {
+          "op": "spaceOf",
+          "entity": "$it"
+        },
+        "tag": "tag.isle_sky"
+      },
+      "modifiers": [
+        {
+          "resource": "res.power",
+          "add": 50
+        }
+      ]
+    },
+    {
+      "id": "rule.sky.festival",
+      "name": "Sky Festival",
+      "trigger": {
+        "event": "turnStarted"
+      },
+      "conditions": {
+        "op": "all",
+        "conds": [
+          {
+            "op": "isKind",
+            "entity": "$actor",
+            "kind": "contestant"
+          },
+          {
+            "op": "spaceHasTag",
+            "space": {
+              "op": "spaceOf",
+              "entity": "$actor"
+            },
+            "tag": "tag.isle_sky"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.gold",
+          "amount": 3
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj.island_hopper",
+      "name": "Island Hopper",
+      "icon": "🧭",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "landed",
+          "where": {
+            "spaceTag": "tag.event"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.slime_slayer",
+      "name": "Slime Slayer",
+      "icon": "🟢",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "defeated",
+          "where": {
+            "enemy": "enemy.slime"
+          }
+        },
+        "times": 4
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.treasure_hoard",
+      "name": "Treasure Hoard",
+      "icon": "💰",
+      "goal": {
+        "kind": "reach",
+        "resource": "res.gold",
+        "atLeast": 35
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.pilgrim",
+      "name": "Pilgrim",
+      "icon": "🙏",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "actionUsed",
+          "where": {
+            "action": "action.pray"
+          }
+        },
+        "times": 2
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.angler",
+      "name": "Angler",
+      "icon": "🎣",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "actionUsed",
+          "where": {
+            "action": "action.fish"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.dojo_devotee",
+      "name": "Dojo Devotee",
+      "icon": "🥋",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "landed",
+          "where": {
+            "spaceTag": "tag.dojo"
+          }
+        },
+        "times": 3
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.big_spender",
+      "name": "Big Spender",
+      "icon": "🛍️",
+      "goal": {
+        "kind": "count",
+        "trigger": {
+          "event": "purchased"
+        },
+        "times": 4
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "obj.banana_baron",
+      "name": "Banana Baron",
+      "icon": "🍌",
+      "goal": {
+        "kind": "reach",
+        "resource": "res.bananas",
+        "atLeast": 6
+      },
+      "reward": [
+        {
+          "op": "changeResource",
+          "target": "$actor",
+          "resource": "res.stars",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}

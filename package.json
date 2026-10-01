@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run test",
-    "fuzz": "node src/cli/fuzz.ts"
+    "fuzz": "node src/cli/fuzz.ts",
+    "make:scale": "node src/cli/make-scale.ts"
   },
   "dependencies": {
     "openai": "^7.25.0",

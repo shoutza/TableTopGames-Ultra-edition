@@ -1,7 +1,8 @@
 import type { CompiledGame } from '../engine/compile.ts';
+import { sealState } from '../engine/continuous.ts';
 import { attachedRuleText, describeCapabilityLoss, describeItem, describeObjectiveGoal, describePromise, describeRule, describeStatus, namesFor, summarizeEffects, type Names } from '../engine/explain.ts';
 import { bagSpacesUsed, equippedIn, receivePlan } from '../engine/inventory.ts';
-import { effectiveTags, effectiveValue, hasCapability, reachableSpaces, suppressedCapabilities } from '../engine/queries.ts';
+import { boardDistances, effectiveTags, effectiveValue, hasCapability, reachableSpaces, suppressedCapabilities } from '../engine/queries.ts';
 import { isTradeableItem, isTradeableResource, tradePartners, termsView } from '../engine/trade.ts';
 import type { ItemDef, ObjectiveDef } from '../schema/definition.ts';
 import type { Capability } from '../schema/rules.ts';
@@ -331,23 +332,40 @@ function statChanges(scope: HintScope, equipped: Record<string, boolean>, remove
   return out;
 }
 
+/** Per game: the space tags that landing rules react to, and per space the nearest space with each. */
+const nearestTagCache = new WeakMap<CompiledGame, { tags: string[]; from: Map<string, Array<{ tag: string; steps: number }>> }>();
+
+function nearestTagged(game: CompiledGame, from: string): Array<{ tag: string; steps: number }> {
+  let cache = nearestTagCache.get(game);
+  if (!cache) {
+    const tags = new Set<string>();
+    for (const rule of game.ruleIndex.get('landed') ?? []) {
+      if (rule.def.kind === 'reaction' && rule.def.trigger.where?.spaceTag !== undefined) tags.add(rule.def.trigger.where.spaceTag);
+    }
+    cache = { tags: [...tags], from: new Map() };
+    nearestTagCache.set(game, cache);
+  }
+  const hit = cache.from.get(from);
+  if (hit) return hit;
+  const best = new Map<string, number>();
+  const wanted = new Set(cache.tags);
+  for (const [space, d] of boardDistances(game, from)) {
+    for (const tag of game.spaces.get(space)?.tags ?? []) if (wanted.has(tag) && !best.has(tag)) best.set(tag, d);
+  }
+  const out = cache.tags.flatMap((tag) => (best.has(tag) ? [{ tag, steps: best.get(tag) as number }] : []));
+  cache.from.set(from, out);
+  return out;
+}
+
 function distancesFrom(game: CompiledGame, state: GameState, from: string): Array<{ label: string; key: string; steps: number }> {
-  const dist = reachableSpaces(game, from, 1000);
+  const dist = boardDistances(game, from);
   const out: Array<{ label: string; key: string; steps: number }> = [];
   for (const e of Object.values(state.entities)) {
     if (e.spaceId === null || e.kind === 'contestant' || e.status !== 'active') continue;
     const d = dist.get(e.spaceId);
     if (d !== undefined) out.push({ label: e.name, key: e.id, steps: d });
   }
-  const tags = new Set<string>();
-  for (const rule of game.ruleIndex.get('landed') ?? []) {
-    if (rule.def.kind === 'reaction' && rule.def.trigger.where?.spaceTag !== undefined) tags.add(rule.def.trigger.where.spaceTag);
-  }
-  for (const tag of tags) {
-    let best: number | undefined;
-    for (const [space, d] of dist) if (game.spaces.get(space)?.tags.includes(tag) && (best === undefined || d < best)) best = d;
-    if (best !== undefined) out.push({ label: `nearest ${game.tags.get(tag)?.name ?? tag} space`, key: tag, steps: best });
-  }
+  for (const { tag, steps } of nearestTagged(game, from)) out.push({ label: `nearest ${game.tags.get(tag)?.name ?? tag} space`, key: tag, steps });
   return out;
 }
 
@@ -369,7 +387,7 @@ function threatMap(scope: HintScope): (space: string) => Threat[] {
   if (!settings.combat.pvp) return () => [];
   const me = state.entities[viewer];
   if (!me || !hasCapability(game, state, me, 'attackable')) return () => [];
-  const rivals: Array<{ id: string; name: string; dist: Map<string, number>; bonus: number; moves: boolean; pKnockout: number; pWin: number }> = [];
+  const rivals: Array<{ id: string; name: string; dist: ReadonlyMap<string, number>; bonus: number; moves: boolean; pKnockout: number; pWin: number }> = [];
   for (const id of state.turnOrder) {
     const e = state.entities[id];
     if (!e || id === viewer || e.status !== 'active' || e.spaceId === null || e.koTurns > 0 || !hasCapability(game, state, e, 'attacks')) continue;
@@ -551,7 +569,7 @@ function previewOption(scope: HintScope, option: DecisionOption, decision: Decis
 /** Builds the viewer's view from authoritative state; hidden values never enter it. */
 export function buildContestantView(fullGame: CompiledGame, state: GameState, viewer: string, history: GameEvent[], recentLimit = 80): ContestantView {
   const game = viewGame(fullGame);
-  const redacted = redactStateFor(fullGame, state, viewer);
+  const redacted = sealState(redactStateFor(fullGame, state, viewer));
   const names = namesFor(game, redacted);
   const scope: HintScope = { game, state: redacted, names, viewer };
   const entities: ViewEntity[] = Object.values(redacted.entities).map((e) => {

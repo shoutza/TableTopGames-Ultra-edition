@@ -1,8 +1,8 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { Layout } from '../schema/definition.ts';
-import { roadPath, THEMES, type Theme } from './boardThemes.ts';
+import { roadPath, THEMES, type Theme } from '../shared/boardThemes.ts';
 
-export { autoDecorate, layoutOf, roadPath, THEMES, type Theme } from './boardThemes.ts';
+export { autoDecorate, layoutOf, roadPath, THEMES, type Theme } from '../shared/boardThemes.ts';
 
 /**
  * Board drawing shared by the match view and the board editor: themed backgrounds, roads between

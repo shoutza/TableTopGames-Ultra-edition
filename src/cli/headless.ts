@@ -7,28 +7,29 @@ import { newMind, type ContestantMind } from '../contestants/mind.ts';
 import { namesFromView } from '../contestants/packet.ts';
 import { ARCHETYPE_INFO, castCandidates, defaultStrategy } from '../contestants/strategy.ts';
 import { advance, answerDecision, createMatch, GM, loadGame, nextStepKind, type CompiledGame } from '../engine/index.ts';
-import type { Archetype } from '../schema/persona.ts';
+import type { Archetype, Persona } from '../schema/persona.ts';
 import type { GameEvent, GameState } from '../schema/state.ts';
-import { publicInfo } from '../visibility/public-info.ts';
+import { publicInfo, type PublicGameInfo } from '../visibility/public-info.ts';
 import { visibleEventsAfter } from '../visibility/redact.ts';
-import { buildContestantView } from '../visibility/view.ts';
+import { buildContestantView, type ContestantView } from '../visibility/view.ts';
 
 /** Headless, synchronous match runner with the offline heuristic player (tests and the sim CLI). */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * Loads the starter scenario. `rounds` forces full-length games of that many rounds (no early
+ * Loads a built-in scenario (Star Chase by default). `rounds` forces full-length games of that many rounds (no early
  * victory), which exercises more of the content in long simulations.
  */
-export function loadStarter(options: { rounds?: number | undefined } = {}): CompiledGame {
-  const json = JSON.parse(readFileSync(path.join(repoRoot, 'content/starter/star-chase.json'), 'utf8')) as { settings: { victory: { roundLimit: number; threshold: number } } };
+export function loadStarter(options: { rounds?: number | undefined; scenario?: string | undefined } = {}): CompiledGame {
+  const file = `content/starter/${options.scenario ?? 'star-chase'}.json`;
+  const json = JSON.parse(readFileSync(path.join(repoRoot, file), 'utf8')) as { settings: { victory: { roundLimit: number; threshold: number } } };
   if (options.rounds !== undefined) {
     json.settings.victory.roundLimit = options.rounds;
     json.settings.victory.threshold = 99;
   }
   const loaded = loadGame(json);
-  if (!loaded.ok) throw new Error(`starter scenario invalid:\n${loaded.errors.join('\n')}`);
+  if (!loaded.ok) throw new Error(`${file} invalid:\n${loaded.errors.join('\n')}`);
   return loaded.game;
 }
 
@@ -50,7 +51,13 @@ export interface HeadlessResult {
   opMs: number[];
 }
 
-export function runHeadlessMatch(game: CompiledGame, seed: string, options: { maxOperations?: number } = {}): HeadlessResult {
+export interface HeadlessOptions {
+  maxOperations?: number;
+  /** Called at every real contestant decision with what a model-driven contestant would see. */
+  onDecision?: (input: { view: ContestantView; info: PublicGameInfo; mind: ContestantMind; persona: Persona }) => void;
+}
+
+export function runHeadlessMatch(game: CompiledGame, seed: string, options: HeadlessOptions = {}): HeadlessResult {
   const created = createMatch(game, { matchId: `sim-${seed}`, seed });
   if (!created.ok) throw new Error(`createMatch failed: ${created.message}`);
   let state = created.state;
@@ -105,6 +112,7 @@ export function runHeadlessMatch(game: CompiledGame, seed: string, options: { ma
         const mind = minds.get(decision.actor);
         if (!persona || !mind) throw new Error('persona missing');
         prepareMind(mind, view, info, visibleEventsAfter(game, events, decision.actor, mind.lastSeenEventSeq), namesFromView(info, view));
+        options.onDecision?.({ view, info, mind, persona });
         let result = decideOffline({ view, info, mind, persona });
         const t0 = performance.now();
         out = answerDecision(game, state, { decisionId: decision.id, optionId: result.optionId, say: result.say ?? undefined, trade: result.trade ?? undefined });

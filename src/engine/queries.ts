@@ -137,13 +137,22 @@ export function holdersOf(game: CompiledGame, state: GameState, owner: RuleOwner
 }
 
 /** Spaces reachable in 0..maxSteps steps, with their distance, in BFS order (stable). */
-export function reachableSpaces(game: CompiledGame, from: string, maxSteps: number): Map<string, number> {
+const distanceCache = new WeakMap<CompiledGame, Map<string, ReadonlyMap<string, number>>>();
+
+/** Fewest steps from a space to every space it can reach (cached per compiled game: the board never changes). */
+export function boardDistances(game: CompiledGame, from: string): ReadonlyMap<string, number> {
+  let perGame = distanceCache.get(game);
+  if (!perGame) {
+    perGame = new Map();
+    distanceCache.set(game, perGame);
+  }
+  const hit = perGame.get(from);
+  if (hit) return hit;
   const dist = new Map<string, number>([[from, 0]]);
   const queue = [from];
   for (let head = 0; head < queue.length; head++) {
     const cur = queue[head] as string;
     const d = dist.get(cur) as number;
-    if (d >= maxSteps) continue;
     for (const next of game.adjacency.get(cur) ?? []) {
       if (!dist.has(next)) {
         dist.set(next, d + 1);
@@ -151,7 +160,17 @@ export function reachableSpaces(game: CompiledGame, from: string, maxSteps: numb
       }
     }
   }
+  perGame.set(from, dist);
   return dist;
+}
+
+/** Spaces within `maxSteps` steps (fewest steps to each). */
+export function reachableSpaces(game: CompiledGame, from: string, maxSteps: number): ReadonlyMap<string, number> {
+  const all = boardDistances(game, from);
+  if (maxSteps >= game.spaceOrder.length) return all;
+  const out = new Map<string, number>();
+  for (const [space, d] of all) if (d <= maxSteps) out.set(space, d);
+  return out;
 }
 
 /** Shortest path from → to (inclusive), neighbors explored in connection order. */

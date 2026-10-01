@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { changeLevel, diffGames } from '../src/authoring/diff.ts';
 import { compileGame } from '../src/engine/index.ts';
 import { GameDefinitionSchema } from '../src/schema/definition.ts';
-import { autoDecorate, layoutOf, THEMES } from '../src/web/boardThemes.ts';
+import { autoDecorate, layoutOf, THEMES } from '../src/shared/boardThemes.ts';
 
 /** The board's look (theme, roads, space shapes, icons, scenery) is layout data and never affects play. */
 

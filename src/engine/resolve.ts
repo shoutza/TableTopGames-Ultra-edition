@@ -1,6 +1,7 @@
 import type { ReactionRule, TriggerWhere } from '../schema/rules.ts';
 import type { EventCause, GameEvent, GameState } from '../schema/state.ts';
 import type { CompiledGame, CompiledRule } from './compile.ts';
+import { sealState } from './continuous.ts';
 import { OpContext, type FaultRecord, type FiringRecord } from './context.ts';
 import { issueNextDecision } from './decisions.ts';
 import { applyEffects, handleDefeat } from './effects.ts';
@@ -55,7 +56,8 @@ export function runOperation(game: CompiledGame, state: GameState, body: (ctx: O
     settleObjectives(ctx);
     issueNextDecision(ctx);
     ctx.state.rev += 1;
-    return { ok: true, state: ctx.state, events: ctx.events, firings: ctx.firings, faults: ctx.faults };
+    // The result is never changed again (the next operation works on a copy), so reads may cache on it.
+    return { ok: true, state: sealState(ctx.state), events: ctx.events, firings: ctx.firings, faults: ctx.faults };
   } catch (err) {
     if (err instanceof BudgetExceeded) return { ok: false, kind: 'aborted', budget: err.budget, message: err.message, events: ctx.events };
     if (err instanceof InvalidInput) return { ok: false, kind: 'invalid', message: err.message };
