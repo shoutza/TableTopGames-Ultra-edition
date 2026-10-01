@@ -174,73 +174,85 @@
       "id": "tag.start",
       "name": "Start",
       "appliesTo": "space",
-      "color": "#95a5a6"
+      "color": "#95a5a6",
+      "icon": "🚩"
     },
     {
       "id": "tag.coin",
       "name": "Coin",
       "appliesTo": "space",
-      "color": "#f1c40f"
+      "color": "#f1c40f",
+      "icon": "🪙"
     },
     {
       "id": "tag.rich_coin",
       "name": "Rich Coin",
       "appliesTo": "space",
-      "color": "#f39c12"
+      "color": "#f39c12",
+      "icon": "💰"
     },
     {
       "id": "tag.blue",
       "name": "Blue",
       "appliesTo": "space",
-      "color": "#3498db"
+      "color": "#3498db",
+      "icon": "🌊"
     },
     {
       "id": "tag.dojo",
       "name": "Dojo",
       "appliesTo": "space",
-      "color": "#e67e22"
+      "color": "#e67e22",
+      "icon": "🥋"
     },
     {
       "id": "tag.shrine",
       "name": "Shrine",
       "appliesTo": "space",
-      "color": "#c0392b"
+      "color": "#c0392b",
+      "icon": "⛩️"
     },
     {
       "id": "tag.hazard",
       "name": "Hazard",
       "appliesTo": "space",
-      "color": "#7f8c8d"
+      "color": "#7f8c8d",
+      "icon": "⚠️"
     },
     {
       "id": "tag.den",
       "name": "Den",
       "appliesTo": "space",
-      "color": "#2ecc71"
+      "color": "#2ecc71",
+      "icon": "🕳️"
     },
     {
       "id": "tag.lair",
       "name": "Lair",
       "appliesTo": "space",
-      "color": "#8e1b1b"
+      "color": "#8e1b1b",
+      "icon": "👹"
     },
     {
       "id": "tag.shop",
       "name": "Shop",
       "appliesTo": "space",
-      "color": "#9b59b6"
+      "color": "#9b59b6",
+      "icon": "🛒"
     },
     {
       "id": "tag.well",
       "name": "Well",
       "appliesTo": "space",
-      "color": "#16a085"
+      "color": "#16a085",
+      "icon": "🪣"
     },
     {
       "id": "tag.idol",
       "name": "Idol",
       "appliesTo": "space",
-      "color": "#d4ac0d"
+      "color": "#d4ac0d",
+      "icon": "🗿"
     },
     {
       "id": "tag.star_spot",
@@ -283,7 +295,8 @@
       "id": "tag.event",
       "name": "Mystery",
       "appliesTo": "space",
-      "color": "#e84393"
+      "color": "#e84393",
+      "icon": "❓"
     },
     {
       "id": "tag.kraken",
@@ -299,7 +312,8 @@
       "tags": [
         "tag.start"
       ],
-      "description": "Where every contestant begins, and where the knocked-out return."
+      "description": "Where every contestant begins, and where the knocked-out return.",
+      "icon": "⚓"
     },
     {
       "id": "space.copper_steps",
@@ -351,7 +365,8 @@
       "name": "Coin Fountain",
       "tags": [
         "tag.coin"
-      ]
+      ],
+      "icon": "⛲"
     },
     {
       "id": "space.slime_pit",
@@ -690,7 +705,199 @@
         "x": 220,
         "y": 380
       }
-    }
+    },
+    "theme": "island",
+    "roads": "road",
+    "curved": true,
+    "spaceStyle": "circle",
+    "decor": [
+      {
+        "icon": "🐚",
+        "x": 225,
+        "y": 50,
+        "size": 23
+      },
+      {
+        "icon": "🌴",
+        "x": 294,
+        "y": 67,
+        "size": 27
+      },
+      {
+        "icon": "🏝️",
+        "x": 768,
+        "y": 30,
+        "size": 42
+      },
+      {
+        "icon": "🐙",
+        "x": 923,
+        "y": 49,
+        "size": 29
+      },
+      {
+        "icon": "🐙",
+        "x": 63,
+        "y": 160,
+        "size": 40
+      },
+      {
+        "icon": "🐠",
+        "x": 115,
+        "y": 117,
+        "size": 40
+      },
+      {
+        "icon": "⛵",
+        "x": 557,
+        "y": 165,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 951,
+        "y": 137,
+        "size": 35
+      },
+      {
+        "icon": "🐬",
+        "x": 400,
+        "y": 241,
+        "size": 41
+      },
+      {
+        "icon": "🌊",
+        "x": 649,
+        "y": 198,
+        "size": 34
+      },
+      {
+        "icon": "🏝️",
+        "x": 746,
+        "y": 229,
+        "size": 36
+      },
+      {
+        "icon": "🐚",
+        "x": 158,
+        "y": 326,
+        "size": 22
+      },
+      {
+        "icon": "🌴",
+        "x": 410,
+        "y": 311,
+        "size": 22
+      },
+      {
+        "icon": "🪨",
+        "x": 485,
+        "y": 291,
+        "size": 34
+      },
+      {
+        "icon": "🌺",
+        "x": 752,
+        "y": 312,
+        "size": 30
+      },
+      {
+        "icon": "🌺",
+        "x": 14,
+        "y": 432,
+        "size": 27
+      },
+      {
+        "icon": "🌴",
+        "x": 315,
+        "y": 431,
+        "size": 25
+      },
+      {
+        "icon": "🦀",
+        "x": 570,
+        "y": 416,
+        "size": 38
+      },
+      {
+        "icon": "🌴",
+        "x": 846,
+        "y": 414,
+        "size": 24
+      },
+      {
+        "icon": "🌊",
+        "x": 244,
+        "y": 499,
+        "size": 33
+      },
+      {
+        "icon": "🌊",
+        "x": 317,
+        "y": 507,
+        "size": 37
+      },
+      {
+        "icon": "⛵",
+        "x": 435,
+        "y": 465,
+        "size": 32
+      },
+      {
+        "icon": "🐬",
+        "x": 505,
+        "y": 504,
+        "size": 30
+      },
+      {
+        "icon": "🏝️",
+        "x": 566,
+        "y": 519,
+        "size": 40
+      },
+      {
+        "icon": "🌴",
+        "x": 655,
+        "y": 465,
+        "size": 25
+      },
+      {
+        "icon": "🦀",
+        "x": 970,
+        "y": 488,
+        "size": 25
+      },
+      {
+        "icon": "🏝️",
+        "x": 59,
+        "y": 589,
+        "size": 34
+      },
+      {
+        "icon": "🐠",
+        "x": 667,
+        "y": 566,
+        "size": 34
+      },
+      {
+        "icon": "🐠",
+        "x": 954,
+        "y": 557,
+        "size": 30
+      },
+      {
+        "icon": "🌊",
+        "x": 22,
+        "y": 695,
+        "size": 35
+      },
+      {
+        "icon": "🌊",
+        "x": 123,
+        "y": 654,
+        "size": 38
+      }
+    ]
   },
   "items": [
     {

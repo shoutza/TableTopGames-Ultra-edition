@@ -36,6 +36,8 @@ export const TagDefSchema = z.strictObject({
   name: Name,
   appliesTo: z.enum(['entity', 'space']),
   color: z.string().max(20).optional(),
+  /** Shown on spaces with this tag (an emoji). */
+  icon: Icon,
   description: z.string().max(300).optional(),
 });
 export type TagDef = z.infer<typeof TagDefSchema>;
@@ -43,6 +45,8 @@ export type TagDef = z.infer<typeof TagDefSchema>;
 export const SpaceDefSchema = z.strictObject({
   id: Id,
   name: Name,
+  /** Overrides the icon of its tags on the board. */
+  icon: z.string().max(8).optional(),
   tags: z.array(Id).max(8).default([]),
   description: z.string().max(300).optional(),
 });
@@ -55,10 +59,20 @@ export const ConnectionDefSchema = z.strictObject({
 });
 export type ConnectionDef = z.infer<typeof ConnectionDefSchema>;
 
+export const BOARD_THEMES = ['plain', 'island', 'forest', 'desert', 'snow', 'space', 'dungeon', 'candy'] as const;
+
+/** Where spaces are drawn, and how the board looks (all cosmetic: never read by the rules). */
 export const LayoutSchema = z.strictObject({
   width: z.number().int().min(100).max(10_000),
   height: z.number().int().min(100).max(10_000),
   positions: z.record(z.string(), z.strictObject({ x: z.number(), y: z.number() })),
+  theme: z.enum(BOARD_THEMES).default('plain'),
+  /** Connections drawn as simple lines, roads, or dotted trails; straight or gently curved. */
+  roads: z.enum(['line', 'road', 'trail']).default('line'),
+  curved: z.boolean().default(false),
+  spaceStyle: z.enum(['circle', 'tile', 'hex']).default('circle'),
+  /** Scenery placed on the board (emoji): trees, rocks, waves, castles … */
+  decor: z.array(z.strictObject({ icon: z.string().min(1).max(8), x: z.number(), y: z.number(), size: z.number().int().min(8).max(240).default(30) })).max(400).default([]),
 });
 export type Layout = z.infer<typeof LayoutSchema>;
 

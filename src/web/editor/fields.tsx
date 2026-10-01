@@ -46,6 +46,32 @@ export function TextInput({ value, onChange, placeholder, multiline, max, wide }
   return <input className={wide ? 'ed-wide' : undefined} disabled={readOnly} value={value ?? ''} maxLength={max} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }
 
+/** Emoji chosen from a palette, or typed. */
+export function IconPicker({ value, onChange, icons }: { value: string | undefined; onChange: (v: string | undefined) => void; icons: readonly string[] }) {
+  const env = useEnv();
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="icon-picker">
+      <button className="icon-big" disabled={env.readOnly} onClick={() => setOpen(!open)} title="Choose an icon">
+        {value || '＋'}
+      </button>
+      <TextInput value={value} max={8} onChange={(v) => onChange(v || undefined)} placeholder="emoji" />
+      {open && (
+        <span className="icon-grid">
+          {icons.map((i) => (
+            <button key={i} className="icon-cell" onClick={() => (onChange(i), setOpen(false))}>
+              {i}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Icons for places on a board (space and tag icons). */
+export const PLACE_ICONS = ['🏠', '🏰', '🏯', '⛪', '🏪', '🏥', '🏛️', '⛺', '🎪', '🗼', '🌋', '⛰️', '🏔️', '🌊', '🏝️', '🌲', '🌵', '🕳️', '🚪', '⚓', '💎', '💰', '🪙', '🎁', '❓', '⭐', '🔥', '❄️', '⚡', '💀', '⚔️', '🛡️', '🍀', '💤', '🛒', '🗿', '🌀', '🎲', '🐉', '👑'];
+
 /** Integer input; while typing, partial input is kept locally until it parses. */
 export function IntInput({ value, onChange, min, max, optional, placeholder }: { value: number | undefined | null; onChange: (v: number | undefined) => void; min?: number | undefined; max?: number | undefined; optional?: boolean; placeholder?: string }) {
   const { readOnly } = useEnv();

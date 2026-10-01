@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { TRAIT_NAMES } from '../../schema/persona.ts';
 import { ID_PREFIX, newCastMember, newEntry, uniqueId } from '../../shared/templates.ts';
 import { allIds, clone, countRefs, renameId, type Json } from './model.ts';
-import { Checkbox, EnumSelect, IntInput, issuesUnder, IssueBadges, JsonBox, ListButtons, moveItem, RefMulti, RefSelect, Row, TextInput, useEnv } from './fields.tsx';
+import { Checkbox, EnumSelect, IconPicker, IntInput, issuesUnder, IssueBadges, JsonBox, ListButtons, moveItem, PLACE_ICONS, RefMulti, RefSelect, Row, TextInput, useEnv } from './fields.tsx';
 import { EffectList, NodeEditor } from './NodeEditor.tsx';
 import { RuleEditor } from './RuleEditor.tsx';
 import { CAPABILITY_LIST, TRIGGER_LABELS, TRIGGER_WHERE, TRIGGERS } from './spec.ts';
@@ -328,6 +328,11 @@ function TagForm({ entry, set }: FormProps) {
           <TextInput value={entry['color'] as string | undefined} max={20} onChange={(v) => set('color', v || undefined)} />
         </span>
       </Row>
+      {entry['appliesTo'] === 'space' && (
+        <Row label="Icon" help="Drawn on every space with this tag (a space's own icon wins).">
+          <IconPicker icons={PLACE_ICONS} value={entry['icon'] as string | undefined} onChange={(v) => set('icon', v)} />
+        </Row>
+      )}
       <Description entry={entry} set={set} />
     </div>
   );

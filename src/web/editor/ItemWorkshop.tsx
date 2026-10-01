@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { uniqueId } from '../../shared/templates.ts';
 import { allIds, type Json } from './model.ts';
-import { Checkbox, EnumSelect, IntInput, RefMulti, Row, TextInput, useEnv } from './fields.tsx';
+import { Checkbox, EnumSelect, IconPicker, IntInput, RefMulti, Row, TextInput, useEnv } from './fields.tsx';
 import { EffectList, NodeEditor } from './NodeEditor.tsx';
 import { AttachedRules, Description, ListSection, StatModifiers, type EntryTemplate, type FormProps, type SectionProps } from './Sections.tsx';
 
@@ -96,28 +96,6 @@ export const ITEM_TEMPLATES: EntryTemplate[] = [
   },
 ];
 
-function IconPicker({ value, onChange }: { value: string | undefined; onChange: (v: string | undefined) => void }) {
-  const env = useEnv();
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="icon-picker">
-      <button className="icon-big" disabled={env.readOnly} onClick={() => setOpen(!open)} title="Choose an icon">
-        {value || '＋'}
-      </button>
-      <TextInput value={value} max={8} onChange={(v) => onChange(v || undefined)} placeholder="emoji" />
-      {open && (
-        <span className="icon-grid">
-          {ICONS.map((i) => (
-            <button key={i} className="icon-cell" onClick={() => (onChange(i), setOpen(false))}>
-              {i}
-            </button>
-          ))}
-        </span>
-      )}
-    </span>
-  );
-}
-
 type TargetChoice = 'none' | 'contestant:here' | 'contestant:anywhere' | 'enemy:here' | 'enemy:anywhere';
 
 /** What an AI contestant reads for this item (inventory line and option line), approximated from the definition. */
@@ -168,7 +146,7 @@ export function ItemWorkshopForm(p: FormProps & { edit: (next: Json) => void }) 
           <div className="ed-block-title">Look and worth</div>
           <div className="ed-grid">
             <Row label="Icon" plain>
-              <IconPicker value={entry['icon'] as string | undefined} onChange={(v) => set('icon', v)} />
+              <IconPicker icons={ICONS} value={entry['icon'] as string | undefined} onChange={(v) => set('icon', v)} />
             </Row>
             <Description entry={entry} set={set} />
             <Row label="Worth (gold)" help="Guides AI contestants when buying, trading and discarding.">

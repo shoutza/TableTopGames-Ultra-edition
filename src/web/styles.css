@@ -204,31 +204,43 @@ pre {
   height: 100%;
   display: block;
 }
-.connections line {
-  stroke: var(--board-line);
-  stroke-width: 4;
-  stroke-linecap: round;
-}
 .space {
   cursor: pointer;
 }
-.space circle {
-  stroke: var(--panel);
-  stroke-width: 3;
+.space-body {
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 2.5;
 }
-.space.selected circle {
+.space:hover .space-body {
   stroke: var(--accent);
-  stroke-width: 4;
 }
+.space.selected .space-body {
+  stroke: var(--accent);
+  stroke-width: 4.5;
+}
+.space-name,
 .space-label {
-  font-size: 11px;
-  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke-width: 3px;
+  stroke-linejoin: round;
   pointer-events: none;
+}
+.decor-item {
+  user-select: none;
+}
+.decor-item.editable {
+  cursor: move;
+}
+.decor-item.selected {
+  filter: drop-shadow(0 0 3px var(--accent)) drop-shadow(0 0 2px var(--accent));
 }
 .token {
   cursor: pointer;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.35, 1);
 }
-.token circle {
+.token-body {
   stroke-width: 2.5;
 }
 .token-icon {
@@ -239,19 +251,46 @@ pre {
   font-size: 10px;
   pointer-events: none;
 }
-.token.active circle {
+.token.active .token-body {
   stroke: var(--accent);
   stroke-width: 4;
 }
-.token.selected circle {
+.token.selected .token-body {
   stroke: #f1c40f;
   stroke-width: 4;
 }
-.token.thinking circle {
+.token.thinking .token-body {
   animation: pulse 1s ease-in-out infinite;
 }
 .token.defeated {
   opacity: 0.3;
+}
+.active-ring {
+  fill: none;
+  stroke: #ffd54a;
+  stroke-width: 3;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ring 1.6s ease-out infinite;
+}
+@keyframes ring {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .token {
+    transition: none;
+  }
+  .active-ring {
+    animation: none;
+  }
 }
 .hp-bg {
   fill: var(--line);
@@ -954,6 +993,7 @@ textarea {
   gap: 10px;
 }
 .board-canvas {
+  align-self: start;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -971,38 +1011,51 @@ textarea {
   fill: transparent;
 }
 .ed-conn .hit {
+  fill: none;
   stroke: transparent;
   stroke-width: 14;
   cursor: pointer;
 }
-.ed-conn .vis {
-  stroke: var(--board-line);
-  stroke-width: 3;
-  pointer-events: none;
-}
-.ed-conn.selected .vis {
+.ed-conn .sel {
+  fill: none;
   stroke: var(--accent);
-  stroke-width: 5;
+  stroke-width: 6;
+  stroke-opacity: 0.8;
+  pointer-events: none;
 }
 .ed-space {
   cursor: pointer;
 }
-.ed-space circle {
-  stroke: var(--text);
-  stroke-width: 1.5;
+.ed-space .space-body {
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 2;
 }
-.ed-space.selected circle {
+.ed-space.selected .space-body {
   stroke: var(--accent);
-  stroke-width: 4;
+  stroke-width: 4.5;
 }
-.ed-space.from circle {
+.ed-space.from .space-body {
   stroke: var(--warn);
   stroke-width: 4;
   stroke-dasharray: 4 3;
 }
 .start-mark {
-  font-size: 16px;
+  font-size: 15px;
   pointer-events: none;
+}
+.decor-palette {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+.decor-palette button {
+  font-size: 18px;
+  padding: 1px 4px;
+}
+.decor-palette button.active {
+  border-color: var(--accent);
+  background: var(--bg);
 }
 .board-side .card {
   margin: 0 0 10px;
@@ -1311,4 +1364,8 @@ ul.changelog {
 .pt-sep {
   margin: 0 3px;
   color: var(--line);
+}
+.decor-custom {
+  width: 52px;
+  font-size: 16px;
 }
